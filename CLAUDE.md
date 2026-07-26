@@ -5,6 +5,35 @@ committed under a new taproot leaf version. The design case and the four
 design obligations live in `docs/bitcoin-script-successor-evaluation.md`
 (section 7). The phased plan lives in `docs/execution-plan.md`.
 
+## Quality mandate (overrides everything else)
+
+Clean, simple, professional code is the point of this project. Speed of
+development and iteration is explicitly NOT a priority. It is better for
+this project to take a long time and be right than to move quickly with
+sloppy code.
+
+In practice this means:
+
+- Never leave placeholder implementations, commented-out code, or "fix
+  later" TODOs in committed code. If something is not ready, do not
+  commit it.
+- Prefer the simple, obvious design over the clever one. Consensus code
+  is read far more often than it is written, and it is read by skeptics.
+- Small, complete, well-tested units of work. A half-finished feature
+  across many files is worse than one finished piece.
+- When a shortcut would save time at the cost of clarity, correctness
+  margin, or test coverage, do not take it. Raise the tradeoff with Evan
+  instead.
+- Comments must be self-documenting. Never reference a documentation
+  file (spec/VM.md, spec/COSTS.md, a README) in a code comment, whether
+  as a citation or a pointer: the reader must not need to open another
+  file to understand the code. State the fact inline, preferably by
+  naming the code constant or function that embodies it. Describe a
+  divergence from the oracle in place and mark it as "a recorded
+  divergence" without naming the log file. Spec citations belong in
+  commit messages and PR descriptions, not in code.
+- Treat every commit as if a Bitcoin Core reviewer will read it cold.
+
 ## Ground rules
 
 1. **Spec before code.** No consensus-relevant behavior lands in

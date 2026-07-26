@@ -12,6 +12,7 @@
 3. **Divergence is documented, never silent.** Anywhere BitLisp differs from CLVM, the divergence table says so and why.
 4. **The novel layer gets adversarial treatment first.** The matching rules (injective output matching, mixed-tx rule, message scoping) are the only part with no external reference — they get property-based invariants and theft-bug regression vectors before feature work.
 5. **Nothing in Phases 0–2 depends on the hardened-implementation language.** That decision is the Phase 3 gate.
+6. **Skeleton fixed, flesh just-in-time.** Binding from day 0: the ground rules, the phase ordering and dependencies, the done-criteria, and the decision gates with their pre-registered evidence. Everything else — task lists inside phases, session specs, far-phase detail — is indicative only, and is re-planned at the recurring checkpoint when the preceding done-criterion clears. Task specs for Claude Code are written the day they're executed, against the current state of the repo. Changing the skeleton requires an explicit, recorded decision; changing the flesh requires nothing.
 
 ---
 
