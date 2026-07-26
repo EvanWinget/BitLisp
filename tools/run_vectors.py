@@ -10,14 +10,14 @@ Envelope format (v0), one JSON object per file:
     {
         "schema": "bitlisp-vector-v0",
         "suite": "vm" | "conditions" | "matching",
-        "spec": "<spec file and section the cases pin, e.g. VM.md#4-D1>",
+        "spec": "<citation of the spec section the cases pin>",
         "cases": [ ... ]
     }
 
-Case shapes are suite-specific and documented in vectors/README.md as
-each suite's runner lands. Failure policy is loud by design: a vector
-file for a suite with no runner yet is an error, never a skip. Silent
-skips are how corpora rot.
+Case shapes are suite-specific, each runner below documents its own.
+Failure policy is loud by design: a vector file for a suite with no
+runner yet is an error, never a skip. Silent skips are how corpora
+rot.
 
 Exit status: 0 when every case in every suite passes, 1 otherwise.
 """
@@ -73,10 +73,57 @@ def discover(root=VECTOR_ROOT):
         yield path
 
 
-# Suite runners land with their implementations: vm in Phase 1,
-# conditions and matching in Phase 2. Each takes (envelope, path) and
-# raises VectorError on the first failing case.
-RUNNERS = {}
+def run_vm_case(case):
+    """One vm case: run serialized (program, env) under a budget.
+
+    Case shape:
+        {
+            "name": "<unique within the file>",
+            "program": "<hex>",
+            "env": "<hex>",
+            "max_cost": <int, optional, default 11_000_000_000>,
+            "expect": {"result": "<hex>", "cost": <int>}
+                      or {"error": "<bitlisp error code>"}
+        }
+    """
+    sys.path.insert(0, str(REPO_ROOT / "python"))
+    from bitlisp import BitLispError, run_serialized
+    from bitlisp.errors import CODES
+
+    program = bytes.fromhex(case["program"])
+    env = bytes.fromhex(case["env"])
+    max_cost = case.get("max_cost", 11_000_000_000)
+    expect = case["expect"]
+    try:
+        cost, result = run_serialized(program, env, max_cost)
+        outcome = {"result": result.hex(), "cost": cost}
+    except BitLispError as exc:
+        outcome = {"error": exc.code}
+    if "error" in expect and expect["error"] not in CODES:
+        raise VectorError(f"unknown expected error code {expect['error']!r}")
+    if outcome != expect:
+        raise VectorError(f"expected {expect}, got {outcome}")
+
+
+def run_vm(envelope, path):
+    names = set()
+    for index, case in enumerate(envelope["cases"]):
+        name = case.get("name", f"case {index}")
+        if name in names:
+            raise VectorError(f"{path}: duplicate case name {name!r}")
+        names.add(name)
+        try:
+            run_vm_case(case)
+        except VectorError as exc:
+            raise VectorError(f"{path}: {name}: {exc}") from None
+        except (KeyError, ValueError) as exc:
+            raise VectorError(f"{path}: {name}: malformed case: {exc!r}") from None
+
+
+# Suite runners land with their implementations: conditions and
+# matching in Phase 2. Each takes (envelope, path) and raises
+# VectorError on the first failing case.
+RUNNERS = {"vm": run_vm}
 
 
 def run_file(path):

@@ -86,10 +86,14 @@ a spec decision rather than picking a plausible reading.
 python3 -m venv .venv && .venv/bin/pip install -e ".[dev,oracles]"
 .venv/bin/pytest python/tests            # unit + invariant suites
 .venv/bin/python tools/run_vectors.py    # full vector corpus
+.venv/bin/python tools/diff_clvm.py --count 10000 --seed 1   # diff harness
 ci/lint/lint.sh                          # codespell, ruff, whitespace, prose
 ```
 
-The diff harness (`tools/diff_clvm.py`) arrives in Phase 1.
+The diff harness generates a randomized corpus and compares bitlisp
+against both oracle wheels. Any unexplained divergence fails the run.
+Use fresh seeds when extending an operator family, and add every
+behavior the harness pins down as a vector the same day.
 
 ## Prose style
 

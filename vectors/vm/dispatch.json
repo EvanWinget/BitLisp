@@ -1,0 +1,253 @@
+{
+ "schema": "bitlisp-vector-v0",
+ "suite": "vm",
+ "spec": "VM.md section 3.2 (application sequence, divergences D3 and D4)",
+ "cases": [
+  {
+   "name": "quote_nil",
+   "program": "ff0180",
+   "env": "80",
+   "expect": {
+    "result": "80",
+    "cost": 20
+   }
+  },
+  {
+   "name": "quote_atom",
+   "program": "ff0101",
+   "env": "80",
+   "expect": {
+    "result": "01",
+    "cost": 20
+   }
+  },
+  {
+   "name": "quote_returns_whole_tail_list",
+   "program": "ff01ff01ff0280",
+   "env": "80",
+   "expect": {
+    "result": "ff01ff0280",
+    "cost": 20
+   }
+  },
+  {
+   "name": "quote_pair_no_arity_check",
+   "program": "ff01ff0102",
+   "env": "80",
+   "expect": {
+    "result": "ff0102",
+    "cost": 20
+   }
+  },
+  {
+   "name": "pair_in_operator_position",
+   "program": "ffff0101ffff018080",
+   "env": "80",
+   "expect": {
+    "error": "operator_not_atom"
+   }
+  },
+  {
+   "name": "unknown_operator_0x2f",
+   "program": "ff2fffff010180",
+   "env": "80",
+   "expect": {
+    "error": "unknown_operator"
+   }
+  },
+  {
+   "name": "unknown_operator_0x64",
+   "program": "ff64ffff010180",
+   "env": "80",
+   "expect": {
+    "error": "unknown_operator"
+   }
+  },
+  {
+   "name": "unknown_operator_single_zero_byte",
+   "program": "ff00ffff010180",
+   "env": "80",
+   "expect": {
+    "error": "unknown_operator"
+   }
+  },
+  {
+   "name": "unknown_operator_leading_zero_opcode",
+   "program": "ff820010ffff0101ffff010280",
+   "env": "80",
+   "expect": {
+    "error": "unknown_operator"
+   }
+  },
+  {
+   "name": "reserved_operator_nil_op",
+   "program": "ff80ffff018080",
+   "env": "80",
+   "expect": {
+    "error": "reserved_operator"
+   }
+  },
+  {
+   "name": "reserved_raised_after_args_cost_20",
+   "program": "ff80ffff010180",
+   "env": "80",
+   "max_cost": 20,
+   "expect": {
+    "error": "cost_exceeded"
+   }
+  },
+  {
+   "name": "reserved_raised_after_args_cost_21",
+   "program": "ff80ffff010180",
+   "env": "80",
+   "max_cost": 21,
+   "expect": {
+    "error": "reserved_operator"
+   }
+  },
+  {
+   "name": "bad_arg_list_improper_tail",
+   "program": "ff10ffff010102",
+   "env": "80",
+   "expect": {
+    "error": "bad_arg_list"
+   }
+  },
+  {
+   "name": "bad_arg_list_immediate",
+   "program": "ff1003",
+   "env": "80",
+   "expect": {
+    "error": "bad_arg_list"
+   }
+  },
+  {
+   "name": "bad_arg_list_uncharged_budget_1",
+   "program": "ff11ffff010103",
+   "env": "80",
+   "max_cost": 1,
+   "expect": {
+    "error": "bad_arg_list"
+   }
+  },
+  {
+   "name": "apply_quoted_path",
+   "program": "ff02ffff0101ffff010580",
+   "env": "80",
+   "expect": {
+    "result": "05",
+    "cost": 175
+   }
+  },
+  {
+   "name": "apply_arity_1",
+   "program": "ff02ffff010180",
+   "env": "80",
+   "expect": {
+    "error": "wrong_arg_count"
+   }
+  },
+  {
+   "name": "apply_arity_3",
+   "program": "ff02ffff0101ffff0180ffff018080",
+   "env": "80",
+   "expect": {
+    "error": "wrong_arg_count"
+   }
+  },
+  {
+   "name": "apply_arity_checked_after_args_60",
+   "program": "ff02ffff0101ffff0102ffff010380",
+   "env": "80",
+   "max_cost": 60,
+   "expect": {
+    "error": "cost_exceeded"
+   }
+  },
+  {
+   "name": "apply_arity_checked_after_args_61",
+   "program": "ff02ffff0101ffff0102ffff010380",
+   "env": "80",
+   "max_cost": 61,
+   "expect": {
+    "error": "wrong_arg_count"
+   }
+  },
+  {
+   "name": "raise_no_args",
+   "program": "ff0880",
+   "env": "80",
+   "expect": {
+    "error": "user_raise"
+   }
+  },
+  {
+   "name": "raise_with_args",
+   "program": "ff08ffff0101ffff010280",
+   "env": "80",
+   "expect": {
+    "error": "user_raise"
+   }
+  },
+  {
+   "name": "raise_evaluates_args_first_rightmost_error",
+   "program": "ff08ffff0880ffff13ffff0101ffff01808080",
+   "env": "80",
+   "expect": {
+    "error": "div_by_zero"
+   }
+  },
+  {
+   "name": "dispatch_charged_at_entry_463",
+   "program": "ff02ffff0101ffff10ffff0102ffff01ff01028080",
+   "env": "80",
+   "max_cost": 463,
+   "expect": {
+    "error": "cost_exceeded"
+   }
+  },
+  {
+   "name": "dispatch_charged_at_entry_464",
+   "program": "ff02ffff0101ffff10ffff0102ffff01ff01028080",
+   "env": "80",
+   "max_cost": 464,
+   "expect": {
+    "error": "arg_not_atom"
+   }
+  },
+  {
+   "name": "apply_90_charged_after_args_484",
+   "program": "ff02ffff10ffff0102ffff01ff010280ffff010180",
+   "env": "80",
+   "max_cost": 484,
+   "expect": {
+    "error": "arg_not_atom"
+   }
+  },
+  {
+   "name": "args_evaluate_right_to_left",
+   "program": "ff10ffff0880ffff13ffff0101ffff01808080",
+   "env": "80",
+   "expect": {
+    "error": "div_by_zero"
+   }
+  },
+  {
+   "name": "args_evaluate_right_to_left_swapped",
+   "program": "ff10ffff13ffff0101ffff018080ffff088080",
+   "env": "80",
+   "expect": {
+    "error": "user_raise"
+   }
+  },
+  {
+   "name": "nested_dispatch_accumulates",
+   "program": "ff10ffff10ffff0101ffff010280ffff010380",
+   "env": "80",
+   "expect": {
+    "result": "06",
+    "cost": 1572
+   }
+  }
+ ]
+}

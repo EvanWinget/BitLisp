@@ -1,12 +1,8 @@
 """Property-based invariant suite.
 
-Phase 0: this file establishes the hypothesis gate before there is
-anything to test (ground rule from docs/execution-plan.md: the gate
-exists before the tests do). The matching-layer invariants listed in
-spec/MATCHING.md land here in Phase 2.
-
-The properties below exercise the vector envelope validator, the one
-piece of real behavior that exists so far.
+The matching-layer invariants land here in Phase 2. Until then the
+properties below cover the vector envelope validator and pin the
+serializer and integer codec against the oracle.
 """
 
 import sys

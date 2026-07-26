@@ -1,0 +1,158 @@
+{
+ "schema": "bitlisp-vector-v0",
+ "suite": "vm",
+ "spec": "VM.md section 3.1 (path lookup)",
+ "cases": [
+  {
+   "name": "path_1_whole_env",
+   "program": "01",
+   "env": "ffff0a14ff1e28",
+   "expect": {
+    "result": "ffff0a14ff1e28",
+    "cost": 44
+   }
+  },
+  {
+   "name": "path_2_left",
+   "program": "02",
+   "env": "ffff0a14ff1e28",
+   "expect": {
+    "result": "ff0a14",
+    "cost": 48
+   }
+  },
+  {
+   "name": "path_3_right",
+   "program": "03",
+   "env": "ffff0a14ff1e28",
+   "expect": {
+    "result": "ff1e28",
+    "cost": 48
+   }
+  },
+  {
+   "name": "path_4_left_left",
+   "program": "04",
+   "env": "ffff0a14ff1e28",
+   "expect": {
+    "result": "0a",
+    "cost": 52
+   }
+  },
+  {
+   "name": "path_5_right_left",
+   "program": "05",
+   "env": "ffff0a14ff1e28",
+   "expect": {
+    "result": "1e",
+    "cost": 52
+   }
+  },
+  {
+   "name": "path_6_left_right",
+   "program": "06",
+   "env": "ffff0a14ff1e28",
+   "expect": {
+    "result": "14",
+    "cost": 52
+   }
+  },
+  {
+   "name": "path_7_right_right",
+   "program": "07",
+   "env": "ffff0a14ff1e28",
+   "expect": {
+    "result": "28",
+    "cost": 52
+   }
+  },
+  {
+   "name": "path_nil_is_zero",
+   "program": "80",
+   "env": "ffff0a14ff1e28",
+   "expect": {
+    "result": "80",
+    "cost": 44
+   }
+  },
+  {
+   "name": "path_zero_byte_costs_extra",
+   "program": "00",
+   "env": "ffff0a14ff1e28",
+   "expect": {
+    "result": "80",
+    "cost": 48
+   }
+  },
+  {
+   "name": "path_leading_zero_byte_value_1",
+   "program": "820001",
+   "env": "ffff0a14ff1e28",
+   "expect": {
+    "result": "ffff0a14ff1e28",
+    "cost": 48
+   }
+  },
+  {
+   "name": "path_three_zero_bytes",
+   "program": "8400000001",
+   "env": "ffff0a14ff1e28",
+   "expect": {
+    "result": "ffff0a14ff1e28",
+    "cost": 56
+   }
+  },
+  {
+   "name": "path_into_atom_deep",
+   "program": "8180",
+   "env": "ffff0a14ff1e28",
+   "expect": {
+    "error": "path_into_atom"
+   }
+  },
+  {
+   "name": "path_into_atom_env_atom",
+   "program": "04",
+   "env": "84c0ffee42",
+   "expect": {
+    "error": "path_into_atom"
+   }
+  },
+  {
+   "name": "path_1_on_nil_env",
+   "program": "01",
+   "env": "",
+   "expect": {
+    "error": "bad_encoding"
+   }
+  },
+  {
+   "name": "walk_precedes_charge_path_error_at_budget_1",
+   "program": "04",
+   "env": "84c0ffee42",
+   "max_cost": 1,
+   "expect": {
+    "error": "path_into_atom"
+   }
+  },
+  {
+   "name": "successful_path_charge_checked_47",
+   "program": "02",
+   "env": "ffff0a14ff1e28",
+   "max_cost": 47,
+   "expect": {
+    "error": "cost_exceeded"
+   }
+  },
+  {
+   "name": "successful_path_charge_checked_48",
+   "program": "02",
+   "env": "ffff0a14ff1e28",
+   "max_cost": 48,
+   "expect": {
+    "result": "ff0a14",
+    "cost": 48
+   }
+  }
+ ]
+}
