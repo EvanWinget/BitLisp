@@ -10,9 +10,11 @@ harness. The weight mapping is filled with Phase 3 measurements.
 - Cost accrues as evaluation proceeds and is checked against the
   budget at every charge. The budget is inclusive (see VM.md 3.3).
 - **Dispatch cost.** Every operator application except quote charges
-  1 in addition to the operator's own cost. This includes apply. The
-  constant is implicit in both CLVM implementations and was pinned
-  empirically, nested applications charge it once per application.
+  1 in addition to the operator's own cost. This includes apply and
+  the reserved empty-atom operator. The constant is implicit in both
+  CLVM implementations and was pinned empirically. It is charged at
+  operator identification, before any argument evaluates. Apply's 90
+  is charged later, after both of its arguments have evaluated.
 - **Malloc cost.** Operators that return freshly built atoms charge
   `MALLOC_COST_PER_BYTE = 10` per byte of each result atom. Operators
   that return shared constants (TRUE, nil) or existing nodes charge no
@@ -20,6 +22,42 @@ harness. The weight mapping is filled with Phase 3 measurements.
   the two atoms.
 - Per-byte argument costs count the argument atom's actual byte
   length, including redundant integer encoding bytes.
+- **Charge order is consensus-visible.** Near the budget boundary,
+  which of `cost_exceeded` and an operator error fires depends on the
+  order of charges, checks, and argument validation. The order,
+  matching the consensus oracle and pinned by vectors:
+  - `+`: the base cost accrues without a budget check. Then per
+    argument, in list order: the argument's atom check, then one
+    checked charge of everything accrued so far plus that argument's
+    `ARITH_COST_PER_ARG` and per-byte cost. With no arguments the
+    base cost is checked at the end. Malloc last. A pair in the first
+    argument is therefore reported even when the base cost alone
+    would burst the budget.
+  - `-`: same constants, different loop. One checked charge of base
+    plus `ARITH_COST_PER_ARG` before the first argument's atom check,
+    then per subsequent argument one checked charge of
+    `ARITH_COST_PER_ARG` plus the *previous* argument's per-byte
+    cost before that argument's atom check, then a final charge of
+    the last argument's per-byte cost, then malloc. Totals equal
+    `+` exactly, the interleaving does not. The consensus oracle
+    implements the two loops differently and the difference is
+    observable, so it is specified.
+  - `*`: the first argument's atom check happens before any charge.
+    Then per subsequent argument, in order: that argument's atom
+    check, then one checked charge of the step cost (the base cost
+    rides along with the first step's charge). With zero or one
+    argument the base cost is charged after the checks. Malloc last.
+    A pair in the second argument is therefore reported before the
+    base cost is checked, a pair in the third only after the first
+    step's charge fits the budget.
+  - `/`, `divmod`, `>`: arity check, then both atom checks, then one
+    checked charge of base plus per-byte cost, then the zero-divisor
+    check where applicable, then malloc. Division by zero is reported
+    only if the base charge fits the budget.
+  - The operand size limits (VM.md section 4) precede every charge.
+    For `*` they ride with each argument's atom check. For `/` and
+    `divmod` they run after both atom checks and before the base
+    charge.
 - Evaluation cost does not include deserialization. A per-byte cost on
   the serialized program belongs to the weight mapping (section 4).
 
@@ -40,7 +78,7 @@ harness. The weight mapping is filled with Phase 3 measurements.
 | Operator | Formula |
 | --- | --- |
 | `+`, `-` | `99 + 320 * n_args + 3 * total_arg_bytes + malloc(result)` |
-| `*` | `92 + sum over steps + malloc(result)`, one step per argument after the first: `885 + 6 * (len(acc) + len(arg)) + (len(acc) * len(arg)) / 128` (integer division), where `len(acc)` is the minimal byte length of the accumulated product and `len(arg)` the argument atom's actual length |
+| `*` | `92 + sum over steps + malloc(result)`, one step per argument after the first: `885 + 6 * (len(acc) + len(arg)) + (len(acc) * len(arg)) / 128` (integer division). `len(arg)` is the argument atom's actual length. For the first step `len(acc)` is the first argument atom's actual length, afterwards it is the accumulated product's *magnitude* byte length (`ceil(bit_length / 8)`), one less than the minimal signed encoding when the top magnitude bit is set: an accumulator of 128 counts 1 byte. Pinned by vectors. |
 | `/` | `988 + 4 * total_arg_bytes + malloc(quotient)` |
 | `divmod` | `1116 + 6 * total_arg_bytes + malloc(quotient) + malloc(remainder)` |
 | `>` | `498 + 2 * total_arg_bytes`, no malloc |

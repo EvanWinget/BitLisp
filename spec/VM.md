@@ -78,29 +78,46 @@ big-endian integer (leading zero bytes are allowed and costed).
   arrived at is the result. Path 1 is the whole environment.
 - Stepping into an atom raises `path_into_atom`.
 - Cost: `40 + 4 * max(1, bit_length(path)) + 4 * leading_zero_bytes`.
+- The walk precedes the charge: `path_into_atom` is reported
+  regardless of the remaining budget, and a successful lookup's cost
+  is charged and checked after the walk completes.
 
 ### 3.2 Pair program: operator application
 
-For a program `(op . args)`:
+For a program `(op . args)`, in this exact sequence:
 
-- If `op` is a pair, raise `operator_not_atom` (divergence D4).
-- If `op` is the atom `0x01` (**quote**), the result is `args`, exactly
-  as given, unevaluated. There is no arity constraint: `(q . X)`
-  returns X whether X is an atom, pair, or nil. Cost: 20.
-- Otherwise `op` must appear in the operator table (section 4) as a
-  one-byte atom. Opcode matching is exact on the atom bytes: a
-  redundantly encoded integer such as `0x0010` is not opcode `0x10`.
-  The empty atom raises `reserved_operator`. Any other atom not in the
-  table raises `unknown_operator` (divergence D3).
-- `args` must be a proper list. Each element is evaluated
-  left-to-right, in the same environment.
-- If `op` is `0x02` (**apply**): exactly 2 arguments. Charge 90 plus
-  the dispatch cost 1, then evaluate the first result as a program
-  with the second result as its environment. The result and any error
-  of that evaluation are the result of the apply.
-- Otherwise: apply the operator to the evaluated arguments, charging
-  the operator's cost from [COSTS.md](COSTS.md) plus the dispatch
-  cost 1.
+1. If `op` is a pair, raise `operator_not_atom`, uncharged
+   (divergence D4).
+2. If `op` is the atom `0x01` (**quote**), charge 20 and return
+   `args`, exactly as given, unevaluated. There is no arity
+   constraint: `(q . X)` returns X whether X is an atom, pair, or
+   nil.
+3. `args` must be a proper list, else `bad_arg_list`, raised before
+   any charge for this application.
+4. Identify the operator. Opcode matching is exact on the atom bytes:
+   a redundantly encoded integer such as `0x0010` is not opcode
+   `0x10`. An atom that is neither in the operator table (section 4)
+   nor the empty atom raises `unknown_operator`, uncharged
+   (divergence D3). Otherwise (a table operator, apply, or the empty
+   atom) charge the dispatch cost 1 now, before any argument is
+   evaluated.
+5. Evaluate each argument in the same environment, **right to left**
+   (the CLVM stack-machine order). The order is consensus-visible:
+   when more than one argument fails, the error of the rightmost
+   failing argument is the one raised, and cost accrues in evaluation
+   order against the budget.
+6. Apply. All application-time errors come after every argument has
+   evaluated, so argument errors always win:
+   - The empty atom raises `reserved_operator` here, not at
+     identification: its dispatch cost is charged and its arguments
+     evaluate first.
+   - `0x02` (**apply**) checks its arity (exactly 2) here, then
+     charges 90, then evaluates the first result as a program with
+     the second result as its environment. That evaluation's result
+     or error is the apply's.
+   - A table operator checks arity, validates arguments, and charges
+     per [COSTS.md](COSTS.md), in the per-operator interleaving
+     specified there.
 
 ### 3.3 Cost budget
 
@@ -132,6 +149,31 @@ All arithmetic operators require atom arguments and raise
 `wrong_arg_count`. Results are minimally encoded integers (section 1),
 except `>` which returns TRUE or nil.
 
+**Operand size limits**, matching the consensus oracle and raising
+`arg_too_long`:
+
+| Operator | Limit |
+| --- | --- |
+| `*` | each argument atom at most 256 bytes |
+| `/`, `divmod` | numerator at most 256 bytes, divisor at most 1024 bytes |
+| `+`, `-`, `>` | no limit |
+
+The limit applies to the argument atom's length as given, redundant
+encoding bytes included: a 257-byte atom encoding the value 2 is
+rejected. It does not apply to intermediate values: a multiplication
+accumulator may exceed 256 bytes and keep multiplying. Ordering,
+consensus-visible and pinned by vectors:
+
+- `*` checks each argument's atomness and size together, argument by
+  argument, in the conversion order of COSTS.md: an oversized first
+  argument is reported before a pair in the second.
+- `/` and `divmod` check both arguments' atomness first, then both
+  sizes: a pair in either argument is reported before an oversized
+  operand.
+- Size checks precede the operator's charges and the zero-divisor
+  check: dividing an oversized numerator by zero reports
+  `arg_too_long`.
+
 Floor division examples, pinned by vectors: `7 / 2 = 3`,
 `-7 / 2 = -4`, `divmod(-7, 2) = (-4 . 1)`.
 
@@ -152,6 +194,7 @@ informative, not normative.
 | `bad_arg_list` | Operator arguments are not a proper list | (varies) | (varies) |
 | `wrong_arg_count` | Operator arity violated | InvalidOperatorArg | (per-op message) |
 | `arg_not_atom` | Integer operator got a pair | InvalidOperatorArg | (per-op message) |
+| `arg_too_long` | Operand exceeds a section 4 size limit | InvalidOperatorArg | (absent, the `clvm` package has no operand limits) |
 | `div_by_zero` | Division or divmod by zero | Division by zero | div/divmod with 0 |
 | `user_raise` | The `x` operator | clvm raise | clvm raise |
 | `cost_exceeded` | Cost budget exceeded | cost exceeded or below zero | cost exceeded |
@@ -179,7 +222,7 @@ adopt/take/decline triage in `docs/execution-plan.md`.
 
 | Oracle | Version | Pinned | Upstream commit | Notes |
 | --- | --- | --- | --- | --- |
-| `clvm` (PyPI) | 0.9.15 | 2026-07-26 | TODO on first triage | Python oracle, carries some non-consensus library policy (see D6) |
+| `clvm` (PyPI) | 0.9.15 | 2026-07-26 | TODO on first triage | Python oracle. Carries non-consensus library policy (see D6), lacks the consensus operand size limits (section 4), and checks the cost budget only after an operator completes. The diff harness tolerates all three, each tagged in its output. |
 | `chia-rs` (PyPI) | 0.46.0 | 2026-07-26 | TODO on first triage | Consensus oracle, run with flags 0 |
 
 Divergent operators are tested against their own oracles. `secp_verify`
