@@ -1,0 +1,15 @@
+# Reference clones for human browsing only (tools/fetch-references.sh).
+# Never a build or test input. See CLAUDE.md.
+references/
+
+# Python
+__pycache__/
+*.egg-info/
+dist/
+.venv/
+.hypothesis/
+.ruff_cache/
+.pytest_cache/
+
+# macOS
+.DS_Store
