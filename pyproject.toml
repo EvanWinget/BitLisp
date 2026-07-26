@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bitlisp"
+version = "0.0.1"
+description = "Executable specification for a CLVM-derived Bitcoin predicate VM and matching layer"
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.11"
+
+# Runtime dependencies stay empty on purpose. The reference
+# implementation is the spec artifact and must be self-contained.
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest==9.1.1",
+    "hypothesis==6.161.5",
+]
+# Oracles are released artifacts only, never vendored source. Pin bumps
+# are governance events, see CLAUDE.md and spec/VM.md provenance.
+oracles = [
+    "clvm==0.9.15",
+    "chia-rs==0.46.0",
+]
+
+[tool.setuptools]
+package-dir = {"" = "python"}
+packages = ["bitlisp"]
+
+[tool.pytest.ini_options]
+testpaths = ["python/tests"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]

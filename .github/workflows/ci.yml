@@ -1,0 +1,53 @@
+# CI for every pull request and for pushes to main.
+#
+# Actions are pinned to commit hashes, not tags, following Bitcoin
+# Core practice. Update the hash and the trailing version comment
+# together. CI never fetches reference material from the network:
+# oracles are the pinned wheels, upstream vectors are vendored data.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+      - name: Install pinned lint tools
+        run: |
+          python3 -m venv "${RUNNER_TEMP}/lint-venv"
+          "${RUNNER_TEMP}/lint-venv/bin/pip" install --quiet -r ci/lint/requirements.txt
+      - name: Run lints
+        run: PATH="${RUNNER_TEMP}/lint-venv/bin:${PATH}" ci/lint/lint.sh
+
+  test:
+    name: Tests and vector corpus
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+      - name: Install package with dev and oracle pins
+        run: |
+          python3 -m venv "${RUNNER_TEMP}/venv"
+          "${RUNNER_TEMP}/venv/bin/pip" install --quiet -e ".[dev,oracles]"
+      - name: Unit and invariant suites
+        run: "${RUNNER_TEMP}/venv/bin/pytest" python/tests
+      - name: Vector corpus
+        run: "${RUNNER_TEMP}/venv/bin/python" tools/run_vectors.py
