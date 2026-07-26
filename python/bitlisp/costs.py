@@ -1,0 +1,28 @@
+"""Cost constants, inherited from the CLVM cost table.
+
+OP_DISPATCH_COST is implicit in both CLVM implementations and was
+pinned empirically: every operator application except quote charges
+it on top of the operator's own cost.
+"""
+
+QUOTE_COST = 20
+APPLY_COST = 90
+OP_DISPATCH_COST = 1
+PATH_LOOKUP_BASE_COST = 40
+PATH_LOOKUP_COST_PER_LEG = 4
+PATH_LOOKUP_COST_PER_ZERO_BYTE = 4
+MALLOC_COST_PER_BYTE = 10
+
+ARITH_BASE_COST = 99
+ARITH_COST_PER_ARG = 320
+ARITH_COST_PER_BYTE = 3
+MUL_BASE_COST = 92
+MUL_COST_PER_OP = 885
+MUL_LINEAR_COST_PER_BYTE = 6
+MUL_SQUARE_COST_PER_BYTE_DIVIDER = 128
+DIV_BASE_COST = 988
+DIV_COST_PER_BYTE = 4
+DIVMOD_BASE_COST = 1116
+DIVMOD_COST_PER_BYTE = 6
+GR_BASE_COST = 498
+GR_COST_PER_BYTE = 2
