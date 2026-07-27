@@ -290,7 +290,15 @@ class Generator:
             value = r.choice((-1, size + 1, 2**31, r.randint(-(2**40), 2**40)))
         atom = int_to_atom(value)
         if value >= 0 and r.random() < 0.15:
-            atom = b"\x00" * r.randint(1, 3) + atom
+            # Padding within the four-byte cap keeps an in-range value
+            # valid. A small share pads past the cap on purpose: the
+            # zero-padded spelling of an oversized index is a distinct
+            # bad_index shape the wild values above never produce.
+            room = 4 - len(atom)
+            if room > 0 and r.random() >= 0.2:
+                atom = b"\x00" * r.randint(1, room) + atom
+            else:
+                atom = b"\x00" * (max(room, 0) + r.randint(1, 3)) + atom
         return atom
 
     def substr_program(self):
