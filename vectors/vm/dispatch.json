@@ -388,6 +388,22 @@
    "expect": {
     "error": "operator_not_atom"
    }
+  },
+  {
+   "name": "pair_operator_lone_atom_list",
+   "program": "ffff108080",
+   "env": "80",
+   "expect": {
+    "error": "operator_not_atom"
+   }
+  },
+  {
+   "name": "pair_operator_lone_atom_list_with_args",
+   "program": "ffff1080ffff010780",
+   "env": "80",
+   "expect": {
+    "error": "operator_not_atom"
+   }
   }
  ]
 }

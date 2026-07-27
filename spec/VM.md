@@ -64,6 +64,18 @@ The deserializer rejects, with error `bad_encoding`:
 The serializer emits the canonical form. Serialize and deserialize are
 exact inverses on the accepted domain.
 
+The length forms cap an atom at 2^34 - 1 bytes, so a longer atom has
+no wire encoding. The serializer reports `bad_encoding` for such an
+atom, the one case where that error arises outside deserialization.
+Input atoms are never oversized, deserialization bounds them by
+construction. Evaluation can only build an oversized atom as a
+freshly allocated operator result, and every freshly built result
+atom charges `MALLOC_COST_PER_BYTE = 10` per byte, so reaching this
+rejection requires a budget of at least 10 * 2^34, about 1.7 * 10^11
+cost units. The Phase 3 weight mapping is expected to grant budgets
+far below that threshold, making the rejection unreachable in
+consensus (section 8, question 4).
+
 ## 3. Evaluation
 
 `run(program, env, max_cost)` returns `(cost, value)` or an error from
@@ -150,6 +162,19 @@ reports that error, every other program reports `cost_exceeded`. Both
 CLVM oracles instead treat a zero `max_cost` as unlimited (divergence
 D7).
 
+**The charge-before-completion invariant.** Every program charges at
+least once before it completes: a path lookup charges after its walk,
+a quote charges 20, and every other application either fails or
+charges the dispatch cost 1 before its operator runs. Apply's
+deferred budget check (section 3.2) and the zero-budget rule above
+both rest on this invariant, and every future operator and special
+form must preserve it. As a backstop, `run` checks the accrued cost
+against the budget once more when evaluation completes. The backstop
+cannot fire while the invariant holds, so no vector can pin it. If a
+future change broke the invariant, the backstop would turn an
+over-budget success, a soundness failure, into `cost_exceeded`,
+failing closed.
+
 ## 4. Operator table
 
 Implemented so far: the core specials, the tree ops family, and the
@@ -232,7 +257,7 @@ informative, not normative.
 
 | Code | Raised when | chia_rs message | clvm message |
 | --- | --- | --- | --- |
-| `bad_encoding` | Deserialization fails (section 2) | bad encoding | (varies) |
+| `bad_encoding` | Deserialization fails, or a result atom has no wire encoding (section 2) | bad encoding | (varies) |
 | `path_into_atom` | Path lookup steps into an atom | path into atom | path into atom |
 | `operator_not_atom` | Pair in operator position | (accepted, D4) | in ((X)...) syntax X must be lone atom |
 | `reserved_operator` | Empty atom in operator position | Reserved operator | reserved operator |
@@ -257,9 +282,9 @@ pin it. No divergence exists outside this table. "Both oracles" means
 | D1 | BLS operators | `point_add`, `pubkey_for_exp`, BLS extension ops present | absent, `unknown_operator` | Bitcoin has no BLS. Removing them removes their entire attack and cost surface. | `vm/dispatch.json` |
 | D2 | secp256k1 | `secp256k1_verify` post-hardfork op | `secp_verify`, BIP340 Schnorr (crypto family session) | Native curve, native signature scheme. | TODO Phase 1 crypto session |
 | D3 | Unknown operators | Both oracles accept unknown opcodes, cost derived from the opcode bytes, result nil | `unknown_operator` error | The operator set is closed by design. Bitcoin soft-forks at the tapleaf-version level, not through unknown-opcode acceptance. PROVISIONAL, see section 8. | `vm/dispatch.json` |
-| D4 | Pair in operator position | `clvm` rejects. `chia-rs` accepts via a legacy apply-style rule (observed: `((A . B) . rest)` dispatches on `A` with arity errors reported for `A`'s operator) | `operator_not_atom` error | The oracles disagree with each other. Strict rejection is the smaller, reviewable surface. PROVISIONAL, see section 8. | `vm/dispatch.json` |
+| D4 | Pair in operator position | Both oracles accept `((X) . args)` when `X` is a lone atom, a legacy apply-style rule: `X` dispatches on the arguments unevaluated, charging apply's 90. They disagree on a non-nil tail in the operator pair: `chia-rs` ignores the tail and dispatches on the head, `clvm` rejects it | `operator_not_atom` error for every pair in operator position | The legacy rule is a remnant the oracles themselves disagree on at the edges. Strict rejection of the whole family is the smaller, reviewable surface. PROVISIONAL, see section 8. | `vm/dispatch.json` |
 | D5 | Deserialization strictness | Both oracles accept non-minimal length encodings, trailing bytes, and (chia-rs) `0xfe` back-references | `bad_encoding` for all three (section 2) | Witness bytes must have exactly one accepted spelling per program. Malleability of the serialized form is a consensus hazard in the Bitcoin context. | `vm/serialize.json` |
-| D6 | `/` with negative operands | Consensus (`chia-rs`): floor division. The `clvm` package injects a policy error ("deprecated") that is not consensus | Floor division, matching consensus | Intersection parity targets the consensus oracle. The Python package's rejection is library policy, the diff harness treats it as an expected divergence. OPEN QUESTION, see section 8. | `vm/arith.json` |
+| D6 | `/` with negative operands | Consensus (`chia-rs`): floor division. The `clvm` package injects a policy error ("deprecated") that is not consensus | Floor division, matching consensus | Intersection parity targets the consensus oracle. The Python package's rejection is library policy, the diff harness treats it as an expected divergence. Ratified, see section 8. | `vm/arith.json` |
 | D7 | Zero cost budget | Both oracles treat `max_cost = 0` as unlimited | A zero budget is a real budget, no program succeeds under it (section 3.3) | A zero sentinel meaning unlimited is a library convenience, not consensus behavior. In the Bitcoin context the budget derives from transaction weight and is never legitimately zero, and an accidental zero must fail closed rather than open. Ratified, see section 8. | `vm/dispatch.json` |
 
 ## 7. Oracle provenance
@@ -284,15 +309,76 @@ these is a spec amendment plus vector update in one reviewed commit.
 
 1. **D3 (unknown operators).** Strict rejection implemented. Confirm
    that BitLisp's upgrade path is new tapleaf versions and that
-   unknown-opcode acceptance stays out permanently.
-2. **D4 (pair operator).** Strict rejection implemented, which matches
-   the Python oracle and rejects chia_rs's legacy rule. Confirm.
-3. **D6 (negative division).** Consensus floor semantics implemented.
-   Chia deprecated negative `/` operands at the policy layer because
-   floor division on negatives surprises programmers. Options: keep
-   floor semantics, reject negative operands in consensus, or drop
-   `/` entirely and keep only `divmod`. Needs a decision before the
-   operator set freezes.
+   unknown-opcode acceptance stays out permanently. The alternative,
+   an in-language extension mechanism in the style of CLVM's
+   `softfork` operator, was analyzed (discussion with Evan,
+   2026-07-26) and is recorded here so ratification weighs it
+   explicitly.
+
+   - CLVM's unknown-opcode acceptance is not an upgrade path for
+     value-returning operators. An unknown operator evaluates its
+     arguments, charges a cost decoded from the opcode bytes, and
+     returns nil into the continuing program. Assigning it real
+     semantics later would change what deployed programs compute,
+     not merely what is valid, which is not a soft fork. Chia's
+     documentation states this directly, and Chia shipped its new
+     operators first inside the `softfork` guard, then promoted
+     them to first-class value-returning operators with a hard
+     fork.
+   - CLVM's `softfork` guard is sound and is assert-only by
+     construction: the declared cost must equal the guarded
+     program's actual cost, and the guarded result is always nil,
+     so no value crosses the boundary. New operators arrive as
+     verifiers, never as producers. Value-producing behavior can be
+     simulated by commit-and-verify: the spender supplies the
+     claimed result as witness data, the guard recomputes it and
+     raises on mismatch, and the outer program uses the supplied
+     value. Old nodes use it unverified, new nodes enforce it,
+     which is the stricter-only direction a soft fork requires.
+     This covers most verify-shaped features at a cost in witness
+     bytes and program shape.
+   - The guard is declined for v0 on four grounds. It is largely
+     redundant with the tapleaf-version boundary, the total
+     surrender point Bitcoin already provides in the style of
+     OP_SUCCESS, where old nodes validate nothing and new semantics
+     may therefore be arbitrary, value-producing included, by soft
+     fork. Its machinery (an extension registry, a guard stack,
+     exact cost equality, state rollback so no value escapes) is
+     permanent consensus surface that must be perfect from v0,
+     against a consensus core designed to stay small enough to
+     review whole. It only benefits scripts that anticipated it,
+     since deployed programs that predate it are equally frozen
+     under either scheme. And the choice is reversible in exactly
+     one direction: a guard can be added in a later leaf version
+     once the cost model has matured, while a guard shipped in v0
+     can never be removed.
+   - Extensibility for deployed coins is planned at the condition
+     layer instead (Phase 2): conditions are inert data in a
+     program's output, so a fork can change what an unknown
+     condition means to validators without changing what any
+     program computes. The reserved-condition rule is the
+     condition-layer analog of this question and gets its own
+     decision in MATCHING.md.
+2. **D4 (pair operator).** Strict rejection implemented. Probing both
+   wheels (2026-07-26) corrected the record: the legacy apply-style
+   rule for `((X) . args)` is in both oracles, not only chia_rs, so
+   strict rejection diverges from both, and the oracles disagree
+   only on a non-nil tail in the operator pair. Confirm that BitLisp
+   rejects the whole family even though the lone-atom shape is
+   common to both oracles.
+3. **D6 (negative division).** Floor semantics RATIFIED (decision by
+   Evan, 2026-07-26): `/` keeps consensus floor division on negative
+   operands, and the alternatives (rejecting negative operands in
+   consensus, or dropping `/` for `divmod` alone) are declined. The
+   upstream deprecation traces to an admitted implementation bug,
+   not a design position: the original Python operator carried a
+   branch its own comment called "a buggy behavior from the initial
+   implementation" (a quotient of exactly -1 with a nonzero
+   remainder was rounded toward zero), consensus settled on clean
+   floor division, and the Python library then deprecated negative
+   operands in February 2023 rather than model the settled outcome.
+   BitLisp matches the consensus binary, which the diff harness
+   verifies on every run.
 4. **D7 (zero budget).** Fail-closed RATIFIED (decision by Evan,
    2026-07-26): a zero `max_cost` rejects every program where the
    oracles treat it as unlimited. A budget bug must reject every
@@ -300,4 +386,10 @@ these is a spec amendment plus vector update in one reviewed commit.
    unlimited execution, a soundness failure. Still open: whether the
    reference should also enforce the unsigned 64-bit budget bound the
    hardened implementation will have (section 3.3 currently records
-   the bound without enforcing it).
+   the bound without enforcing it). The bound interacts with
+   serialization: a budget below 10 * 2^34 makes a result atom too
+   long for the wire format unbuildable (section 2), and the u64
+   bound alone does not. The Phase 3 weight mapping should record its
+   maximum grantable budget against that threshold so the
+   serializer's rejection of unrepresentable results is provably
+   dead in consensus.

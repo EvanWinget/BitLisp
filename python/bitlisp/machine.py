@@ -99,6 +99,14 @@ def run(program, env, max_cost):
             # when the budget is already burst.
             accrue(costs.APPLY_COST)
             tasks.append((_EVAL, new_program, new_env))
+    # Backstop for the charge-before-completion invariant: every
+    # program calls charge at least once (a path lookup, a quote, or
+    # the dispatch cost), so any cost accrued by apply is checked
+    # before evaluation completes and this cannot fire. If a future
+    # operator or special form broke the invariant, an over-budget
+    # success would fail closed here instead.
+    if cost > max_cost:
+        raise BitLispError("cost_exceeded", "cost exceeded")
     return cost, values[0]
 
 

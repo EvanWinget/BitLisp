@@ -20,8 +20,10 @@ list and f or r on an atom, and its integer conversion running before
 the arity check where consensus checks arity first. The two budget-timing tolerances
 are verified per case, not assumed: the tolerating branch re-runs an
 implementation without the tight budget and requires it to reproduce
-the other side's outcome exactly, so neither can absorb an unrelated
-divergence.
+the other side's outcome, exactly except for the recorded
+improper-list message ambiguity, so neither can absorb an unrelated
+divergence. The tolerances compose: a program can hit the apply-cost
+timing and the improper-list ambiguity at once.
 
 The generator never emits three of the recorded BitLisp divergences:
 unknown operators, pairs in operator position, and non-canonical
@@ -32,8 +34,12 @@ zero budget as unlimited): those runs assert bitlisp's fail-closed
 outcome and skip the oracles. It also emits wrong arities, improper
 argument tails, and the reserved empty-atom operator, and a share of
 runs use a budget within a few units of the program's measured cost,
-where the charge interleaving decides the error class. Anything else
-is a finding and fails the run.
+where the charge interleaving decides the error class. Path programs
+include multi-byte values and zero-byte padding, atom sizes cross
+the 0x2000-byte floor of the 0xe0 length form, raise carries
+arguments, and environment depth varies so that long paths can
+resolve as well as fail. Anything else is a finding and fails the
+run.
 
 Usage:
     python3 tools/diff_clvm.py --count 10000 --seed 1
@@ -83,8 +89,8 @@ RS_ERRORS = {
 }
 # The Python oracle also reports an improper argument list as
 # first/rest of non-cons, indistinguishable from f or r on an atom.
-# The generator only emits proper argument lists, so the mapping to
-# arg_not_pair is unambiguous here.
+# The generator emits improper tails, so every comparison against a
+# Python-side arg_not_pair must go through py_outcome_matches below.
 PY_ERRORS = {
     "path into atom": "path_into_atom",
     "div with 0": "div_by_zero",
@@ -106,6 +112,19 @@ def classify(message, table):
         if fragment in message:
             return code
     return f"UNMAPPED({message})"
+
+
+def py_outcome_matches(expected, py_outcome):
+    """Whether a Python-oracle outcome matches a bitlisp-side one.
+
+    Exact match, except that the Python oracle reports an improper
+    argument list with the same message as f or r on an atom, so its
+    arg_not_pair is accepted where the bitlisp side says
+    bad_arg_list.
+    """
+    if py_outcome == expected:
+        return True
+    return expected == ("err", "bad_arg_list") and py_outcome == ("err", "arg_not_pair")
 
 
 def run_bitlisp(program, env, max_cost):
@@ -190,11 +209,16 @@ class Generator:
             value = r.randint(-(2**31), 2**31)
         elif choice < 0.8:
             value = r.randint(-(2**200), 2**200)
-        elif choice < 0.85:
+        elif choice < 0.845:
             # Large atoms cross serialization length-prefix forms and
             # exercise superlinear multiplication costs. A generator
             # capped at small atoms missed a length-encoding bug once.
             value = r.randint(-(2 ** (8 * 400)), 2 ** (8 * 400))
+        elif choice < 0.85:
+            # Past the 0x2000-byte floor of the 0xe0 length form, so
+            # that form appears in evaluated atoms and results, not
+            # only in serializer vectors.
+            value = r.randint(-(2 ** (8 * 8500)), 2 ** (8 * 8500))
         else:
             value = 0
         atom = int_to_atom(value)
@@ -209,13 +233,33 @@ class Generator:
             return self.atom_int()
         return (self.value_tree(depth - 1), self.value_tree(depth - 1))
 
+    def path_atom(self):
+        # Paths are read as unsigned big-endian, so the atom is built
+        # without a sign byte. Signed encoding would turn a value like
+        # 128 into 0x0080, which is instead generated deliberately as
+        # zero-byte padding below.
+        r = self.rng
+        roll = r.random()
+        if roll < 0.6:
+            value = r.randint(0, 15)
+        elif roll < 0.85:
+            value = r.randint(16, 255)
+        else:
+            value = r.randint(256, 1 << 17)
+        atom = value.to_bytes((value.bit_length() + 7) // 8, "big")
+        if r.random() < 0.2:
+            # Leading zero bytes are legal path padding, costed at
+            # PATH_LOOKUP_COST_PER_ZERO_BYTE each.
+            atom = b"\x00" * r.randint(1, 3) + atom
+        return atom
+
     def program(self, depth):
         r = self.rng
         roll = r.random()
         if depth <= 0 or roll < 0.25:
             return (b"\x01", self.value_tree(1))  # quoted value
         if roll < 0.35:
-            return int_to_atom(r.randint(0, 15))  # environment path
+            return self.path_atom()  # environment path
         if roll < 0.42:
             return (
                 b"\x02",
@@ -225,7 +269,13 @@ class Generator:
                 ),
             )  # (a (q . prog) (q . env))
         if roll < 0.44:
-            return (b"\x08", b"")  # (x)
+            # (x ...) with 0 to 2 arguments, which evaluate before the
+            # raise: a failing argument's error must win over
+            # user_raise in every implementation.
+            args = b""
+            for _ in range(r.randint(0, 2)):
+                args = (self.program(depth - 1), args)
+            return (b"\x08", args)
         opcode = r.choice(self.OPCODES)
         arity = self.ARITIES[opcode]
         if arity is None:
@@ -269,7 +319,9 @@ def main():
 
     for i in range(args.count):
         program_node = gen.program(args.max_depth)
-        env_node = gen.value_tree(3)
+        # Varied depth so multi-byte paths sometimes resolve to a
+        # value instead of always walking into an atom.
+        env_node = gen.value_tree(rng.randint(2, 6))
         program = serialize(program_node)
         env = serialize(env_node)
         roll = rng.random()
@@ -337,8 +389,8 @@ def main():
             # keeps evaluating, so bitlisp's outcome is unconstrained.
             py_agrees = True
             stats["policy_div"] += 1
-        elif bl == ("err", "cost_exceeded") and py == run_bitlisp(
-            program, env, MAX_COST
+        elif bl == ("err", "cost_exceeded") and py_outcome_matches(
+            run_bitlisp(program, env, MAX_COST), py
         ):
             # The Python oracle checks the budget only after an
             # operator completes, so where consensus bursts
@@ -352,7 +404,9 @@ def main():
             # unconstrained.
             py_agrees = True
             stats["py_no_operand_limit"] += 1
-        elif py == ("err", "cost_exceeded") and run_py(program, env, MAX_COST) == bl:
+        elif py == ("err", "cost_exceeded") and py_outcome_matches(
+            bl, run_py(program, env, MAX_COST)
+        ):
             # The Python oracle checks apply's cost immediately where
             # consensus defers the check to the applied program's
             # first charge, so it can burst its budget where
