@@ -284,7 +284,7 @@ pin it. No divergence exists outside this table. "Both oracles" means
 | D3 | Unknown operators | Both oracles accept unknown opcodes, cost derived from the opcode bytes, result nil | `unknown_operator` error | The operator set is closed by design. Bitcoin soft-forks at the tapleaf-version level, not through unknown-opcode acceptance. PROVISIONAL, see section 8. | `vm/dispatch.json` |
 | D4 | Pair in operator position | Both oracles accept `((X) . args)` when `X` is a lone atom, a legacy apply-style rule: `X` dispatches on the arguments unevaluated, charging apply's 90. They disagree on a non-nil tail in the operator pair: `chia-rs` ignores the tail and dispatches on the head, `clvm` rejects it | `operator_not_atom` error for every pair in operator position | The legacy rule is a remnant the oracles themselves disagree on at the edges. Strict rejection of the whole family is the smaller, reviewable surface. PROVISIONAL, see section 8. | `vm/dispatch.json` |
 | D5 | Deserialization strictness | Both oracles accept non-minimal length encodings, trailing bytes, and (chia-rs) `0xfe` back-references | `bad_encoding` for all three (section 2) | Witness bytes must have exactly one accepted spelling per program. Malleability of the serialized form is a consensus hazard in the Bitcoin context. | `vm/serialize.json` |
-| D6 | `/` with negative operands | Consensus (`chia-rs`): floor division. The `clvm` package injects a policy error ("deprecated") that is not consensus | Floor division, matching consensus | Intersection parity targets the consensus oracle. The Python package's rejection is library policy, the diff harness treats it as an expected divergence. OPEN QUESTION, see section 8. | `vm/arith.json` |
+| D6 | `/` with negative operands | Consensus (`chia-rs`): floor division. The `clvm` package injects a policy error ("deprecated") that is not consensus | Floor division, matching consensus | Intersection parity targets the consensus oracle. The Python package's rejection is library policy, the diff harness treats it as an expected divergence. Ratified, see section 8. | `vm/arith.json` |
 | D7 | Zero cost budget | Both oracles treat `max_cost = 0` as unlimited | A zero budget is a real budget, no program succeeds under it (section 3.3) | A zero sentinel meaning unlimited is a library convenience, not consensus behavior. In the Bitcoin context the budget derives from transaction weight and is never legitimately zero, and an accidental zero must fail closed rather than open. Ratified, see section 8. | `vm/dispatch.json` |
 
 ## 7. Oracle provenance
@@ -317,12 +317,19 @@ these is a spec amendment plus vector update in one reviewed commit.
    only on a non-nil tail in the operator pair. Confirm that BitLisp
    rejects the whole family even though the lone-atom shape is
    common to both oracles.
-3. **D6 (negative division).** Consensus floor semantics implemented.
-   Chia deprecated negative `/` operands at the policy layer because
-   floor division on negatives surprises programmers. Options: keep
-   floor semantics, reject negative operands in consensus, or drop
-   `/` entirely and keep only `divmod`. Needs a decision before the
-   operator set freezes.
+3. **D6 (negative division).** Floor semantics RATIFIED (decision by
+   Evan, 2026-07-26): `/` keeps consensus floor division on negative
+   operands, and the alternatives (rejecting negative operands in
+   consensus, or dropping `/` for `divmod` alone) are declined. The
+   upstream deprecation traces to an admitted implementation bug,
+   not a design position: the original Python operator carried a
+   branch its own comment called "a buggy behavior from the initial
+   implementation" (a quotient of exactly -1 with a nonzero
+   remainder was rounded toward zero), consensus settled on clean
+   floor division, and the Python library then deprecated negative
+   operands in February 2023 rather than model the settled outcome.
+   BitLisp matches the consensus binary, which the diff harness
+   verifies on every run.
 4. **D7 (zero budget).** Fail-closed RATIFIED (decision by Evan,
    2026-07-26): a zero `max_cost` rejects every program where the
    oracles treat it as unlimited. A budget bug must reject every
