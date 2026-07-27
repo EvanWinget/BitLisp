@@ -282,7 +282,7 @@ pin it. No divergence exists outside this table. "Both oracles" means
 | D1 | BLS operators | `point_add`, `pubkey_for_exp`, BLS extension ops present | absent, `unknown_operator` | Bitcoin has no BLS. Removing them removes their entire attack and cost surface. | `vm/dispatch.json` |
 | D2 | secp256k1 | `secp256k1_verify` post-hardfork op | `secp_verify`, BIP340 Schnorr (crypto family session) | Native curve, native signature scheme. | TODO Phase 1 crypto session |
 | D3 | Unknown operators | Both oracles accept unknown opcodes, cost derived from the opcode bytes, result nil | `unknown_operator` error | The operator set is closed by design. Bitcoin soft-forks at the tapleaf-version level, not through unknown-opcode acceptance. PROVISIONAL, see section 8. | `vm/dispatch.json` |
-| D4 | Pair in operator position | `clvm` rejects. `chia-rs` accepts via a legacy apply-style rule (observed: `((A . B) . rest)` dispatches on `A` with arity errors reported for `A`'s operator) | `operator_not_atom` error | The oracles disagree with each other. Strict rejection is the smaller, reviewable surface. PROVISIONAL, see section 8. | `vm/dispatch.json` |
+| D4 | Pair in operator position | Both oracles accept `((X) . args)` when `X` is a lone atom, a legacy apply-style rule: `X` dispatches on the arguments unevaluated, charging apply's 90. They disagree on a non-nil tail in the operator pair: `chia-rs` ignores the tail and dispatches on the head, `clvm` rejects it | `operator_not_atom` error for every pair in operator position | The legacy rule is a remnant the oracles themselves disagree on at the edges. Strict rejection of the whole family is the smaller, reviewable surface. PROVISIONAL, see section 8. | `vm/dispatch.json` |
 | D5 | Deserialization strictness | Both oracles accept non-minimal length encodings, trailing bytes, and (chia-rs) `0xfe` back-references | `bad_encoding` for all three (section 2) | Witness bytes must have exactly one accepted spelling per program. Malleability of the serialized form is a consensus hazard in the Bitcoin context. | `vm/serialize.json` |
 | D6 | `/` with negative operands | Consensus (`chia-rs`): floor division. The `clvm` package injects a policy error ("deprecated") that is not consensus | Floor division, matching consensus | Intersection parity targets the consensus oracle. The Python package's rejection is library policy, the diff harness treats it as an expected divergence. OPEN QUESTION, see section 8. | `vm/arith.json` |
 | D7 | Zero cost budget | Both oracles treat `max_cost = 0` as unlimited | A zero budget is a real budget, no program succeeds under it (section 3.3) | A zero sentinel meaning unlimited is a library convenience, not consensus behavior. In the Bitcoin context the budget derives from transaction weight and is never legitimately zero, and an accidental zero must fail closed rather than open. Ratified, see section 8. | `vm/dispatch.json` |
@@ -310,8 +310,13 @@ these is a spec amendment plus vector update in one reviewed commit.
 1. **D3 (unknown operators).** Strict rejection implemented. Confirm
    that BitLisp's upgrade path is new tapleaf versions and that
    unknown-opcode acceptance stays out permanently.
-2. **D4 (pair operator).** Strict rejection implemented, which matches
-   the Python oracle and rejects chia_rs's legacy rule. Confirm.
+2. **D4 (pair operator).** Strict rejection implemented. Probing both
+   wheels (2026-07-26) corrected the record: the legacy apply-style
+   rule for `((X) . args)` is in both oracles, not only chia_rs, so
+   strict rejection diverges from both, and the oracles disagree
+   only on a non-nil tail in the operator pair. Confirm that BitLisp
+   rejects the whole family even though the lone-atom shape is
+   common to both oracles.
 3. **D6 (negative division).** Consensus floor semantics implemented.
    Chia deprecated negative `/` operands at the policy layer because
    floor division on negatives surprises programmers. Options: keep
