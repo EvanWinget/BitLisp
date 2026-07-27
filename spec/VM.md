@@ -150,6 +150,19 @@ reports that error, every other program reports `cost_exceeded`. Both
 CLVM oracles instead treat a zero `max_cost` as unlimited (divergence
 D7).
 
+**The charge-before-completion invariant.** Every program charges at
+least once before it completes: a path lookup charges after its walk,
+a quote charges 20, and every other application either fails or
+charges the dispatch cost 1 before its operator runs. Apply's
+deferred budget check (section 3.2) and the zero-budget rule above
+both rest on this invariant, and every future operator and special
+form must preserve it. As a backstop, `run` checks the accrued cost
+against the budget once more when evaluation completes. The backstop
+cannot fire while the invariant holds, so no vector can pin it. If a
+future change broke the invariant, the backstop would turn an
+over-budget success, a soundness failure, into `cost_exceeded`,
+failing closed.
+
 ## 4. Operator table
 
 Implemented so far: the core specials, the tree ops family, and the
