@@ -119,14 +119,6 @@
    }
   },
   {
-   "name": "path_1_on_nil_env",
-   "program": "01",
-   "env": "",
-   "expect": {
-    "error": "bad_encoding"
-   }
-  },
-  {
    "name": "walk_precedes_charge_path_error_at_budget_1",
    "program": "04",
    "env": "84c0ffee42",
@@ -152,6 +144,15 @@
    "expect": {
     "result": "ff0a14",
     "cost": 48
+   }
+  },
+  {
+   "name": "path_1_on_nil_env",
+   "program": "01",
+   "env": "80",
+   "expect": {
+    "result": "80",
+    "cost": 44
    }
   }
  ]

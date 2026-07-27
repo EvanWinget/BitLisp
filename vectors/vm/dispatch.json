@@ -320,6 +320,74 @@
    "expect": {
     "error": "cost_exceeded"
    }
+  },
+  {
+   "name": "zero_budget_rejects_quote",
+   "program": "ff0101",
+   "env": "80",
+   "max_cost": 0,
+   "expect": {
+    "error": "cost_exceeded"
+   }
+  },
+  {
+   "name": "zero_budget_uncharged_error_wins",
+   "program": "07",
+   "env": "65",
+   "max_cost": 0,
+   "expect": {
+    "error": "path_into_atom"
+   }
+  },
+  {
+   "name": "unknown_operator_bls_point_add",
+   "program": "ff1d80",
+   "env": "80",
+   "expect": {
+    "error": "unknown_operator"
+   }
+  },
+  {
+   "name": "unknown_operator_bls_pubkey_for_exp",
+   "program": "ff1e80",
+   "env": "80",
+   "expect": {
+    "error": "unknown_operator"
+   }
+  },
+  {
+   "name": "bad_arg_list_beats_unknown_operator",
+   "program": "ff2f05",
+   "env": "80",
+   "expect": {
+    "error": "bad_arg_list"
+   }
+  },
+  {
+   "name": "pair_operator_beats_bad_arg_list",
+   "program": "ffff010105",
+   "env": "80",
+   "expect": {
+    "error": "operator_not_atom"
+   }
+  },
+  {
+   "name": "unknown_operator_uncharged_budget_1",
+   "program": "ff2f80",
+   "env": "80",
+   "max_cost": 1,
+   "expect": {
+    "error": "unknown_operator"
+   }
+  },
+  {
+   "name": "pair_operator_uncharged_budget_1",
+   "program": "ffff0101ffff010280",
+   "env": "80",
+   "max_cost": 1,
+   "expect": {
+    "error": "operator_not_atom"
+   }
   }
  ]
 }
