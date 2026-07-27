@@ -53,3 +53,14 @@ jobs:
       - name: Vector corpus
         run: |
           "${RUNNER_TEMP}/venv/bin/python" tools/run_vectors.py
+      - name: Differential harness, 10k programs
+        # The Phase 1 done-criterion gate. The seed varies per run so
+        # regressions cannot hide behind one fixed slice, and it is
+        # printed so any failure reproduces locally with
+        # tools/diff_clvm.py --count 10000 --seed <printed seed>.
+        env:
+          DIFF_SEED: ${{ github.run_id }}
+        run: |
+          echo "diff harness seed: ${DIFF_SEED}"
+          "${RUNNER_TEMP}/venv/bin/python" tools/diff_clvm.py \
+            --count 10000 --seed "${DIFF_SEED}"
