@@ -64,6 +64,18 @@ The deserializer rejects, with error `bad_encoding`:
 The serializer emits the canonical form. Serialize and deserialize are
 exact inverses on the accepted domain.
 
+The length forms cap an atom at 2^34 - 1 bytes, so a longer atom has
+no wire encoding. The serializer reports `bad_encoding` for such an
+atom, the one case where that error arises outside deserialization.
+Input atoms are never oversized, deserialization bounds them by
+construction. Evaluation can only build an oversized atom as a
+freshly allocated operator result, and every freshly built result
+atom charges `MALLOC_COST_PER_BYTE = 10` per byte, so reaching this
+rejection requires a budget of at least 10 * 2^34, about 1.7 * 10^11
+cost units. The Phase 3 weight mapping is expected to grant budgets
+far below that threshold, making the rejection unreachable in
+consensus (section 8, question 4).
+
 ## 3. Evaluation
 
 `run(program, env, max_cost)` returns `(cost, value)` or an error from
@@ -245,7 +257,7 @@ informative, not normative.
 
 | Code | Raised when | chia_rs message | clvm message |
 | --- | --- | --- | --- |
-| `bad_encoding` | Deserialization fails (section 2) | bad encoding | (varies) |
+| `bad_encoding` | Deserialization fails, or a result atom has no wire encoding (section 2) | bad encoding | (varies) |
 | `path_into_atom` | Path lookup steps into an atom | path into atom | path into atom |
 | `operator_not_atom` | Pair in operator position | (accepted, D4) | in ((X)...) syntax X must be lone atom |
 | `reserved_operator` | Empty atom in operator position | Reserved operator | reserved operator |
@@ -313,4 +325,10 @@ these is a spec amendment plus vector update in one reviewed commit.
    unlimited execution, a soundness failure. Still open: whether the
    reference should also enforce the unsigned 64-bit budget bound the
    hardened implementation will have (section 3.3 currently records
-   the bound without enforcing it).
+   the bound without enforcing it). The bound interacts with
+   serialization: a budget below 10 * 2^34 makes a result atom too
+   long for the wire format unbuildable (section 2), and the u64
+   bound alone does not. The Phase 3 weight mapping should record its
+   maximum grantable budget against that threshold so the
+   serializer's rejection of unrepresentable results is provably
+   dead in consensus.
