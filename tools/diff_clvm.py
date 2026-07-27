@@ -15,12 +15,15 @@ rejection of negative division operands (consensus does floor
 division), its budget check running only after an operator completes,
 its immediate check of apply's cost where consensus defers the check
 to the applied program's first charge, and its lack of the consensus
-operand size limits. The generator never
-emits the recorded BitLisp divergences: unknown operators, pairs in
-operator position, and non-canonical serializations cannot arise
-because programs are emitted by bitlisp's own canonical serializer
-over the implemented opcode set. Anything else is a finding and fails
-the run.
+operand size limits. The two budget-timing tolerances are verified
+per case, not assumed: the tolerating branch re-runs an
+implementation without the tight budget and requires it to reproduce
+the other side's outcome exactly, so neither can absorb an unrelated
+divergence. The generator never emits the recorded BitLisp
+divergences: unknown operators, pairs in operator position, and
+non-canonical serializations cannot arise because programs are
+emitted by bitlisp's own canonical serializer over the implemented
+opcode set. Anything else is a finding and fails the run.
 
 Usage:
     python3 tools/diff_clvm.py --count 10000 --seed 1
@@ -261,34 +264,50 @@ def main():
                 break
             continue
 
-        # Secondary oracle. Two tolerated disagreements, both library
-        # behavior rather than consensus: the negative-division policy
-        # error (a recorded divergence, it aborts the Python oracle
-        # where consensus keeps evaluating), and budget timing (the
-        # Python oracle checks the budget only after an operator
-        # completes, so it can report an operator error where
-        # consensus already reported cost_exceeded).
-        if py[0] == "policy_div":
+        # Secondary oracle. The four tolerated disagreements are
+        # documented in the module docstring. Both timing tolerances
+        # re-run an implementation without the tight budget and
+        # require it to reproduce the other side's outcome, so a
+        # disagreement with any other cause still fails the run.
+        py_agrees = False
+        if py == bl:
+            py_agrees = True
+        elif py[0] == "policy_div":
+            # The negative-division policy error, a recorded
+            # divergence: it aborts the Python oracle where consensus
+            # keeps evaluating, so bitlisp's outcome is unconstrained.
+            py_agrees = True
             stats["policy_div"] += 1
-        elif bl == ("err", "cost_exceeded") and py[0] == "err":
+        elif bl == ("err", "cost_exceeded") and py == run_bitlisp(
+            program, env, MAX_COST
+        ):
+            # The Python oracle checks the budget only after an
+            # operator completes, so where consensus bursts
+            # mid-operator it runs on and reports the program's
+            # unbounded outcome instead.
+            py_agrees = True
             stats["py_budget_timing"] += 1
         elif bl == ("err", "arg_too_long"):
             # The Python oracle has no operand size limits, so once
             # consensus rejects an oversized operand its outcome is
             # unconstrained.
+            py_agrees = True
             stats["py_no_operand_limit"] += 1
-        elif py == ("err", "cost_exceeded") and bl[0] == "err":
+        elif py == ("err", "cost_exceeded") and run_py(program, env, MAX_COST) == bl:
             # The Python oracle checks apply's cost immediately where
             # consensus defers the check to the applied program's
-            # first charge, so it can report cost_exceeded where
+            # first charge, so it can burst its budget where
             # consensus reports the applied program's error.
+            py_agrees = True
             stats["py_apply_cost_timing"] += 1
-        elif py != bl:
+
+        if not py_agrees:
             failures += 1
             print(f"MISMATCH bl-vs-py #{i}: prog={program.hex()} env={env.hex()}")
             print(f"  max_cost={max_cost} bitlisp={bl} clvm={py}")
             if failures >= args.max_fails:
                 break
+            continue
 
         stats["ok" if bl[0] == "ok" else "err_agree"] += 1
 
