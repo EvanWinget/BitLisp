@@ -93,11 +93,26 @@ a spec decision rather than picking a plausible reading.
 - Chia test vectors are vendored as data into `vectors/upstream/` with
   provenance headers. CI never fetches from the network.
 - `tools/fetch-references.sh` clones upstream repos into git-ignored
-  `references/` for human browsing only. Open `references/` only in
-  divergence-triage sessions, never in implementation sessions. Never copy
-  code from it. Differential testing only detects bugs the two
-  implementations do not share, and implementation-by-paraphrase destroys
-  that independence.
+  `references/`. Reading upstream source (clvm, clvm_rs, chia_rs) is
+  allowed at any time, including during implementation (decision by
+  Evan, 2026-07-26, amending the original triage-only rule). Reading
+  is safe for the operator intersection because correctness there is
+  defined by the deployed binary, not by anyone's source, and the
+  diff harness always compares against the binary.
+- Reading comes with three guardrails that protect the deliverable:
+  1. Copying code into the tree remains prohibited. The
+     implementation stays ours, under one license, small enough to
+     review whole.
+  2. Spec before code still governs. A behavior enters the
+     implementation only through a `spec/` statement, and spec
+     statements are established by evidence against the consensus
+     binary (probes and cross-checked vectors), never by "matches
+     upstream source." Reading generates hypotheses, the binary
+     confirms them. The spec must stay complete enough that a reader
+     never needs upstream source to predict a vector.
+  3. When upstream source materially informed an implementation or
+     design choice, say so in the commit message. Reviewers get the
+     provenance trail.
 - Upstream pin bumps are governance events: adopt, take, or decline per
   `docs/execution-plan.md`, one reviewed commit each, reasons recorded.
 
