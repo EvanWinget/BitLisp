@@ -309,7 +309,56 @@ these is a spec amendment plus vector update in one reviewed commit.
 
 1. **D3 (unknown operators).** Strict rejection implemented. Confirm
    that BitLisp's upgrade path is new tapleaf versions and that
-   unknown-opcode acceptance stays out permanently.
+   unknown-opcode acceptance stays out permanently. The alternative,
+   an in-language extension mechanism in the style of CLVM's
+   `softfork` operator, was analyzed (discussion with Evan,
+   2026-07-26) and is recorded here so ratification weighs it
+   explicitly.
+
+   - CLVM's unknown-opcode acceptance is not an upgrade path for
+     value-returning operators. An unknown operator evaluates its
+     arguments, charges a cost decoded from the opcode bytes, and
+     returns nil into the continuing program. Assigning it real
+     semantics later would change what deployed programs compute,
+     not merely what is valid, which is not a soft fork. Chia's
+     documentation states this directly, and Chia shipped its new
+     operators first inside the `softfork` guard, then promoted
+     them to first-class value-returning operators with a hard
+     fork.
+   - CLVM's `softfork` guard is sound and is assert-only by
+     construction: the declared cost must equal the guarded
+     program's actual cost, and the guarded result is always nil,
+     so no value crosses the boundary. New operators arrive as
+     verifiers, never as producers. Value-producing behavior can be
+     simulated by commit-and-verify: the spender supplies the
+     claimed result as witness data, the guard recomputes it and
+     raises on mismatch, and the outer program uses the supplied
+     value. Old nodes use it unverified, new nodes enforce it,
+     which is the stricter-only direction a soft fork requires.
+     This covers most verify-shaped features at a cost in witness
+     bytes and program shape.
+   - The guard is declined for v0 on four grounds. It is largely
+     redundant with the tapleaf-version boundary, the total
+     surrender point Bitcoin already provides in the style of
+     OP_SUCCESS, where old nodes validate nothing and new semantics
+     may therefore be arbitrary, value-producing included, by soft
+     fork. Its machinery (an extension registry, a guard stack,
+     exact cost equality, state rollback so no value escapes) is
+     permanent consensus surface that must be perfect from v0,
+     against a consensus core designed to stay small enough to
+     review whole. It only benefits scripts that anticipated it,
+     since deployed programs that predate it are equally frozen
+     under either scheme. And the choice is reversible in exactly
+     one direction: a guard can be added in a later leaf version
+     once the cost model has matured, while a guard shipped in v0
+     can never be removed.
+   - Extensibility for deployed coins is planned at the condition
+     layer instead (Phase 2): conditions are inert data in a
+     program's output, so a fork can change what an unknown
+     condition means to validators without changing what any
+     program computes. The reserved-condition rule is the
+     condition-layer analog of this question and gets its own
+     decision in MATCHING.md.
 2. **D4 (pair operator).** Strict rejection implemented. Probing both
    wheels (2026-07-26) corrected the record: the legacy apply-style
    rule for `((X) . args)` is in both oracles, not only chia_rs, so
