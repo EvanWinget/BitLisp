@@ -14,7 +14,10 @@ harness. The weight mapping is filled with Phase 3 measurements.
   the reserved empty-atom operator. The constant is implicit in both
   CLVM implementations and was pinned empirically. It is charged at
   operator identification, before any argument evaluates. Apply's 90
-  is charged later, after both of its arguments have evaluated.
+  accrues later, after both of its arguments have evaluated, and
+  without an immediate budget check: the check rides on the applied
+  program's first charge, so a pre-charge failure inside the applied
+  program is reported first. Pinned by boundary vectors.
 - **Malloc cost.** Operators that return freshly built atoms charge
   `MALLOC_COST_PER_BYTE = 10` per byte of each result atom. Operators
   that return shared constants (TRUE, nil) or existing nodes charge no

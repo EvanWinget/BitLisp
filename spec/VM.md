@@ -111,10 +111,14 @@ For a program `(op . args)`, in this exact sequence:
    - The empty atom raises `reserved_operator` here, not at
      identification: its dispatch cost is charged and its arguments
      evaluate first.
-   - `0x02` (**apply**) checks its arity (exactly 2) here, then
-     charges 90, then evaluates the first result as a program with
-     the second result as its environment. That evaluation's result
-     or error is the apply's.
+   - `0x02` (**apply**) checks its arity (exactly 2) here, uncharged.
+     Its cost 90 then accrues without an immediate budget check: the
+     check rides on the applied program's first charge, so pre-charge
+     failures inside the applied program (a path walk into an atom,
+     an improper argument list) are reported even when the accrued
+     cost already exceeds the budget. Apply then evaluates the first
+     result as a program with the second result as its environment,
+     and that evaluation's result or error is the apply's.
    - A table operator checks arity, validates arguments, and charges
      per [COSTS.md](COSTS.md), in the per-operator interleaving
      specified there.
