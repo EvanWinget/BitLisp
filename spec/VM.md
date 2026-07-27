@@ -47,6 +47,11 @@ rules on input (divergence D5). One node serializes as follows.
 
 nil is `0x80` (the zero-length case of the second row).
 
+Deserialization operates on an immutable byte string. The reference
+implementation rejects any other input type with `bad_encoding`
+before reading a byte, so type coercion can never produce a
+differently shaped tree.
+
 The deserializer rejects, with error `bad_encoding`:
 
 1. Truncated input, and input with trailing bytes after the root node.
@@ -132,6 +137,18 @@ Cost accrues as evaluation proceeds and is checked against `max_cost`
 at every charge. The budget is inclusive: a program whose total cost
 equals `max_cost` exactly succeeds. Exceeding it raises
 `cost_exceeded`.
+
+`max_cost` is a nonnegative integer. In the consensus interface it is
+an unsigned 64-bit quantity, derived from transaction weight in the
+Phase 3 mapping. The Python reference accepts any nonnegative Python
+integer and does not enforce the 64-bit bound, the hardened
+implementation will. A budget of zero is a real budget: every program
+charges at least once before completing, so no program succeeds under
+a zero budget. A program whose uncharged checks fail first (a path
+walk into an atom, an improper argument list, an unknown operator)
+reports that error, every other program reports `cost_exceeded`. Both
+CLVM oracles instead treat a zero `max_cost` as unlimited (divergence
+D7).
 
 ## 4. Operator table
 
@@ -237,12 +254,13 @@ pin it. No divergence exists outside this table. "Both oracles" means
 
 | # | Area | CLVM behavior | BitLisp behavior | Rationale | Vectors |
 | --- | --- | --- | --- | --- | --- |
-| D1 | BLS operators | `point_add`, `pubkey_for_exp`, BLS extension ops present | absent, `unknown_operator` | Bitcoin has no BLS. Removing them removes their entire attack and cost surface. | `vm/operators.json` |
+| D1 | BLS operators | `point_add`, `pubkey_for_exp`, BLS extension ops present | absent, `unknown_operator` | Bitcoin has no BLS. Removing them removes their entire attack and cost surface. | `vm/dispatch.json` |
 | D2 | secp256k1 | `secp256k1_verify` post-hardfork op | `secp_verify`, BIP340 Schnorr (crypto family session) | Native curve, native signature scheme. | TODO Phase 1 crypto session |
 | D3 | Unknown operators | Both oracles accept unknown opcodes, cost derived from the opcode bytes, result nil | `unknown_operator` error | The operator set is closed by design. Bitcoin soft-forks at the tapleaf-version level, not through unknown-opcode acceptance. PROVISIONAL, see section 8. | `vm/dispatch.json` |
 | D4 | Pair in operator position | `clvm` rejects. `chia-rs` accepts via a legacy apply-style rule (observed: `((A . B) . rest)` dispatches on `A` with arity errors reported for `A`'s operator) | `operator_not_atom` error | The oracles disagree with each other. Strict rejection is the smaller, reviewable surface. PROVISIONAL, see section 8. | `vm/dispatch.json` |
 | D5 | Deserialization strictness | Both oracles accept non-minimal length encodings, trailing bytes, and (chia-rs) `0xfe` back-references | `bad_encoding` for all three (section 2) | Witness bytes must have exactly one accepted spelling per program. Malleability of the serialized form is a consensus hazard in the Bitcoin context. | `vm/serialize.json` |
 | D6 | `/` with negative operands | Consensus (`chia-rs`): floor division. The `clvm` package injects a policy error ("deprecated") that is not consensus | Floor division, matching consensus | Intersection parity targets the consensus oracle. The Python package's rejection is library policy, the diff harness treats it as an expected divergence. OPEN QUESTION, see section 8. | `vm/arith.json` |
+| D7 | Zero cost budget | Both oracles treat `max_cost = 0` as unlimited | A zero budget is a real budget, no program succeeds under it (section 3.3) | A zero sentinel meaning unlimited is a library convenience, not consensus behavior. In the Bitcoin context the budget derives from transaction weight and is never legitimately zero, and an accidental zero must fail closed rather than open. PROVISIONAL, see section 8. | `vm/dispatch.json` |
 
 ## 7. Oracle provenance
 
@@ -275,3 +293,10 @@ these is a spec amendment plus vector update in one reviewed commit.
    floor semantics, reject negative operands in consensus, or drop
    `/` entirely and keep only `divmod`. Needs a decision before the
    operator set freezes.
+4. **D7 (zero budget).** Fail-closed implemented: a zero `max_cost`
+   rejects every program where the oracles treat it as unlimited.
+   Found by the codebase review, previously undocumented. Confirm
+   fail-closed, and decide whether the reference should also enforce
+   the unsigned 64-bit budget bound the hardened implementation will
+   have (section 3.3 currently records the bound without enforcing
+   it).
