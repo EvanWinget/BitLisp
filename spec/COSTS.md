@@ -1,9 +1,10 @@
 # BitLisp Cost Model
 
 Status: Phase 1 in progress. This table is normative for the evaluator
-core and the arithmetic family. It inherits the CLVM cost table for the
-operator intersection, verified against the pinned oracles by the diff
-harness. The weight mapping is filled with Phase 3 measurements.
+core, the tree ops family, and the arithmetic family. It inherits the
+CLVM cost table for the operator intersection, verified against the
+pinned oracles by the diff harness. The weight mapping is filled with
+Phase 3 measurements.
 
 ## 1. General rules
 
@@ -14,12 +15,15 @@ harness. The weight mapping is filled with Phase 3 measurements.
   the reserved empty-atom operator. The constant is implicit in both
   CLVM implementations and was pinned empirically. It is charged at
   operator identification, before any argument evaluates. Apply's 90
-  is charged later, after both of its arguments have evaluated.
+  accrues later, after both of its arguments have evaluated, and
+  without an immediate budget check: the check rides on the applied
+  program's first charge, so a pre-charge failure inside the applied
+  program is reported first. Pinned by boundary vectors.
 - **Malloc cost.** Operators that return freshly built atoms charge
   `MALLOC_COST_PER_BYTE = 10` per byte of each result atom. Operators
   that return shared constants (TRUE, nil) or existing nodes charge no
-  malloc. Building a pair (divmod's result) charges no malloc beyond
-  the two atoms.
+  malloc. Building a pair (`c`'s result, divmod's result) charges no
+  malloc beyond any freshly built atoms inside it.
 - Per-byte argument costs count the argument atom's actual byte
   length, including redundant integer encoding bytes.
 - **Charge order is consensus-visible.** Near the budget boundary,
@@ -58,8 +62,13 @@ harness. The weight mapping is filled with Phase 3 measurements.
     For `*` they ride with each argument's atom check. For `/` and
     `divmod` they run after both atom checks and before the base
     charge.
+  - `i`, `c`, `f`, `r`, `l`, `=`: arity check first, then the node
+    checks (`f` and `r` require a pair, `=` checks both arguments for
+    atomness), then one checked charge of the operator's full cost.
+    Every check therefore wins over `cost_exceeded` when both would
+    fire, pinned by boundary vectors.
 - Evaluation cost does not include deserialization. A per-byte cost on
-  the serialized program belongs to the weight mapping (section 4).
+  the serialized program belongs to the weight mapping (section 5).
 
 ## 2. Core evaluation costs
 
@@ -73,7 +82,22 @@ harness. The weight mapping is filled with Phase 3 measurements.
 | `PATH_LOOKUP_COST_PER_ZERO_BYTE` | 4 | Per leading zero byte of the path atom |
 | `MALLOC_COST_PER_BYTE` | 10 | Per byte of freshly built result atoms |
 
-## 3. Arithmetic family
+## 3. Tree ops family
+
+No tree op charges malloc.
+
+| Operator | Formula |
+| --- | --- |
+| `i` | `33`, returns the selected argument node |
+| `c` | `50`, the pair itself is not malloc-charged |
+| `f`, `r` | `30`, returns an existing node |
+| `l` | `19` |
+| `=` | `117 + 1 * total_arg_bytes`, no operand size limit |
+
+Worked example, pinned by vectors: `(= (q . 1) (q . 1))` costs
+`20 + 20 + 1 + 117 + 2 = 160`.
+
+## 4. Arithmetic family
 
 | Operator | Formula |
 | --- | --- |
@@ -86,13 +110,13 @@ harness. The weight mapping is filled with Phase 3 measurements.
 Worked example, pinned by vectors: `(+ (q . 2) (q . 3))` costs
 `20 + 20 + 99 + 320 * 2 + 3 * 2 + 10 + 1 = 796`.
 
-## 4. Weight mapping
+## 5. Weight mapping
 
 TODO (Phase 3): mapping from VM cost units to Bitcoin transaction
 weight, derived from benchmark data on the measured artifacts,
 including the per-byte cost of the serialized program itself.
 
-## 5. Condition costs
+## 6. Condition costs
 
 TODO (Phase 2): per-condition base costs and the superlinear
 `CREATE_COIN` schedule.

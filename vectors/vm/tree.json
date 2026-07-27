@@ -1,0 +1,534 @@
+{
+ "schema": "bitlisp-vector-v0",
+ "suite": "vm",
+ "spec": "VM.md section 4 and COSTS.md section 3 (tree ops family)",
+ "cases": [
+  {
+   "name": "cons_two_atoms",
+   "program": "ff04ffff0101ffff010280",
+   "env": "80",
+   "expect": {
+    "result": "ff0102",
+    "cost": 91
+   }
+  },
+  {
+   "name": "cons_pair_children",
+   "program": "ff04ffff01ff01ff0280ffff010380",
+   "env": "80",
+   "expect": {
+    "result": "ffff01ff028003",
+    "cost": 91
+   }
+  },
+  {
+   "name": "cons_no_malloc_for_big_atoms",
+   "program": "ff04ffff01c064aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaffff01c064bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb80",
+   "env": "80",
+   "expect": {
+    "result": "ffc064aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaac064bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "cost": 91
+   }
+  },
+  {
+   "name": "first_of_list",
+   "program": "ff05ffff01ff01ff028080",
+   "env": "80",
+   "expect": {
+    "result": "01",
+    "cost": 51
+   }
+  },
+  {
+   "name": "rest_of_list",
+   "program": "ff06ffff01ff01ff028080",
+   "env": "80",
+   "expect": {
+    "result": "ff0280",
+    "cost": 51
+   }
+  },
+  {
+   "name": "first_of_freshly_built_cons",
+   "program": "ff05ffff04ffff0101ffff01028080",
+   "env": "80",
+   "expect": {
+    "result": "01",
+    "cost": 122
+   }
+  },
+  {
+   "name": "listp_pair",
+   "program": "ff07ffff01ff01ff028080",
+   "env": "80",
+   "expect": {
+    "result": "01",
+    "cost": 40
+   }
+  },
+  {
+   "name": "listp_atom",
+   "program": "ff07ffff010180",
+   "env": "80",
+   "expect": {
+    "result": "80",
+    "cost": 40
+   }
+  },
+  {
+   "name": "listp_nil",
+   "program": "ff07ffff018080",
+   "env": "80",
+   "expect": {
+    "result": "80",
+    "cost": 40
+   }
+  },
+  {
+   "name": "if_true_selects_second",
+   "program": "ff03ffff0101ffff0102ffff010380",
+   "env": "80",
+   "expect": {
+    "result": "02",
+    "cost": 94
+   }
+  },
+  {
+   "name": "if_nil_selects_third",
+   "program": "ff03ffff0180ffff0102ffff010380",
+   "env": "80",
+   "expect": {
+    "result": "03",
+    "cost": 94
+   }
+  },
+  {
+   "name": "if_zero_byte_atom_is_true",
+   "program": "ff03ffff0100ffff0102ffff010380",
+   "env": "80",
+   "expect": {
+    "result": "02",
+    "cost": 94
+   }
+  },
+  {
+   "name": "if_pair_condition_is_true",
+   "program": "ff03ffff01ff01ff0280ffff0102ffff010380",
+   "env": "80",
+   "expect": {
+    "result": "02",
+    "cost": 94
+   }
+  },
+  {
+   "name": "if_selected_pair_not_malloced",
+   "program": "ff03ffff0101ffff01ff01ff0280ffff010380",
+   "env": "80",
+   "expect": {
+    "result": "ff01ff0280",
+    "cost": 94
+   }
+  },
+  {
+   "name": "if_strict_raise_in_unselected_arm",
+   "program": "ff03ffff0101ffff0102ffff088080",
+   "env": "80",
+   "expect": {
+    "error": "user_raise"
+   }
+  },
+  {
+   "name": "eq_equal_atoms",
+   "program": "ff09ffff0101ffff010180",
+   "env": "80",
+   "expect": {
+    "result": "01",
+    "cost": 160
+   }
+  },
+  {
+   "name": "eq_unequal_atoms",
+   "program": "ff09ffff0101ffff010280",
+   "env": "80",
+   "expect": {
+    "result": "80",
+    "cost": 160
+   }
+  },
+  {
+   "name": "eq_nil_nil",
+   "program": "ff09ffff0180ffff018080",
+   "env": "80",
+   "expect": {
+    "result": "01",
+    "cost": 158
+   }
+  },
+  {
+   "name": "eq_redundant_encoding_is_distinct",
+   "program": "ff09ffff01820001ffff010180",
+   "env": "80",
+   "expect": {
+    "result": "80",
+    "cost": 161
+   }
+  },
+  {
+   "name": "eq_zero_byte_vs_nil_distinct",
+   "program": "ff09ffff0100ffff018080",
+   "env": "80",
+   "expect": {
+    "result": "80",
+    "cost": 159
+   }
+  },
+  {
+   "name": "eq_long_atoms_no_size_limit",
+   "program": "ff09ffff01c12caaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaffff01c12caaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa80",
+   "env": "80",
+   "expect": {
+    "result": "01",
+    "cost": 758
+   }
+  },
+  {
+   "name": "first_of_env",
+   "program": "ff05ff0180",
+   "env": "ffff01ff028003",
+   "expect": {
+    "result": "ff01ff0280",
+    "cost": 75
+   }
+  },
+  {
+   "name": "rest_of_env",
+   "program": "ff06ff0180",
+   "env": "ffff01ff028003",
+   "expect": {
+    "result": "03",
+    "cost": 75
+   }
+  },
+  {
+   "name": "if_arg_path_error_wins",
+   "program": "ff03ff05ffff0102ffff010380",
+   "env": "ffff01ff028003",
+   "expect": {
+    "error": "path_into_atom"
+   }
+  },
+  {
+   "name": "if_two_args",
+   "program": "ff03ffff0101ffff010280",
+   "env": "80",
+   "expect": {
+    "error": "wrong_arg_count"
+   }
+  },
+  {
+   "name": "if_four_args",
+   "program": "ff03ffff0101ffff0102ffff0103ffff010180",
+   "env": "80",
+   "expect": {
+    "error": "wrong_arg_count"
+   }
+  },
+  {
+   "name": "cons_one_arg",
+   "program": "ff04ffff010180",
+   "env": "80",
+   "expect": {
+    "error": "wrong_arg_count"
+   }
+  },
+  {
+   "name": "first_no_args",
+   "program": "ff0580",
+   "env": "80",
+   "expect": {
+    "error": "wrong_arg_count"
+   }
+  },
+  {
+   "name": "first_two_args",
+   "program": "ff05ffff01ff01ff0280ffff01ff01ff028080",
+   "env": "80",
+   "expect": {
+    "error": "wrong_arg_count"
+   }
+  },
+  {
+   "name": "rest_two_args",
+   "program": "ff06ffff01ff01ff0280ffff01ff01ff028080",
+   "env": "80",
+   "expect": {
+    "error": "wrong_arg_count"
+   }
+  },
+  {
+   "name": "listp_no_args",
+   "program": "ff0780",
+   "env": "80",
+   "expect": {
+    "error": "wrong_arg_count"
+   }
+  },
+  {
+   "name": "eq_one_arg",
+   "program": "ff09ffff010180",
+   "env": "80",
+   "expect": {
+    "error": "wrong_arg_count"
+   }
+  },
+  {
+   "name": "eq_three_args",
+   "program": "ff09ffff0101ffff0101ffff010180",
+   "env": "80",
+   "expect": {
+    "error": "wrong_arg_count"
+   }
+  },
+  {
+   "name": "first_of_atom",
+   "program": "ff05ffff010180",
+   "env": "80",
+   "expect": {
+    "error": "arg_not_pair"
+   }
+  },
+  {
+   "name": "first_of_nil",
+   "program": "ff05ffff018080",
+   "env": "80",
+   "expect": {
+    "error": "arg_not_pair"
+   }
+  },
+  {
+   "name": "rest_of_atom",
+   "program": "ff06ffff010180",
+   "env": "80",
+   "expect": {
+    "error": "arg_not_pair"
+   }
+  },
+  {
+   "name": "eq_pair_in_first_arg",
+   "program": "ff09ffff01ff01ff0280ffff010180",
+   "env": "80",
+   "expect": {
+    "error": "arg_not_atom"
+   }
+  },
+  {
+   "name": "eq_pair_in_second_arg",
+   "program": "ff09ffff0101ffff01ff01ff028080",
+   "env": "80",
+   "expect": {
+    "error": "arg_not_atom"
+   }
+  },
+  {
+   "name": "cons_budget_exact",
+   "program": "ff04ffff0101ffff010280",
+   "env": "80",
+   "max_cost": 91,
+   "expect": {
+    "result": "ff0102",
+    "cost": 91
+   }
+  },
+  {
+   "name": "cons_budget_one_under",
+   "program": "ff04ffff0101ffff010280",
+   "env": "80",
+   "max_cost": 90,
+   "expect": {
+    "error": "cost_exceeded"
+   }
+  },
+  {
+   "name": "first_budget_exact",
+   "program": "ff05ffff01ff01ff028080",
+   "env": "80",
+   "max_cost": 51,
+   "expect": {
+    "result": "01",
+    "cost": 51
+   }
+  },
+  {
+   "name": "first_budget_one_under",
+   "program": "ff05ffff01ff01ff028080",
+   "env": "80",
+   "max_cost": 50,
+   "expect": {
+    "error": "cost_exceeded"
+   }
+  },
+  {
+   "name": "listp_budget_exact",
+   "program": "ff07ffff010180",
+   "env": "80",
+   "max_cost": 40,
+   "expect": {
+    "result": "80",
+    "cost": 40
+   }
+  },
+  {
+   "name": "listp_budget_one_under",
+   "program": "ff07ffff010180",
+   "env": "80",
+   "max_cost": 39,
+   "expect": {
+    "error": "cost_exceeded"
+   }
+  },
+  {
+   "name": "if_budget_exact",
+   "program": "ff03ffff0101ffff0102ffff010380",
+   "env": "80",
+   "max_cost": 94,
+   "expect": {
+    "result": "02",
+    "cost": 94
+   }
+  },
+  {
+   "name": "if_budget_one_under",
+   "program": "ff03ffff0101ffff0102ffff010380",
+   "env": "80",
+   "max_cost": 93,
+   "expect": {
+    "error": "cost_exceeded"
+   }
+  },
+  {
+   "name": "eq_budget_exact",
+   "program": "ff09ffff0101ffff010180",
+   "env": "80",
+   "max_cost": 160,
+   "expect": {
+    "result": "01",
+    "cost": 160
+   }
+  },
+  {
+   "name": "eq_budget_one_under",
+   "program": "ff09ffff0101ffff010180",
+   "env": "80",
+   "max_cost": 159,
+   "expect": {
+    "error": "cost_exceeded"
+   }
+  },
+  {
+   "name": "first_of_atom_wins_at_spent_budget",
+   "program": "ff05ffff010180",
+   "env": "80",
+   "max_cost": 21,
+   "expect": {
+    "error": "arg_not_pair"
+   }
+  },
+  {
+   "name": "first_of_atom_loses_to_arg_cost",
+   "program": "ff05ffff010180",
+   "env": "80",
+   "max_cost": 20,
+   "expect": {
+    "error": "cost_exceeded"
+   }
+  },
+  {
+   "name": "arity_error_wins_uncharged",
+   "program": "ff0580",
+   "env": "80",
+   "max_cost": 1,
+   "expect": {
+    "error": "wrong_arg_count"
+   }
+  },
+  {
+   "name": "arity_error_wins_at_spent_budget",
+   "program": "ff05ffff01ff01ff0280ffff01ff01ff028080",
+   "env": "80",
+   "max_cost": 41,
+   "expect": {
+    "error": "wrong_arg_count"
+   }
+  },
+  {
+   "name": "eq_pair_wins_at_spent_budget",
+   "program": "ff09ffff01ff01ff0280ffff010180",
+   "env": "80",
+   "max_cost": 41,
+   "expect": {
+    "error": "arg_not_atom"
+   }
+  },
+  {
+   "name": "if_arity_wins_at_spent_budget",
+   "program": "ff03ffff0101ffff010280",
+   "env": "80",
+   "max_cost": 41,
+   "expect": {
+    "error": "wrong_arg_count"
+   }
+  },
+  {
+   "name": "if_arity_loses_to_dispatch_cost",
+   "program": "ff03ffff0101ffff010280",
+   "env": "80",
+   "max_cost": 40,
+   "expect": {
+    "error": "cost_exceeded"
+   }
+  },
+  {
+   "name": "first_improper_arg_list",
+   "program": "ff0505",
+   "env": "80",
+   "expect": {
+    "error": "bad_arg_list"
+   }
+  },
+  {
+   "name": "rest_of_nil",
+   "program": "ff06ffff018080",
+   "env": "80",
+   "expect": {
+    "error": "arg_not_pair"
+   }
+  },
+  {
+   "name": "rest_of_atom_wins_at_spent_budget",
+   "program": "ff06ffff010180",
+   "env": "80",
+   "max_cost": 21,
+   "expect": {
+    "error": "arg_not_pair"
+   }
+  },
+  {
+   "name": "rest_of_atom_loses_to_arg_cost",
+   "program": "ff06ffff010180",
+   "env": "80",
+   "max_cost": 20,
+   "expect": {
+    "error": "cost_exceeded"
+   }
+  },
+  {
+   "name": "if_condition_read_from_env",
+   "program": "ff03ff02ffff0105ffff010780",
+   "env": "ff8003",
+   "expect": {
+    "result": "07",
+    "cost": 122
+   }
+  }
+ ]
+}

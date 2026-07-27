@@ -216,7 +216,7 @@
    }
   },
   {
-   "name": "apply_90_charged_after_args_484",
+   "name": "apply_90_not_applied_before_args_484",
    "program": "ff02ffff10ffff0102ffff01ff010280ffff010180",
    "env": "80",
    "max_cost": 484,
@@ -247,6 +247,78 @@
    "expect": {
     "result": "06",
     "cost": 1572
+   }
+  },
+  {
+   "name": "apply_path_walks_into_atom",
+   "program": "ff02ffff010dffff01ff808080",
+   "env": "80",
+   "expect": {
+    "error": "path_into_atom"
+   }
+  },
+  {
+   "name": "apply_cost_pending_path_error_41",
+   "program": "ff02ffff010dffff01ff808080",
+   "env": "80",
+   "max_cost": 41,
+   "expect": {
+    "error": "path_into_atom"
+   }
+  },
+  {
+   "name": "apply_cost_pending_path_error_40",
+   "program": "ff02ffff010dffff01ff808080",
+   "env": "80",
+   "max_cost": 40,
+   "expect": {
+    "error": "cost_exceeded"
+   }
+  },
+  {
+   "name": "apply_cost_pending_bad_arg_list_41",
+   "program": "ff02ffff01ff1005ffff018080",
+   "env": "80",
+   "max_cost": 41,
+   "expect": {
+    "error": "bad_arg_list"
+   }
+  },
+  {
+   "name": "apply_arity_uncharged_budget_1",
+   "program": "ff0280",
+   "env": "80",
+   "max_cost": 1,
+   "expect": {
+    "error": "wrong_arg_count"
+   }
+  },
+  {
+   "name": "apply_cost_checked_at_applied_program_151",
+   "program": "ff02ffff01ff0101ffff018080",
+   "env": "80",
+   "max_cost": 151,
+   "expect": {
+    "result": "01",
+    "cost": 151
+   }
+  },
+  {
+   "name": "apply_cost_checked_at_applied_program_150",
+   "program": "ff02ffff01ff0101ffff018080",
+   "env": "80",
+   "max_cost": 150,
+   "expect": {
+    "error": "cost_exceeded"
+   }
+  },
+  {
+   "name": "apply_cost_pending_bad_arg_list_40",
+   "program": "ff02ffff01ff1005ffff018080",
+   "env": "80",
+   "max_cost": 40,
+   "expect": {
+    "error": "cost_exceeded"
    }
   }
  ]

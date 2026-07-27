@@ -29,6 +29,13 @@ def run(program, env, max_cost):
         if cost > max_cost:
             raise BitLispError("cost_exceeded", "cost exceeded")
 
+    def accrue(amount):
+        # Adds cost without checking the budget. The check rides on
+        # the next charge, so an uncharged error raised in between
+        # wins over cost_exceeded, matching the consensus oracle.
+        nonlocal cost
+        cost += amount
+
     values = []
     tasks = [(_EVAL, program, env)]
     while tasks:
@@ -86,7 +93,11 @@ def run(program, env, max_cost):
             # Right-to-left evaluation: the program result is on top.
             new_program = values.pop()
             new_env = values.pop()
-            charge(costs.APPLY_COST)
+            # The apply cost is checked only at the applied program's
+            # first charge: its pre-charge failures (a path walk into
+            # an atom, an improper argument list) are reported even
+            # when the budget is already burst.
+            accrue(costs.APPLY_COST)
             tasks.append((_EVAL, new_program, new_env))
     return cost, values[0]
 

@@ -1,9 +1,9 @@
 # BitLisp VM
 
 Status: Phase 1 in progress. Sections 1 to 6 are normative for the
-evaluator core and the arithmetic operator family. Remaining operator
-families land one session at a time, each extending section 4 and the
-vector corpus together.
+evaluator core, the tree ops family, and the arithmetic operator
+family. Remaining operator families land one session at a time, each
+extending section 4 and the vector corpus together.
 
 The evaluator is CLVM-derived. The shared core must be bit-for-bit
 equivalent to the pinned consensus oracle (`chia-rs`, flags 0) on the
@@ -111,10 +111,17 @@ For a program `(op . args)`, in this exact sequence:
    - The empty atom raises `reserved_operator` here, not at
      identification: its dispatch cost is charged and its arguments
      evaluate first.
-   - `0x02` (**apply**) checks its arity (exactly 2) here, then
-     charges 90, then evaluates the first result as a program with
-     the second result as its environment. That evaluation's result
-     or error is the apply's.
+   - `0x02` (**apply**) checks its arity (exactly 2) here, uncharged.
+     Its cost 90 then accrues without an immediate budget check: the
+     check rides on the applied program's first charge, so pre-charge
+     failures inside the applied program (a path walk into an atom,
+     an improper argument list) are reported even when the accrued
+     cost already exceeds the budget. Such a charge always exists,
+     because every program charges before it completes (a path
+     lookup, a quote, or a dispatch cost), so no program can succeed
+     with an accrued cost above the budget. Apply then evaluates the first
+     result as a program with the second result as its environment,
+     and that evaluation's result or error is the apply's.
    - A table operator checks arity, validates arguments, and charges
      per [COSTS.md](COSTS.md), in the per-operator interleaving
      specified there.
@@ -128,21 +135,43 @@ equals `max_cost` exactly succeeds. Exceeding it raises
 
 ## 4. Operator table
 
-Implemented so far: the core specials and the arithmetic family.
-Remaining families (bytes and strings, tree ops, crypto) land in later
-sessions.
+Implemented so far: the core specials, the tree ops family, and the
+arithmetic family. Remaining families (bytes and strings, crypto) land
+in later sessions.
 
 | Opcode | Name | Arity | Semantics |
 | --- | --- | --- | --- |
 | `0x01` | `q` quote | none | Returns its unevaluated tail. Section 3.2. |
 | `0x02` | `a` apply | 2 | Evaluates result 1 as a program with result 2 as environment. |
+| `0x03` | `i` if | 3 | Selects on the first argument: nil selects the third argument, any other value selects the second. All three arguments are evaluated first, there is no lazy branch. |
+| `0x04` | `c` cons | 2 | Builds the pair `(first . second)`. |
+| `0x05` | `f` first | 1 | The left cell of a pair argument. An atom argument raises `arg_not_pair`. |
+| `0x06` | `r` rest | 1 | The right cell of a pair argument. An atom argument raises `arg_not_pair`. |
+| `0x07` | `l` listp | 1 | TRUE if the argument is a pair, nil if it is an atom. |
 | `0x08` | `x` raise | any | Evaluates its arguments, then raises `user_raise`. Never returns. |
+| `0x09` | `=` equal | 2 | Byte equality of two atoms: TRUE if identical, nil otherwise. A pair argument raises `arg_not_atom`. |
 | `0x10` | `+` add | 0 or more | Sum of integer arguments. No arguments gives nil (zero). |
 | `0x11` | `-` subtract | 0 or more | First argument minus the rest. No arguments gives nil, one argument returns it. |
 | `0x12` | `*` multiply | 0 or more | Product. No arguments gives 1 (`0x01`). |
 | `0x13` | `/` divide | 2 | Floor division, truncating toward negative infinity. Divisor zero raises `div_by_zero`. See divergence D6. |
 | `0x14` | `divmod` | 2 | Returns the pair `(quotient . remainder)` under floor division. Divisor zero raises `div_by_zero`. |
 | `0x15` | `>` greater | 2 | Signed integer comparison. TRUE if the first argument is strictly greater. |
+
+The tree ops select, build, and compare nodes without interpreting
+them as integers:
+
+- `=` compares raw atom bytes. Redundantly encoded integers are
+  distinct values to `=`: `0x0001` does not equal `0x01`, and `0x00`
+  does not equal nil. There is no operand size limit, the cost is
+  linear in the bytes compared.
+- `i` treats nil as the only false value. Every other value selects
+  the second argument, the one-byte atom `0x00` and every pair
+  included.
+- No tree op charges malloc: every result is an existing node, the
+  pair built by `c`, or a shared constant (TRUE, nil).
+- Each tree op's checks all precede its single charge, in the order
+  given in COSTS.md: arity, then the pair or atom requirements. Every
+  check therefore wins over `cost_exceeded` when both would fire.
 
 All arithmetic operators require atom arguments and raise
 `arg_not_atom` on a pair argument. Arity violations raise
@@ -193,7 +222,8 @@ informative, not normative.
 | `unknown_operator` | Operator atom not in the table | (accepted, D3) | (accepted, D3) |
 | `bad_arg_list` | Operator arguments are not a proper list | (varies) | (varies) |
 | `wrong_arg_count` | Operator arity violated | InvalidOperatorArg | (per-op message) |
-| `arg_not_atom` | Integer operator got a pair | InvalidOperatorArg | (per-op message) |
+| `arg_not_atom` | An atom-only operator (`=` or the integer family) got a pair | InvalidOperatorArg | (per-op message) |
+| `arg_not_pair` | `f` or `r` applied to an atom | InvalidOperatorArg: first/rest of non-cons | first/rest of non-cons |
 | `arg_too_long` | Operand exceeds a section 4 size limit | InvalidOperatorArg | (absent, the `clvm` package has no operand limits) |
 | `div_by_zero` | Division or divmod by zero | Division by zero | div/divmod with 0 |
 | `user_raise` | The `x` operator | clvm raise | clvm raise |
@@ -222,7 +252,7 @@ adopt/take/decline triage in `docs/execution-plan.md`.
 
 | Oracle | Version | Pinned | Upstream commit | Notes |
 | --- | --- | --- | --- | --- |
-| `clvm` (PyPI) | 0.9.15 | 2026-07-26 | TODO on first triage | Python oracle. Carries non-consensus library policy (see D6), lacks the consensus operand size limits (section 4), and checks the cost budget only after an operator completes. The diff harness tolerates all three, each tagged in its output. |
+| `clvm` (PyPI) | 0.9.15 | 2026-07-26 | TODO on first triage | Python oracle. Carries non-consensus library policy (see D6), lacks the consensus operand size limits (section 4), checks the cost budget only after an operator completes, and checks apply's cost immediately where consensus defers the check to the applied program's first charge (section 3.2). The diff harness tolerates all four, each tagged in its output. |
 | `chia-rs` (PyPI) | 0.46.0 | 2026-07-26 | TODO on first triage | Consensus oracle, run with flags 0 |
 
 Divergent operators are tested against their own oracles. `secp_verify`
