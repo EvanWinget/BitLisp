@@ -7,9 +7,10 @@ this table, the machine handles both.
 
 The interleaving of argument validation, charges, and value checks is
 consensus-visible: near the budget boundary it decides which of
-cost_exceeded, arg_not_atom, and div_by_zero is reported. Every
-function below performs them in the consensus oracle's order, and the
-boundary cases are pinned by vectors.
+cost_exceeded, wrong_arg_count, arg_not_atom, arg_not_pair, and
+div_by_zero is reported. Every function below performs them in the
+consensus oracle's order, and the boundary cases are pinned by
+vectors.
 """
 
 from . import costs
