@@ -1,7 +1,7 @@
 {
  "schema": "bitlisp-vector-v0",
  "suite": "vm",
- "spec": "VM.md section 4 and COSTS.md section 3 (arithmetic family, divergence D6)",
+ "spec": "VM.md section 4 and COSTS.md section 4 (arithmetic family, divergence D6)",
  "cases": [
   {
    "name": "add_2_3",
