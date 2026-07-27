@@ -10,9 +10,14 @@ import random
 import sys
 from pathlib import Path
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(REPO_ROOT / "tools"))
 
+# The oracle wheels are the `oracles` extra, not `dev`: skip cleanly
+# instead of failing collection when only `dev` is installed.
+pytest.importorskip("chia_rs")
 import diff_clvm  # noqa: E402
 from diff_clvm import Generator, run_bitlisp, run_rs  # noqa: E402
 
