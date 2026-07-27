@@ -1,4 +1,4 @@
-"""The operator table: arithmetic family.
+"""The operator table: tree ops and arithmetic families.
 
 Each operator takes the evaluated argument list and the machine's
 charge callback, and returns the result node. The machine charges
@@ -14,7 +14,7 @@ boundary cases are pinned by vectors.
 
 from . import costs
 from .errors import BitLispError
-from .sexp import NIL, TRUE, atom_to_int, int_to_atom, is_atom
+from .sexp import NIL, TRUE, atom_to_int, int_to_atom, is_atom, is_pair
 
 
 def _int_arg(arg, op_name, max_bytes=None):
@@ -47,6 +47,62 @@ def _exactly(args, count, op_name):
 
 def _malloc(charge, atom):
     charge(costs.MALLOC_COST_PER_BYTE * len(atom))
+
+
+def op_if(args, charge):
+    # All three arguments were evaluated before dispatch reached this
+    # table: there is no lazy branch. nil is the only false value, the
+    # one-byte atom 0x00 and every pair select the second argument.
+    _exactly(args, 3, "i")
+    charge(costs.IF_COST)
+    return args[2] if args[0] == NIL else args[1]
+
+
+def op_cons(args, charge):
+    _exactly(args, 2, "c")
+    # The freshly built pair is never malloc-charged, only freshly
+    # built atoms are, and both children here are existing nodes.
+    charge(costs.CONS_COST)
+    return (args[0], args[1])
+
+
+def _pair_arg(args, op_name, noun):
+    _exactly(args, 1, op_name)
+    if not is_pair(args[0]):
+        raise BitLispError("arg_not_pair", f"{noun} of non-cons")
+    return args[0]
+
+
+def op_first(args, charge):
+    # The pair check precedes the charge: an atom argument is reported
+    # even when the budget is already spent.
+    pair = _pair_arg(args, "f", "first")
+    charge(costs.FIRST_COST)
+    return pair[0]
+
+
+def op_rest(args, charge):
+    pair = _pair_arg(args, "r", "rest")
+    charge(costs.REST_COST)
+    return pair[1]
+
+
+def op_listp(args, charge):
+    _exactly(args, 1, "l")
+    charge(costs.LISTP_COST)
+    return TRUE if is_pair(args[0]) else NIL
+
+
+def op_eq(args, charge):
+    _exactly(args, 2, "=")
+    # Both atom checks precede the single charge. The comparison is on
+    # raw bytes: redundantly encoded integers are distinct values, and
+    # there is no operand size limit.
+    for arg in args:
+        if not is_atom(arg):
+            raise BitLispError("arg_not_atom", "= used on list")
+    charge(costs.EQ_BASE_COST + costs.EQ_COST_PER_BYTE * (len(args[0]) + len(args[1])))
+    return TRUE if args[0] == args[1] else NIL
 
 
 def op_add(args, charge):
@@ -193,7 +249,13 @@ def op_raise(args, charge):
 
 
 OPERATORS = {
+    b"\x03": op_if,
+    b"\x04": op_cons,
+    b"\x05": op_first,
+    b"\x06": op_rest,
+    b"\x07": op_listp,
     b"\x08": op_raise,
+    b"\x09": op_eq,
     b"\x10": op_add,
     b"\x11": op_sub,
     b"\x12": op_mul,
