@@ -47,14 +47,15 @@ from clvm.serialize import sexp_from_stream, sexp_to_stream  # noqa: E402
 
 MAX_COST = 11_000_000_000
 
-# Error message fragments mapped to bitlisp error codes. The
-# "first of non-cons" mapping is only valid while the tree-ops family
-# (f, r) is unimplemented, revisit in that session.
+# Error message fragments mapped to bitlisp error codes.
 RS_ERRORS = {
     "path into atom": "path_into_atom",
     "Division by zero": "div_by_zero",
     "takes exactly": "wrong_arg_count",
     "Requires Int Argument": "arg_not_atom",
+    "= used on list": "arg_not_atom",
+    "first of non-cons": "arg_not_pair",
+    "rest of non-cons": "arg_not_pair",
     "Invalid Nil Terminator": "bad_arg_list",
     "clvm raise": "user_raise",
     "cost exceeded": "cost_exceeded",
@@ -65,13 +66,19 @@ RS_ERRORS = {
     # first-hit in insertion order.
     "InvalidOperatorArg": "arg_too_long",
 }
+# The Python oracle also reports an improper argument list as
+# first/rest of non-cons, indistinguishable from f or r on an atom.
+# The generator only emits proper argument lists, so the mapping to
+# arg_not_pair is unambiguous here.
 PY_ERRORS = {
     "path into atom": "path_into_atom",
     "div with 0": "div_by_zero",
     "divmod with 0": "div_by_zero",
     "takes exactly": "wrong_arg_count",
     "requires int args": "arg_not_atom",
-    "first of non-cons": "bad_arg_list",
+    "= on list": "arg_not_atom",
+    "first of non-cons": "arg_not_pair",
+    "rest of non-cons": "arg_not_pair",
     "clvm raise": "user_raise",
     "cost exceeded": "cost_exceeded",
     "reserved operator": "reserved_operator",
@@ -135,7 +142,24 @@ def run_py(program, env, max_cost):
 class Generator:
     """Random programs over the implemented operator set."""
 
-    OPCODES = [b"\x10", b"\x11", b"\x12", b"\x13", b"\x14", b"\x15"]
+    # opcode -> arity, None for variadic (0 to 4 arguments). The
+    # generator always emits a valid arity: wrong_arg_count paths are
+    # pinned by hand-written vectors instead.
+    ARITIES = {
+        b"\x03": 3,  # i
+        b"\x04": 2,  # c
+        b"\x05": 1,  # f
+        b"\x06": 1,  # r
+        b"\x07": 1,  # l
+        b"\x09": 2,  # =
+        b"\x10": None,  # +
+        b"\x11": None,  # -
+        b"\x12": None,  # *
+        b"\x13": 2,  # /
+        b"\x14": 2,  # divmod
+        b"\x15": 2,  # >
+    }
+    OPCODES = sorted(ARITIES)
 
     def __init__(self, rng, max_depth):
         self.rng = rng
@@ -187,10 +211,8 @@ class Generator:
         if roll < 0.44:
             return (b"\x08", b"")  # (x)
         opcode = r.choice(self.OPCODES)
-        if opcode in (b"\x13", b"\x14", b"\x15"):
-            arg_count = 2
-        else:
-            arg_count = r.randint(0, 4)
+        arity = self.ARITIES[opcode]
+        arg_count = r.randint(0, 4) if arity is None else arity
         args = b""
         for _ in range(arg_count):
             args = (self.program(depth - 1), args)
