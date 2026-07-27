@@ -1,9 +1,10 @@
 # BitLisp VM
 
 Status: Phase 1 in progress. Sections 1 to 6 are normative for the
-evaluator core, the tree ops family, and the arithmetic operator
-family. Remaining operator families land one session at a time, each
-extending section 4 and the vector corpus together.
+evaluator core, the tree ops family, the arithmetic operator family,
+and the bytes and strings family. Remaining operator families land one
+session at a time, each extending section 4 and the vector corpus
+together.
 
 The evaluator is CLVM-derived. The shared core must be bit-for-bit
 equivalent to the pinned consensus oracle (`chia-rs`, flags 0) on the
@@ -177,9 +178,9 @@ failing closed.
 
 ## 4. Operator table
 
-Implemented so far: the core specials, the tree ops family, and the
-arithmetic family. Remaining families (bytes and strings, crypto) land
-in later sessions.
+Implemented so far: the core specials, the tree ops family, the
+arithmetic family, and the bytes and strings family. Remaining
+families (bitwise, boolean, crypto) land in later sessions.
 
 | Opcode | Name | Arity | Semantics |
 | --- | --- | --- | --- |
@@ -192,6 +193,10 @@ in later sessions.
 | `0x07` | `l` listp | 1 | TRUE if the argument is a pair, nil if it is an atom. |
 | `0x08` | `x` raise | any | Evaluates its arguments, then raises `user_raise`. Never returns. |
 | `0x09` | `=` equal | 2 | Byte equality of two atoms: TRUE if identical, nil otherwise. A pair argument raises `arg_not_atom`. |
+| `0x0a` | `>s` greater-bytes | 2 | Unsigned lexicographic comparison of two atoms: TRUE if the first is greater, nil otherwise. |
+| `0x0c` | `substr` | 2 or 3 | The slice of an atom from a start index to an end index, which defaults to the atom's length. |
+| `0x0d` | `strlen` | 1 | The byte length of an atom, as a minimally encoded integer. |
+| `0x0e` | `concat` | 0 or more | The concatenation of its atom arguments. No arguments gives nil. |
 | `0x10` | `+` add | 0 or more | Sum of integer arguments. No arguments gives nil (zero). |
 | `0x11` | `-` subtract | 0 or more | First argument minus the rest. No arguments gives nil, one argument returns it. |
 | `0x12` | `*` multiply | 0 or more | Product. No arguments gives 1 (`0x01`). |
@@ -248,6 +253,47 @@ consensus-visible and pinned by vectors:
 Floor division examples, pinned by vectors: `7 / 2 = 3`,
 `-7 / 2 = -4`, `divmod(-7, 2) = (-4 . 1)`.
 
+The bytes and strings ops treat atoms as raw byte strings, never as
+integers. All four require atom arguments and raise `arg_not_atom` on
+a pair, except that a pair in a `substr` index position raises
+`bad_index` (below). None has an operand size limit.
+
+- `>s` compares raw atom bytes as unsigned values, lexicographically:
+  the first differing byte position decides, the greater byte winning,
+  and when one atom is a proper prefix of the other the longer one is
+  greater. Equal atoms give nil. Redundantly encoded integers are
+  distinct values to `>s`, and `0x0001` is less than `0x01` because
+  its first byte is smaller. No malloc: the result is TRUE or nil.
+- `strlen` returns its argument's byte length as given, redundant
+  encoding bytes included, as a minimally encoded integer.
+- `concat` returns the concatenation of its arguments in argument
+  order, a freshly built atom. Concatenation is the one implemented
+  operator whose result can exceed every input atom, but its
+  per-input-byte charge is above the plain malloc rate, so the
+  section 2 threshold for building an atom the wire format cannot
+  encode applies unchanged.
+- `substr` returns the slice of its first argument from index `start`
+  up to but not including index `end`. The two-argument form
+  `(substr data start)` slices to the end of the atom. The result is
+  a portion of an existing atom, charged no malloc, and never longer
+  than the data argument, so `substr` alone can never build an
+  oversized atom.
+
+`substr` index arguments follow consensus exactly, pinned by vectors:
+
+- An index must be an atom of at most four bytes. A longer atom or a
+  pair raises `bad_index`.
+- The index value is the signed big-endian two's-complement reading
+  of the atom, the same reading integers get everywhere else (section
+  1). The empty atom is index 0, and leading zero bytes are legal
+  within the four-byte cap: `0x0000ffff` is 65535, while a five-byte
+  encoding of the same value raises `bad_index`.
+- The indices must satisfy `0 <= start <= end <= strlen(data)`, else
+  `index_out_of_range`. A negative index is out of range, not a
+  from-the-end reference. `start = end` gives nil, and both indices
+  equal to the length are legal, so `(substr data (strlen data))` is
+  nil for any atom.
+
 ## 5. Error taxonomy
 
 Errors are consensus-relevant only as "the spend is invalid". The
@@ -264,12 +310,20 @@ informative, not normative.
 | `unknown_operator` | Operator atom not in the table | (accepted, D3) | (accepted, D3) |
 | `bad_arg_list` | Operator arguments are not a proper list | (varies) | (varies) |
 | `wrong_arg_count` | Operator arity violated | InvalidOperatorArg | (per-op message) |
-| `arg_not_atom` | An atom-only operator (`=` or the integer family) got a pair | InvalidOperatorArg | (per-op message) |
+| `arg_not_atom` | An atom-only operator (`=`, the integer family, or the bytes family outside `substr`'s index positions) got a pair | InvalidOperatorArg | (per-op message) |
 | `arg_not_pair` | `f` or `r` applied to an atom | InvalidOperatorArg: first/rest of non-cons | first/rest of non-cons |
 | `arg_too_long` | Operand exceeds a section 4 size limit | InvalidOperatorArg | (absent, the `clvm` package has no operand limits) |
+| `bad_index` | A `substr` index argument is a pair or an atom longer than four bytes | substr requires int32 args (with no leading zeros) | substr requires int32 args |
+| `index_out_of_range` | A `substr` index value is negative, past the end of the data, or an end before a start | Invalid Indices for Substring | invalid indices for substr |
 | `div_by_zero` | Division or divmod by zero | Division by zero | div/divmod with 0 |
 | `user_raise` | The `x` operator | clvm raise | clvm raise |
 | `cost_exceeded` | Cost budget exceeded | cost exceeded or below zero | cost exceeded |
+
+One message column is actively misleading: both oracles' `bad_index`
+message claims to reject leading zeros, but both binaries accept
+leading zero bytes on a `substr` index within the four-byte cap,
+verified by probes and pinned by vectors. The message text describes
+neither oracle's behavior and must not be read back into the rule.
 
 ## 6. Divergence from CLVM
 

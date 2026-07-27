@@ -1,7 +1,8 @@
 # BitLisp Cost Model
 
 Status: Phase 1 in progress. This table is normative for the evaluator
-core, the tree ops family, and the arithmetic family. It inherits the
+core, the tree ops family, the arithmetic family, and the bytes and
+strings family. It inherits the
 CLVM cost table for the operator intersection, verified against the
 pinned oracles by the diff harness. The weight mapping is filled with
 Phase 3 measurements.
@@ -67,8 +68,22 @@ Phase 3 measurements.
     atomness), then one checked charge of the operator's full cost.
     Every check therefore wins over `cost_exceeded` when both would
     fire, pinned by boundary vectors.
+  - `>s`, `strlen`, `substr`: arity check first, then every argument
+    check in argument order (`substr`: the data atom check, then each
+    index's four-byte atom check, then the bounds check), then one
+    checked charge of the operator's full cost, malloc included for
+    `strlen`. Every check wins over `cost_exceeded`, pinned by
+    boundary vectors.
+  - `concat`: the base cost accrues without a budget check. Then per
+    argument, in list order: that argument's atom check, then one
+    checked charge of everything accrued so far plus that argument's
+    `CONCAT_COST_PER_ARG` and per-byte cost. With no arguments the
+    base cost is checked at completion. A pair in the first argument
+    is therefore reported even when the base cost alone would burst
+    the budget, and a pair in a later argument only after every
+    earlier argument's charge fits, pinned by boundary vectors.
 - Evaluation cost does not include deserialization. A per-byte cost on
-  the serialized program belongs to the weight mapping (section 5).
+  the serialized program belongs to the weight mapping (section 6).
 
 ## 2. Core evaluation costs
 
@@ -110,13 +125,32 @@ Worked example, pinned by vectors: `(= (q . 1) (q . 1))` costs
 Worked example, pinned by vectors: `(+ (q . 2) (q . 3))` costs
 `20 + 20 + 99 + 320 * 2 + 3 * 2 + 10 + 1 = 796`.
 
-## 5. Weight mapping
+## 5. Bytes and strings family
+
+| Operator | Formula |
+| --- | --- |
+| `>s` | `117 + 1 * total_arg_bytes`, no malloc, the same constants as `=` |
+| `substr` | `1`, no malloc: the result is a portion of an existing atom |
+| `strlen` | `173 + 1 * arg_bytes + malloc(result)` |
+| `concat` | `142 + 135 * n_args + 13 * total_arg_bytes`, no separate result malloc |
+
+`concat`'s 13 per byte is its own `CONCAT_COST_PER_BYTE = 3` plus
+`MALLOC_COST_PER_BYTE = 10`: the result atom's malloc is charged per
+input byte inside the argument loop rather than on the freshly built
+result, and a nil argument contributes only the per-argument 135.
+The totals agree with charging malloc on the result, the interleaving
+(section 1) does not.
+
+Worked example, pinned by vectors: `(concat (q . "ab") (q . "cd"))`
+costs `20 + 20 + 1 + 142 + 135 * 2 + 13 * 4 = 505`.
+
+## 6. Weight mapping
 
 TODO (Phase 3): mapping from VM cost units to Bitcoin transaction
 weight, derived from benchmark data on the measured artifacts,
 including the per-byte cost of the serialized program itself.
 
-## 6. Condition costs
+## 7. Condition costs
 
 TODO (Phase 2): per-condition base costs and the superlinear
 `CREATE_COIN` schedule.
