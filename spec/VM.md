@@ -249,7 +249,7 @@ adopt/take/decline triage in `docs/execution-plan.md`.
 
 | Oracle | Version | Pinned | Upstream commit | Notes |
 | --- | --- | --- | --- | --- |
-| `clvm` (PyPI) | 0.9.15 | 2026-07-26 | TODO on first triage | Python oracle. Carries non-consensus library policy (see D6), lacks the consensus operand size limits (section 4), and checks the cost budget only after an operator completes. The diff harness tolerates all three, each tagged in its output. |
+| `clvm` (PyPI) | 0.9.15 | 2026-07-26 | TODO on first triage | Python oracle. Carries non-consensus library policy (see D6), lacks the consensus operand size limits (section 4), checks the cost budget only after an operator completes, and checks apply's cost immediately where consensus defers the check to the applied program's first charge (section 3.2). The diff harness tolerates all four, each tagged in its output. |
 | `chia-rs` (PyPI) | 0.46.0 | 2026-07-26 | TODO on first triage | Consensus oracle, run with flags 0 |
 
 Divergent operators are tested against their own oracles. `secp_verify`

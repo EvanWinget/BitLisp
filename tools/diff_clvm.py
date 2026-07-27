@@ -9,11 +9,13 @@ intersection and runs every program through three implementations:
 - clvm (Python package), the secondary oracle
 
 Success requires identical (cost, result bytes) or an identical error
-class. Three disagreements with the Python oracle are tolerated and
+class. Four disagreements with the Python oracle are tolerated and
 counted, all library behavior rather than consensus: its policy
 rejection of negative division operands (consensus does floor
 division), its budget check running only after an operator completes,
-and its lack of the consensus operand size limits. The generator never
+its immediate check of apply's cost where consensus defers the check
+to the applied program's first charge, and its lack of the consensus
+operand size limits. The generator never
 emits the recorded BitLisp divergences: unknown operators, pairs in
 operator position, and non-canonical serializations cannot arise
 because programs are emitted by bitlisp's own canonical serializer
@@ -234,6 +236,7 @@ def main():
         "err_agree": 0,
         "policy_div": 0,
         "py_budget_timing": 0,
+        "py_apply_cost_timing": 0,
         "py_no_operand_limit": 0,
     }
     failures = 0
@@ -274,6 +277,12 @@ def main():
             # consensus rejects an oversized operand its outcome is
             # unconstrained.
             stats["py_no_operand_limit"] += 1
+        elif py == ("err", "cost_exceeded") and bl[0] == "err":
+            # The Python oracle checks apply's cost immediately where
+            # consensus defers the check to the applied program's
+            # first charge, so it can report cost_exceeded where
+            # consensus reports the applied program's error.
+            stats["py_apply_cost_timing"] += 1
         elif py != bl:
             failures += 1
             print(f"MISMATCH bl-vs-py #{i}: prog={program.hex()} env={env.hex()}")
@@ -289,6 +298,7 @@ def main():
         f"{stats['err_agree']} errors agreed, "
         f"{stats['policy_div']} tolerated py policy-div, "
         f"{stats['py_budget_timing']} tolerated py budget-timing, "
+        f"{stats['py_apply_cost_timing']} tolerated py apply-cost-timing, "
         f"{stats['py_no_operand_limit']} tolerated py no-operand-limit, "
         f"{failures} failures"
     )
