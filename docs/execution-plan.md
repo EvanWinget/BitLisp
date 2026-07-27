@@ -20,7 +20,7 @@
 
 **Goal:** a repo Claude Code can be productive in within one session.
 
-- [ ] Create `bitlisp` monorepo (monorepo so spec, reference impl, and vectors version together):
+- [x] Create `bitlisp` monorepo (monorepo so spec, reference impl, and vectors version together):
   ```
   bitlisp/
     CLAUDE.md              # working rules for Claude Code (below)
@@ -39,10 +39,10 @@
     tools/                 # vector runners, corpus generators, size measurement
     docs/                  # evaluation doc, essay drafts
   ```
-- [ ] `bll-consensus`: add README pointer ("paused; superseded by BitLisp — rationale in linked evaluation doc"), archive.
-- [ ] Cherry-pick from bll-consensus: CI config, vector-runner scaffolding, any generic utilities. No history fork.
-- [ ] CI from day 1: pytest + vector runner + `hypothesis` property suite (empty is fine; the gate exists before the tests do).
-- [ ] **Reference-material policy (no submodules, deliberately):**
+- [x] `bll-consensus`: add README pointer ("paused; superseded by BitLisp — rationale in linked evaluation doc"), archive.
+- [x] Cherry-pick from bll-consensus: CI config, vector-runner scaffolding, any generic utilities. No history fork.
+- [x] CI from day 1: pytest + vector runner + `hypothesis` property suite (empty is fine; the gate exists before the tests do).
+- [x] **Reference-material policy (no submodules, deliberately):**
   - Oracles = released artifacts: `clvm` + `chia_rs` wheels pinned in the lockfile (dev deps only); upstream commit hashes recorded in `VM.md` provenance. Rust phase: `clvm_rs` as pinned crates.io dev-dependency.
   - Chia's official test vectors vendored as **data** into `vectors/upstream/` with provenance headers (repo, commit, license). CI never fetches from the network.
   - `tools/fetch-references.sh` clones clvm/clvm_rs/chia_rs into git-ignored `references/` for human browsing only.
@@ -66,10 +66,10 @@
 
 **Goal:** a minimal Python evaluator whose shared core is bit-for-bit CLVM-equivalent, with divergences enumerated.
 
-- [ ] Implement the evaluator in `python/bitlisp/` — own code, not a wrapper (it is the spec artifact), small and boring: cons cells, serialization, operator dispatch, cost accounting.
+- [x] Implement the evaluator in `python/bitlisp/` — own code, not a wrapper (it is the spec artifact), small and boring: cons cells, serialization, operator dispatch, cost accounting.
 - [ ] Define operator set in `VM.md`: CLVM core **minus** BLS operators, **plus** `secp_verify` (BIP340, assertive semantics deferred to condition layer). Divergence table with rationale per row.
 - [ ] Inherit the CLVM cost table (`COSTS.md`); weight-mapping section stubbed for Phase 3 data.
-- [ ] **Differential harness v1** (`tools/diff_clvm.py`): run every intersection program through bitlisp-python AND `clvm`/`chia_rs`; assert identical (result, cost) or identical error class.
+- [x] **Differential harness v1** (`tools/diff_clvm.py`): run every intersection program through bitlisp-python AND `clvm`/`chia_rs`; assert identical (result, cost) or identical error class.
 - [ ] Import Chia's official CLVM test vectors for the intersection; generate randomized program corpus (Claude Code task: corpus generator with size/depth knobs).
 - [ ] Divergent operators tested against their own oracles (`secp_verify` → BIP340 official vectors + libsecp256k1 via `coincurve`).
 
