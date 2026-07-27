@@ -20,8 +20,10 @@ list and f or r on an atom, and its integer conversion running before
 the arity check where consensus checks arity first. The two budget-timing tolerances
 are verified per case, not assumed: the tolerating branch re-runs an
 implementation without the tight budget and requires it to reproduce
-the other side's outcome exactly, so neither can absorb an unrelated
-divergence.
+the other side's outcome, exactly except for the recorded
+improper-list message ambiguity, so neither can absorb an unrelated
+divergence. The tolerances compose: a program can hit the apply-cost
+timing and the improper-list ambiguity at once.
 
 The generator never emits three of the recorded BitLisp divergences:
 unknown operators, pairs in operator position, and non-canonical
@@ -87,8 +89,8 @@ RS_ERRORS = {
 }
 # The Python oracle also reports an improper argument list as
 # first/rest of non-cons, indistinguishable from f or r on an atom.
-# The generator only emits proper argument lists, so the mapping to
-# arg_not_pair is unambiguous here.
+# The generator emits improper tails, so every comparison against a
+# Python-side arg_not_pair must go through py_outcome_matches below.
 PY_ERRORS = {
     "path into atom": "path_into_atom",
     "div with 0": "div_by_zero",
@@ -110,6 +112,19 @@ def classify(message, table):
         if fragment in message:
             return code
     return f"UNMAPPED({message})"
+
+
+def py_outcome_matches(expected, py_outcome):
+    """Whether a Python-oracle outcome matches a bitlisp-side one.
+
+    Exact match, except that the Python oracle reports an improper
+    argument list with the same message as f or r on an atom, so its
+    arg_not_pair is accepted where the bitlisp side says
+    bad_arg_list.
+    """
+    if py_outcome == expected:
+        return True
+    return expected == ("err", "bad_arg_list") and py_outcome == ("err", "arg_not_pair")
 
 
 def run_bitlisp(program, env, max_cost):
@@ -374,8 +389,8 @@ def main():
             # keeps evaluating, so bitlisp's outcome is unconstrained.
             py_agrees = True
             stats["policy_div"] += 1
-        elif bl == ("err", "cost_exceeded") and py == run_bitlisp(
-            program, env, MAX_COST
+        elif bl == ("err", "cost_exceeded") and py_outcome_matches(
+            run_bitlisp(program, env, MAX_COST), py
         ):
             # The Python oracle checks the budget only after an
             # operator completes, so where consensus bursts
@@ -389,7 +404,9 @@ def main():
             # unconstrained.
             py_agrees = True
             stats["py_no_operand_limit"] += 1
-        elif py == ("err", "cost_exceeded") and run_py(program, env, MAX_COST) == bl:
+        elif py == ("err", "cost_exceeded") and py_outcome_matches(
+            bl, run_py(program, env, MAX_COST)
+        ):
             # The Python oracle checks apply's cost immediately where
             # consensus defers the check to the applied program's
             # first charge, so it can burst its budget where
