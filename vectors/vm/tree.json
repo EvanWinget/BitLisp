@@ -210,7 +210,7 @@
    }
   },
   {
-   "name": "if_condition_from_env",
+   "name": "if_arg_path_error_wins",
    "program": "ff03ff05ffff0102ffff010380",
    "env": "ffff01ff028003",
    "expect": {
@@ -485,6 +485,49 @@
    "max_cost": 40,
    "expect": {
     "error": "cost_exceeded"
+   }
+  },
+  {
+   "name": "first_improper_arg_list",
+   "program": "ff0505",
+   "env": "80",
+   "expect": {
+    "error": "bad_arg_list"
+   }
+  },
+  {
+   "name": "rest_of_nil",
+   "program": "ff06ffff018080",
+   "env": "80",
+   "expect": {
+    "error": "arg_not_pair"
+   }
+  },
+  {
+   "name": "rest_of_atom_wins_at_spent_budget",
+   "program": "ff06ffff010180",
+   "env": "80",
+   "max_cost": 21,
+   "expect": {
+    "error": "arg_not_pair"
+   }
+  },
+  {
+   "name": "rest_of_atom_loses_to_arg_cost",
+   "program": "ff06ffff010180",
+   "env": "80",
+   "max_cost": 20,
+   "expect": {
+    "error": "cost_exceeded"
+   }
+  },
+  {
+   "name": "if_condition_read_from_env",
+   "program": "ff03ff02ffff0105ffff010780",
+   "env": "ff8003",
+   "expect": {
+    "result": "07",
+    "cost": 122
    }
   }
  ]
