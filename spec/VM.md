@@ -260,7 +260,7 @@ pin it. No divergence exists outside this table. "Both oracles" means
 | D4 | Pair in operator position | `clvm` rejects. `chia-rs` accepts via a legacy apply-style rule (observed: `((A . B) . rest)` dispatches on `A` with arity errors reported for `A`'s operator) | `operator_not_atom` error | The oracles disagree with each other. Strict rejection is the smaller, reviewable surface. PROVISIONAL, see section 8. | `vm/dispatch.json` |
 | D5 | Deserialization strictness | Both oracles accept non-minimal length encodings, trailing bytes, and (chia-rs) `0xfe` back-references | `bad_encoding` for all three (section 2) | Witness bytes must have exactly one accepted spelling per program. Malleability of the serialized form is a consensus hazard in the Bitcoin context. | `vm/serialize.json` |
 | D6 | `/` with negative operands | Consensus (`chia-rs`): floor division. The `clvm` package injects a policy error ("deprecated") that is not consensus | Floor division, matching consensus | Intersection parity targets the consensus oracle. The Python package's rejection is library policy, the diff harness treats it as an expected divergence. OPEN QUESTION, see section 8. | `vm/arith.json` |
-| D7 | Zero cost budget | Both oracles treat `max_cost = 0` as unlimited | A zero budget is a real budget, no program succeeds under it (section 3.3) | A zero sentinel meaning unlimited is a library convenience, not consensus behavior. In the Bitcoin context the budget derives from transaction weight and is never legitimately zero, and an accidental zero must fail closed rather than open. PROVISIONAL, see section 8. | `vm/dispatch.json` |
+| D7 | Zero cost budget | Both oracles treat `max_cost = 0` as unlimited | A zero budget is a real budget, no program succeeds under it (section 3.3) | A zero sentinel meaning unlimited is a library convenience, not consensus behavior. In the Bitcoin context the budget derives from transaction weight and is never legitimately zero, and an accidental zero must fail closed rather than open. Ratified, see section 8. | `vm/dispatch.json` |
 
 ## 7. Oracle provenance
 
@@ -293,10 +293,11 @@ these is a spec amendment plus vector update in one reviewed commit.
    floor semantics, reject negative operands in consensus, or drop
    `/` entirely and keep only `divmod`. Needs a decision before the
    operator set freezes.
-4. **D7 (zero budget).** Fail-closed implemented: a zero `max_cost`
-   rejects every program where the oracles treat it as unlimited.
-   Found by the codebase review, previously undocumented. Confirm
-   fail-closed, and decide whether the reference should also enforce
-   the unsigned 64-bit budget bound the hardened implementation will
-   have (section 3.3 currently records the bound without enforcing
-   it).
+4. **D7 (zero budget).** Fail-closed RATIFIED (decision by Evan,
+   2026-07-26): a zero `max_cost` rejects every program where the
+   oracles treat it as unlimited. A budget bug must reject every
+   spend, a recoverable liveness failure, rather than hand out
+   unlimited execution, a soundness failure. Still open: whether the
+   reference should also enforce the unsigned 64-bit budget bound the
+   hardened implementation will have (section 3.3 currently records
+   the bound without enforcing it).
