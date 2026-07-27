@@ -1,9 +1,10 @@
 # BitLisp Cost Model
 
 Status: Phase 1 in progress. This table is normative for the evaluator
-core, the tree ops family, and the arithmetic family. It inherits the CLVM cost table for the
-operator intersection, verified against the pinned oracles by the diff
-harness. The weight mapping is filled with Phase 3 measurements.
+core, the tree ops family, and the arithmetic family. It inherits the
+CLVM cost table for the operator intersection, verified against the
+pinned oracles by the diff harness. The weight mapping is filled with
+Phase 3 measurements.
 
 ## 1. General rules
 

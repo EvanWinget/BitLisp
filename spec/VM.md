@@ -116,7 +116,10 @@ For a program `(op . args)`, in this exact sequence:
      check rides on the applied program's first charge, so pre-charge
      failures inside the applied program (a path walk into an atom,
      an improper argument list) are reported even when the accrued
-     cost already exceeds the budget. Apply then evaluates the first
+     cost already exceeds the budget. Such a charge always exists,
+     because every program charges before it completes (a path
+     lookup, a quote, or a dispatch cost), so no program can succeed
+     with an accrued cost above the budget. Apply then evaluates the first
      result as a program with the second result as its environment,
      and that evaluation's result or error is the apply's.
    - A table operator checks arity, validates arguments, and charges
