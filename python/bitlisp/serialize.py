@@ -12,9 +12,10 @@ limited by the Python recursion limit.
 from .errors import BitLispError
 from .sexp import is_atom
 
-# Length prefix forms: (leading byte low-bit mask, extra length bytes,
-# smallest length that requires this form). An encoding is canonical
-# only if the length could not fit a shorter form.
+# Length prefix forms: (prefix byte, mask selecting the length bits
+# inside the prefix byte, count of extra length bytes, smallest length
+# that requires this form). An encoding is canonical only if the
+# length could not fit a shorter form.
 _FORMS = (
     (0x80, 0x3F, 0, 0),
     (0xC0, 0x1F, 1, 0x40),
@@ -22,7 +23,6 @@ _FORMS = (
     (0xF0, 0x07, 3, 0x100000),
     (0xF8, 0x03, 4, 0x8000000),
 )
-_MAX_LENGTH = 0x400000000 - 1  # 34-bit length field
 
 _PARSE, _CONS = 0, 1
 
@@ -54,11 +54,20 @@ def _write_atom(out, atom):
             out += low_bits.to_bytes(extra, "big") if extra else b""
             out += atom
             return
+    # The forms cover every length below 2**34. Longer atoms have no
+    # encoding in the wire format.
     raise BitLispError("bad_encoding", "atom too long to serialize")
 
 
 def deserialize(data):
     """Parses exactly one node from all of data, strictly."""
+    # Only immutable bytes may enter. A bytearray would slice into
+    # bytearray atoms, which the machine would not recognize as atoms,
+    # and a memoryview can escape as a bare IndexError. Rejecting the
+    # type before reading a byte keeps every failure inside the error
+    # taxonomy.
+    if type(data) is not bytes:
+        raise BitLispError("bad_encoding", "input must be bytes")
     pos = 0
     values = []
     tasks = [_PARSE]
