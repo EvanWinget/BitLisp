@@ -178,6 +178,54 @@
     "result": "ffff0102ffff807fff0102",
     "cost": 20
    }
+  },
+  {
+   "name": "empty_env_bytes_rejected",
+   "program": "01",
+   "env": "",
+   "expect": {
+    "error": "bad_encoding"
+   }
+  },
+  {
+   "name": "non_minimal_e0_form",
+   "program": "e0000141",
+   "env": "80",
+   "expect": {
+    "error": "bad_encoding"
+   }
+  },
+  {
+   "name": "non_minimal_f0_form",
+   "program": "f000000141",
+   "env": "80",
+   "expect": {
+    "error": "bad_encoding"
+   }
+  },
+  {
+   "name": "non_minimal_f8_form",
+   "program": "f80000000141",
+   "env": "80",
+   "expect": {
+    "error": "bad_encoding"
+   }
+  },
+  {
+   "name": "declared_length_exceeds_input",
+   "program": "fbffffffff",
+   "env": "80",
+   "expect": {
+    "error": "bad_encoding"
+   }
+  },
+  {
+   "name": "empty_program_bytes_rejected",
+   "program": "",
+   "env": "80",
+   "expect": {
+    "error": "bad_encoding"
+   }
   }
  ]
 }

@@ -8,7 +8,7 @@ version = "0.0.1"
 description = "Executable specification for a CLVM-derived Bitcoin predicate VM and matching layer"
 readme = "README.md"
 license = "Apache-2.0"
-requires-python = ">=3.11"
+requires-python = ">=3.14"
 
 # Runtime dependencies stay empty on purpose. The reference
 # implementation is the spec artifact and must be self-contained.
@@ -35,7 +35,7 @@ testpaths = ["python/tests"]
 
 [tool.ruff]
 line-length = 88
-target-version = "py311"
+target-version = "py314"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP"]

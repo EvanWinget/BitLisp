@@ -32,6 +32,9 @@ class BitLispError(Exception):
     """
 
     def __init__(self, code, message):
-        assert code in CODES, code
+        # A typo'd code must fail loudly even under python -O, where
+        # an assert would vanish and let it become a live error class.
+        if code not in CODES:
+            raise ValueError(f"unknown error code {code!r}")
         super().__init__(message)
         self.code = code

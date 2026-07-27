@@ -9,21 +9,31 @@ intersection and runs every program through three implementations:
 - clvm (Python package), the secondary oracle
 
 Success requires identical (cost, result bytes) or an identical error
-class. Four disagreements with the Python oracle are tolerated and
+class. Six disagreements with the Python oracle are tolerated and
 counted, all library behavior rather than consensus: its policy
 rejection of negative division operands (consensus does floor
 division), its budget check running only after an operator completes,
 its immediate check of apply's cost where consensus defers the check
-to the applied program's first charge, and its lack of the consensus
-operand size limits. The two budget-timing tolerances are verified
-per case, not assumed: the tolerating branch re-runs an
+to the applied program's first charge, its lack of the consensus
+operand size limits, its single message for both an improper argument
+list and f or r on an atom, and its integer conversion running before
+the arity check where consensus checks arity first. The two budget-timing tolerances
+are verified per case, not assumed: the tolerating branch re-runs an
 implementation without the tight budget and requires it to reproduce
 the other side's outcome exactly, so neither can absorb an unrelated
-divergence. The generator never emits the recorded BitLisp
-divergences: unknown operators, pairs in operator position, and
-non-canonical serializations cannot arise because programs are
-emitted by bitlisp's own canonical serializer over the implemented
-opcode set. Anything else is a finding and fails the run.
+divergence.
+
+The generator never emits three of the recorded BitLisp divergences:
+unknown operators, pairs in operator position, and non-canonical
+serializations cannot arise because programs are emitted by bitlisp's
+own canonical serializer over the implemented opcode set. It does
+emit zero budgets, which exercise divergence D7 (the oracles treat a
+zero budget as unlimited): those runs assert bitlisp's fail-closed
+outcome and skip the oracles. It also emits wrong arities, improper
+argument tails, and the reserved empty-atom operator, and a share of
+runs use a budget within a few units of the program's measured cost,
+where the charge interleaving decides the error class. Anything else
+is a finding and fails the run.
 
 Usage:
     python3 tools/diff_clvm.py --count 10000 --seed 1
@@ -147,9 +157,10 @@ def run_py(program, env, max_cost):
 class Generator:
     """Random programs over the implemented operator set."""
 
-    # opcode -> arity, None for variadic (0 to 4 arguments). The
-    # generator always emits a valid arity: wrong_arg_count paths are
-    # pinned by hand-written vectors instead.
+    # opcode -> arity, None for variadic (0 to 4 arguments). Wrong
+    # arities, improper argument tails, and the reserved empty-atom
+    # operator are emitted at low probability so the wrong_arg_count,
+    # bad_arg_list, and reserved_operator paths stay exercised.
     ARITIES = {
         b"\x03": 3,  # i
         b"\x04": 2,  # c
@@ -217,8 +228,17 @@ class Generator:
             return (b"\x08", b"")  # (x)
         opcode = r.choice(self.OPCODES)
         arity = self.ARITIES[opcode]
-        arg_count = r.randint(0, 4) if arity is None else arity
+        if arity is None:
+            arg_count = r.randint(0, 4)
+        elif r.random() < 0.06:
+            arg_count = max(0, arity + r.choice((-1, 1)))
+        else:
+            arg_count = arity
+        if r.random() < 0.03:
+            opcode = b""  # reserved operator, arguments still evaluate
         args = b""
+        if r.random() < 0.03:
+            args = int_to_atom(r.randint(1, 127))  # improper tail
         for _ in range(arg_count):
             args = (self.program(depth - 1), args)
         return (opcode, args)
@@ -237,10 +257,13 @@ def main():
     stats = {
         "ok": 0,
         "err_agree": 0,
+        "d7_zero_budget": 0,
         "policy_div": 0,
         "py_budget_timing": 0,
         "py_apply_cost_timing": 0,
         "py_no_operand_limit": 0,
+        "py_improper_list_ambiguity": 0,
+        "py_arity_check_order": 0,
     }
     failures = 0
 
@@ -249,9 +272,45 @@ def main():
         env_node = gen.value_tree(3)
         program = serialize(program_node)
         env = serialize(env_node)
-        max_cost = MAX_COST if rng.random() < 0.9 else rng.randint(1, 5000)
+        roll = rng.random()
+        if roll < 0.84:
+            max_cost = MAX_COST
+        elif roll < 0.85:
+            max_cost = 0  # divergence D7, asserted below
+        elif roll < 0.90:
+            max_cost = rng.randint(1, 5000)
+        else:
+            # Boundary budgets: measure the program's actual cost,
+            # then rerun within a few units of it, where the charge
+            # interleaving decides which error class is reported.
+            probe = run_bitlisp(program, env, MAX_COST)
+            if probe[0] == "ok":
+                max_cost = max(1, probe[1] + rng.randint(-3, 1))
+            else:
+                max_cost = rng.randint(1, 5000)
 
         bl = run_bitlisp(program, env, max_cost)
+
+        # Recorded divergence D7: the oracles treat a zero budget as
+        # unlimited, bitlisp fails closed. No program may succeed. An
+        # uncharged check failure wins over the empty budget and is
+        # budget-independent, so it must match the unbounded outcome,
+        # everything else must be cost_exceeded. The oracles are not
+        # consulted.
+        if max_cost == 0:
+            zero_ok = bl == ("err", "cost_exceeded") or (
+                bl[0] == "err" and bl == run_bitlisp(program, env, MAX_COST)
+            )
+            if zero_ok:
+                stats["d7_zero_budget"] += 1
+            else:
+                failures += 1
+                print(f"MISMATCH d7 #{i}: prog={program.hex()} env={env.hex()}")
+                print(f"  max_cost=0 bitlisp={bl}, expected a failure")
+                if failures >= args.max_fails:
+                    break
+            continue
+
         rs = run_rs(program, env, max_cost)
         py = run_py(program, env, max_cost)
 
@@ -300,6 +359,21 @@ def main():
             # consensus reports the applied program's error.
             py_agrees = True
             stats["py_apply_cost_timing"] += 1
+        elif bl == ("err", "bad_arg_list") and py == ("err", "arg_not_pair"):
+            # The Python oracle reports an improper argument list
+            # with the same message as f or r on an atom, so the two
+            # classes are indistinguishable in its output. The
+            # consensus comparison above already matched the class
+            # exactly.
+            py_agrees = True
+            stats["py_improper_list_ambiguity"] += 1
+        elif bl == ("err", "wrong_arg_count") and py == ("err", "arg_not_atom"):
+            # On a program that is wrong in both ways (bad arity and
+            # a pair argument), consensus checks arity first while
+            # the Python oracle converts arguments to integers while
+            # iterating, before counting them.
+            py_agrees = True
+            stats["py_arity_check_order"] += 1
 
         if not py_agrees:
             failures += 1
@@ -311,14 +385,17 @@ def main():
 
         stats["ok" if bl[0] == "ok" else "err_agree"] += 1
 
-    total = stats["ok"] + stats["err_agree"]
+    total = stats["ok"] + stats["err_agree"] + stats["d7_zero_budget"]
     print(
         f"diff_clvm: {total} compared, {stats['ok']} ok, "
         f"{stats['err_agree']} errors agreed, "
+        f"{stats['d7_zero_budget']} d7 zero-budget, "
         f"{stats['policy_div']} tolerated py policy-div, "
         f"{stats['py_budget_timing']} tolerated py budget-timing, "
         f"{stats['py_apply_cost_timing']} tolerated py apply-cost-timing, "
         f"{stats['py_no_operand_limit']} tolerated py no-operand-limit, "
+        f"{stats['py_improper_list_ambiguity']} tolerated py improper-list, "
+        f"{stats['py_arity_check_order']} tolerated py arity-order, "
         f"{failures} failures"
     )
     return 1 if failures else 0

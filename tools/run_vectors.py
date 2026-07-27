@@ -28,6 +28,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 VECTOR_ROOT = REPO_ROOT / "vectors"
+sys.path.insert(0, str(REPO_ROOT / "python"))
 
 SCHEMA = "bitlisp-vector-v0"
 SUITES = ("vm", "conditions", "matching")
@@ -76,7 +77,9 @@ def discover(root=VECTOR_ROOT):
 def run_vm_case(case):
     """One vm case: run serialized (program, env) under a budget.
 
-    Case shape:
+    Case shape, closed like the envelope (unknown keys rejected, a
+    typo'd max_cost would otherwise silently rerun the case at the
+    default budget and pass while pinning nothing):
         {
             "name": "<unique within the file>",
             "program": "<hex>",
@@ -86,14 +89,27 @@ def run_vm_case(case):
                       or {"error": "<bitlisp error code>"}
         }
     """
-    sys.path.insert(0, str(REPO_ROOT / "python"))
     from bitlisp import BitLispError, run_serialized
     from bitlisp.errors import CODES
 
+    required = {"name", "program", "env", "expect"}
+    keys = set(case)
+    if missing := required - keys:
+        raise VectorError(f"missing keys {sorted(missing)}")
+    if extra := keys - required - {"max_cost"}:
+        raise VectorError(f"unknown keys {sorted(extra)}")
+    expect = case["expect"]
+    if not isinstance(expect, dict) or set(expect) not in (
+        {"result", "cost"},
+        {"error"},
+    ):
+        raise VectorError(
+            "expect must be exactly {result, cost} or {error}, "
+            f"got {sorted(expect) if isinstance(expect, dict) else expect!r}"
+        )
     program = bytes.fromhex(case["program"])
     env = bytes.fromhex(case["env"])
     max_cost = case.get("max_cost", 11_000_000_000)
-    expect = case["expect"]
     try:
         cost, result = run_serialized(program, env, max_cost)
         outcome = {"result": result.hex(), "cost": cost}
