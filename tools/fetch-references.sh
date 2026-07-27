@@ -1,11 +1,8 @@
 #!/usr/bin/env bash
 # Clones upstream reference repos into git-ignored references/ for
-# HUMAN BROWSING ONLY.
-#
-# Policy (CLAUDE.md): references/ is opened only in divergence-triage
-# sessions, never implementation sessions. Code is never copied from
-# it. Oracles used by tests are the released wheels pinned in
-# pyproject.toml, not these checkouts.
+# reading. Code is never copied from these checkouts, and they are
+# not a build input: the oracles used by tests are the released
+# wheels pinned in pyproject.toml.
 set -o errexit -o nounset -o pipefail
 
 cd "$(git rev-parse --show-toplevel)"

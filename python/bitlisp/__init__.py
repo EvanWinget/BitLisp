@@ -1,8 +1,8 @@
 """BitLisp reference implementation.
 
-This package is the executable specification. Every consensus-relevant
-behavior implemented here cites a section of spec/ (ground rule 1 in
-CLAUDE.md).
+This package is the executable specification: small, boring, and
+readable whole. Behavior is pinned by the vector corpus and by
+differential testing against the consensus oracle.
 """
 
 from .errors import CODES, BitLispError

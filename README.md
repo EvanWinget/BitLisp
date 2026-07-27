@@ -4,8 +4,10 @@ An executable specification for a Bitcoin Script successor: a CLVM-derived
 predicate VM plus a condition vocabulary and transaction-matching layer,
 committed under a new taproot leaf version.
 
-Status: Phase 0 (bootstrap). Nothing here is consensus-ready. The phased
-plan is in [docs/execution-plan.md](docs/execution-plan.md).
+Status: Phase 1 (VM core via CLVM intersection) in progress. The
+evaluator core, the tree ops family, and the arithmetic family are
+implemented and pinned by vectors. Nothing here is consensus-ready.
+The phased plan is in [docs/execution-plan.md](docs/execution-plan.md).
 
 ## Layout
 
