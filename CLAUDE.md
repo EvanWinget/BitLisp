@@ -5,6 +5,27 @@ committed under a new taproot leaf version. The design case and the four
 design obligations live in `docs/bitcoin-script-successor-evaluation.md`
 (section 7). The phased plan lives in `docs/execution-plan.md`.
 
+## Branch workflow
+
+All new development happens on feature branches. Never commit directly
+to `main` unless told by Evan. Each unit of work gets its own branch
+and lands on `main` through a pull request that is reviewed before
+merging.
+
+- CI runs on every pull request. A PR merges only when CI is green
+  and Evan has reviewed it.
+- Keep PRs small and complete: one spec section, one operator family,
+  one tool. The session-hygiene rule (one unit of work per session)
+  and the PR boundary should usually coincide.
+- Review is also how Evan builds expertise in this codebase. Every PR
+  description includes a short review guide: what changed, the spec
+  sections that authorize it, the order to read the commits in, and
+  the commands that verify the claims independently (vector suite,
+  diff harness with a fresh seed, tests). Write it for a careful
+  reader who did not watch the work happen.
+- Spec commits, implementation commits, and vector commits stay
+  separate within the PR so they can be reviewed in that order.
+
 ## Quality mandate (overrides everything else)
 
 Clean, simple, professional code is the point of this project. Speed of
