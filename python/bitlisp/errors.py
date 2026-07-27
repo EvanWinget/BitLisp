@@ -17,6 +17,8 @@ CODES = frozenset(
         "arg_not_atom",
         "arg_not_pair",
         "arg_too_long",
+        "bad_index",
+        "index_out_of_range",
         "div_by_zero",
         "user_raise",
         "cost_exceeded",
