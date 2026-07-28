@@ -219,6 +219,15 @@
     "result": "01",
     "cost": 1161
    }
+  },
+  {
+   "name": "all_full_cost_short_one",
+   "program": "ff22ffff0101ffff0102ffff010380",
+   "env": "80",
+   "max_cost": 1160,
+   "expect": {
+    "error": "cost_exceeded"
+   }
   }
  ]
 }

@@ -652,6 +652,49 @@
    "expect": {
     "error": "cost_exceeded"
    }
+  },
+  {
+   "name": "ash_count_ff_padded_negative_within_cap",
+   "program": "ff16ffff0107ffff0184ffffffff80",
+   "env": "80",
+   "expect": {
+    "result": "03",
+    "cost": 653
+   }
+  },
+  {
+   "name": "ash_count_ff_padded_past_cap_bad_index",
+   "program": "ff16ffff0107ffff0185ffffffffff80",
+   "env": "80",
+   "expect": {
+    "error": "bad_index"
+   }
+  },
+  {
+   "name": "lsh_count_minus_65536_too_large",
+   "program": "ff17ffff0101ffff0183ff000080",
+   "env": "80",
+   "expect": {
+    "error": "shift_too_large"
+   }
+  },
+  {
+   "name": "lsh_value_check_beats_charge",
+   "program": "ff17ffff01ff0180ffff010880",
+   "env": "80",
+   "max_cost": 41,
+   "expect": {
+    "error": "arg_not_atom"
+   }
+  },
+  {
+   "name": "lsh_value_check_below_dispatch",
+   "program": "ff17ffff01ff0180ffff010880",
+   "env": "80",
+   "max_cost": 40,
+   "expect": {
+    "error": "cost_exceeded"
+   }
   }
  ]
 }
