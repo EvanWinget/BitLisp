@@ -13,6 +13,14 @@ from .sexp import NIL, is_atom, is_pair, iter_proper_list
 QUOTE = b"\x01"
 APPLY = b"\x02"
 
+
+def _is_reserved(op):
+    # The reserved families: the empty atom, and every atom of two or
+    # more bytes starting 0xff 0xff. Both raise at apply time, after
+    # their arguments evaluate, never at identification.
+    return op == NIL or op.startswith(b"\xff\xff")
+
+
 _EVAL, _APPLY_OP, _APPLY_PROGRAM = 0, 1, 2
 
 
@@ -56,11 +64,10 @@ def run(program, env, max_cost):
             # The proper-list walk precedes every charge for this
             # application, then unknown operators are rejected
             # uncharged (a recorded divergence, CLVM accepts them).
-            # Everything else, the reserved empty atom included,
-            # charges the dispatch cost now, before any argument
-            # evaluates.
+            # Everything else, the reserved families included, charges
+            # the dispatch cost now, before any argument evaluates.
             arg_list = list(iter_proper_list(args))
-            if op != APPLY and op not in OPERATORS and op != NIL:
+            if op != APPLY and op not in OPERATORS and not _is_reserved(op):
                 raise BitLispError("unknown_operator", f"unknown operator {op.hex()}")
             charge(costs.OP_DISPATCH_COST)
             if op == APPLY:
@@ -82,7 +89,7 @@ def run(program, env, max_cost):
             # operator raises here, not at identification.
             args = values[len(values) - arg_count :][::-1]
             del values[len(values) - arg_count :]
-            if op == NIL:
+            if _is_reserved(op):
                 raise BitLispError("reserved_operator", "reserved operator")
             values.append(OPERATORS[op](args, charge))
         else:
