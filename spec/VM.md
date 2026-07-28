@@ -114,9 +114,11 @@ For a program `(op . args)`, in this exact sequence:
    any charge for this application.
 4. Identify the operator. Opcode matching is exact on the atom bytes:
    a redundantly encoded integer such as `0x0010` is not opcode
-   `0x10`. An atom that is neither in the operator table (section 4)
-   nor the empty atom raises `unknown_operator`, uncharged
-   (divergence D3). Otherwise (a table operator, apply, or the empty
+   `0x10`. Two atom families are **reserved**: the empty atom, and
+   every atom of two or more bytes whose first two bytes are
+   `0xff 0xff`. An atom that is neither in the operator table
+   (section 4) nor reserved raises `unknown_operator`, uncharged
+   (divergence D3). Otherwise (a table operator, apply, or a reserved
    atom) charge the dispatch cost 1 now, before any argument is
    evaluated.
 5. Evaluate each argument in the same environment, **right to left**
@@ -126,9 +128,10 @@ For a program `(op . args)`, in this exact sequence:
    order against the budget.
 6. Apply. All application-time errors come after every argument has
    evaluated, so argument errors always win:
-   - The empty atom raises `reserved_operator` here, not at
-     identification: its dispatch cost is charged and its arguments
-     evaluate first.
+   - A reserved atom (the empty atom or the `0xffff` prefix family)
+     raises `reserved_operator` here, not at identification: its
+     dispatch cost is charged and its arguments evaluate first, so a
+     raising argument's error wins.
    - `0x02` (**apply**) checks its arity (exactly 2) here, uncharged.
      Its cost 90 then accrues without an immediate budget check: the
      check rides on the applied program's first charge, so pre-charge
@@ -384,8 +387,8 @@ informative, not normative.
 | `bad_encoding` | Deserialization fails, or a result atom has no wire encoding (section 2) | bad encoding | (varies) |
 | `path_into_atom` | Path lookup steps into an atom | path into atom | path into atom |
 | `operator_not_atom` | Pair in operator position | (accepted, D4) | in ((X)...) syntax X must be lone atom |
-| `reserved_operator` | Empty atom in operator position | Reserved operator | reserved operator |
-| `unknown_operator` | Operator atom not in the table | (accepted, D3) | (accepted, D3) |
+| `reserved_operator` | A reserved atom in operator position: the empty atom, or two or more bytes starting `0xff 0xff` | Reserved operator | reserved operator |
+| `unknown_operator` | Operator atom not in the table and not reserved | (accepted, D3) | (accepted, D3) |
 | `bad_arg_list` | Operator arguments are not a proper list | (varies) | (varies) |
 | `wrong_arg_count` | Operator arity violated | InvalidOperatorArg | (per-op message) |
 | `arg_not_atom` | An atom-only operator (`=`, the integer family, the bytes family outside `substr`'s index positions, or the bitwise family outside shift count positions) got a pair | InvalidOperatorArg | (per-op message) |
@@ -419,7 +422,7 @@ pin it. No divergence exists outside this table. "Both oracles" means
 | --- | --- | --- | --- | --- | --- |
 | D1 | BLS operators | `point_add`, `pubkey_for_exp`, BLS extension ops present | absent, `unknown_operator` | Bitcoin has no BLS. Removing them removes their entire attack and cost surface. | `vm/dispatch.json` |
 | D2 | secp256k1 | `secp256k1_verify` post-hardfork op | `secp_verify`, BIP340 Schnorr (crypto family session) | Native curve, native signature scheme. | TODO Phase 1 crypto session |
-| D3 | Unknown operators | Both oracles accept unknown opcodes, cost derived from the opcode bytes, result nil | `unknown_operator` error | The operator set is closed by design. Bitcoin soft-forks at the tapleaf-version level, not through unknown-opcode acceptance. PROVISIONAL, see section 8. | `vm/dispatch.json` |
+| D3 | Unknown operators, outside the reserved families of section 3.2 | Both oracles accept unknown opcodes, cost derived from the opcode bytes, result nil. Reserved atoms are rejected by both oracles and by BitLisp alike, so they sit outside this divergence | `unknown_operator` error | The operator set is closed by design. Bitcoin soft-forks at the tapleaf-version level, not through unknown-opcode acceptance. PROVISIONAL, see section 8. | `vm/dispatch.json` |
 | D4 | Pair in operator position | Both oracles accept `((X) . args)` when `X` is a lone atom, a legacy apply-style rule: `X` dispatches on the arguments unevaluated, charging apply's 90. They disagree on a non-nil tail in the operator pair: `chia-rs` ignores the tail and dispatches on the head, `clvm` rejects it | `operator_not_atom` error for every pair in operator position | The legacy rule is a remnant the oracles themselves disagree on at the edges. Strict rejection of the whole family is the smaller, reviewable surface. PROVISIONAL, see section 8. | `vm/dispatch.json` |
 | D5 | Deserialization strictness | Both oracles accept non-minimal length encodings, trailing bytes, and (chia-rs) `0xfe` back-references | `bad_encoding` for all three (section 2) | Witness bytes must have exactly one accepted spelling per program. Malleability of the serialized form is a consensus hazard in the Bitcoin context. | `vm/serialize.json` |
 | D6 | `/` with negative operands | Consensus (`chia-rs`): floor division. The `clvm` package injects a policy error ("deprecated") that is not consensus | Floor division, matching consensus | Intersection parity targets the consensus oracle. The Python package's rejection is library policy, the diff harness treats it as an expected divergence. Ratified, see section 8. | `vm/arith.json` |
