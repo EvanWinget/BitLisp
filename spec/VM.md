@@ -200,7 +200,7 @@ later session.
 | `0x0e` | `concat` | 0 or more | The concatenation of its atom arguments. No arguments gives nil. |
 | `0x10` | `+` add | 0 or more | Sum of integer arguments. No arguments gives nil (zero). |
 | `0x11` | `-` subtract | 0 or more | First argument minus the rest. No arguments gives nil, one argument returns it. |
-| `0x12` | `*` multiply | 0 or more | Product. No arguments gives 1 (`0x01`). |
+| `0x12` | `*` multiply | 0 or more | Product. No arguments gives 1 (`0x01`). The running product is capped at 1024 magnitude bytes (below). |
 | `0x13` | `/` divide | 2 | Floor division, truncating toward negative infinity. Divisor zero raises `div_by_zero`. See divergence D6. |
 | `0x14` | `divmod` | 2 | Returns the pair `(quotient . remainder)` under floor division. Divisor zero raises `div_by_zero`. |
 | `0x15` | `>` greater | 2 | Signed integer comparison. TRUE if the first argument is strictly greater. |
@@ -246,13 +246,26 @@ except `>` which returns TRUE or nil.
 
 The limit applies to the argument atom's length as given, redundant
 encoding bytes included: a 257-byte atom encoding the value 2 is
-rejected. It does not apply to intermediate values: a multiplication
-accumulator may exceed 256 bytes and keep multiplying. Ordering,
-consensus-visible and pinned by vectors:
+rejected. The running product carries its own cap: after every
+multiplication step the accumulator's magnitude byte length must not
+exceed 1024, raising `arg_too_long`. Magnitude bytes count the
+absolute value's bits divided by eight, rounded up, the same
+sign-agnostic rule the accumulator's step costs use, so a product of
+exactly 2^8191 passes at 1024 magnitude bytes even though its encoded
+atom is 1025 bytes, 2^8192 fails, and -(2^8191) passes. The cap
+tracks the running product only, never any operand, and a later
+operand cannot repair a burst cap: a product that exceeds 1024
+magnitude bytes fails at that step even when the next operand is
+zero. Ordering, consensus-visible and pinned by vectors:
 
 - `*` checks each argument's atomness and size together, argument by
   argument, in the conversion order of COSTS.md: an oversized first
   argument is reported before a pair in the second.
+- The accumulator cap is checked after each step's charge and
+  multiply, before the next argument is examined: an over-cap product
+  is reported before a pair in the following argument, and a budget
+  too small for the step's charge reports `cost_exceeded` rather than
+  the cap.
 - `/` and `divmod` check both arguments' atomness first, then both
   sizes: a pair in either argument is reported before an oversized
   operand.
