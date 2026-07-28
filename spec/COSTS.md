@@ -141,6 +141,18 @@ result, and a nil argument contributes only the per-argument 135.
 The totals agree with charging malloc on the result, the interleaving
 (section 1) does not.
 
+`substr`'s flat cost is safe only under a shared-bytes result
+representation. The consensus oracle returns a view into the parent
+atom, doing constant work per slice, and the cost models that. An
+implementation that copies on slice does work proportional to the
+result while charging a cost that does not grow with it, and a
+program can repeat large slices of one large atom until the copying
+dwarfs the budget, a validation denial of service. A hardened
+implementation must therefore slice by reference. The Python
+reference copies, which is acceptable in a spec artifact that never
+validates adversarial input, and any consensus-facing implementation
+must not inherit that shortcut.
+
 Worked example, pinned by vectors: `(concat (q . "ab") (q . "cd"))`
 costs `20 + 20 + 1 + 142 + 135 * 2 + 13 * 4 = 505`.
 
