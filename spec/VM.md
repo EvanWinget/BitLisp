@@ -329,17 +329,20 @@ position raises `bad_index` (below). None has an operand size limit.
 
 Shift count arguments follow the substr index rules, pinned by
 vectors: an atom of at most four bytes read as a signed integer,
-leading zero bytes legal within the cap, a pair or a longer atom
-raising `bad_index`. The count's magnitude is additionally capped at
+redundant encoding bytes legal within the cap (leading zeros on a
+non-negative count, leading `0xff` on a negative one, the section 1
+rule), a pair or a longer atom raising `bad_index`. The count's magnitude is additionally capped at
 65535, raising `shift_too_large` beyond it in either direction. The
 checks run in consensus order, all before any charge: the value's
 atom check first (a pair value is reported before any count defect),
 then the count's shape, then the count's range.
 
-A left shift can grow an atom by at most 8191 bytes over its input,
-and the result charges plain malloc per byte, so the section 2
-threshold for building an atom the wire format cannot encode applies
-unchanged.
+A left shift can grow an atom by at most 8192 bytes over its input:
+a count of 65535 bits adds up to 8192 magnitude bytes, so
+`(ash (q . 1) (q . 65535))` grows one byte to 8193, sign byte
+included, pinned by vectors. The result charges plain malloc per
+byte, so the section 2 threshold for building an atom the wire
+format cannot encode applies unchanged.
 
 The boolean ops test nil-ness and return the shared TRUE and nil
 constants. They are the one non-tree family that accepts pair
