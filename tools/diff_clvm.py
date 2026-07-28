@@ -409,7 +409,13 @@ class Generator:
             if r.random() < 0.06:
                 arg_count = max(0, arg_count + r.choice((-1, 1)))
         if r.random() < 0.03:
-            opcode = b""  # reserved operator, arguments still evaluate
+            # A reserved operator, arguments still evaluate. Half the
+            # picks take the empty atom, half the 0xffff prefix family
+            # with up to three random tail bytes.
+            opcode = b""
+            if r.random() < 0.5:
+                tail = bytes(r.randint(0, 255) for _ in range(r.randint(0, 3)))
+                opcode = b"\xff\xff" + tail
         args = b""
         if r.random() < 0.03:
             args = int_to_atom(r.randint(1, 127))  # improper tail

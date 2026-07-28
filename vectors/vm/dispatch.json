@@ -404,6 +404,64 @@
    "expect": {
     "error": "operator_not_atom"
    }
+  },
+  {
+   "name": "reserved_ffff_bare",
+   "program": "ff82ffff80",
+   "env": "80",
+   "expect": {
+    "error": "reserved_operator"
+   }
+  },
+  {
+   "name": "reserved_ffff00_no_args",
+   "program": "ff83ffff0080",
+   "env": "80",
+   "expect": {
+    "error": "reserved_operator"
+   }
+  },
+  {
+   "name": "reserved_ffff_six_bytes",
+   "program": "ff86ffffffffff0080",
+   "env": "80",
+   "expect": {
+    "error": "reserved_operator"
+   }
+  },
+  {
+   "name": "reserved_ffff_argument_raise_wins",
+   "program": "ff83ffff00ffff088080",
+   "env": "80",
+   "expect": {
+    "error": "user_raise"
+   }
+  },
+  {
+   "name": "reserved_ffff_arguments_charge_budget_1",
+   "program": "ff83ffff00ff0180",
+   "env": "80",
+   "max_cost": 1,
+   "expect": {
+    "error": "cost_exceeded"
+   }
+  },
+  {
+   "name": "reserved_ffff_dispatch_charged_budget_0",
+   "program": "ff83ffff0080",
+   "env": "80",
+   "max_cost": 0,
+   "expect": {
+    "error": "cost_exceeded"
+   }
+  },
+  {
+   "name": "unknown_operator_single_ff",
+   "program": "ff81ff80",
+   "env": "80",
+   "expect": {
+    "error": "unknown_operator"
+   }
   }
  ]
 }
