@@ -179,8 +179,9 @@ failing closed.
 ## 4. Operator table
 
 Implemented so far: the core specials, the tree ops family, the
-arithmetic family, and the bytes and strings family. Remaining
-families (bitwise, boolean, crypto) land in later sessions.
+arithmetic family, the bytes and strings family, the bitwise family,
+and the boolean family. The remaining family (crypto) lands in a
+later session.
 
 | Opcode | Name | Arity | Semantics |
 | --- | --- | --- | --- |
@@ -203,6 +204,15 @@ families (bitwise, boolean, crypto) land in later sessions.
 | `0x13` | `/` divide | 2 | Floor division, truncating toward negative infinity. Divisor zero raises `div_by_zero`. See divergence D6. |
 | `0x14` | `divmod` | 2 | Returns the pair `(quotient . remainder)` under floor division. Divisor zero raises `div_by_zero`. |
 | `0x15` | `>` greater | 2 | Signed integer comparison. TRUE if the first argument is strictly greater. |
+| `0x16` | `ash` arithmetic shift | 2 | Shift of the value's integer reading by a signed count: positive shifts left, negative shifts right with sign extension. |
+| `0x17` | `lsh` logical shift | 2 | Shift of the value's bytes read as an unsigned integer, re-encoded signed. |
+| `0x18` | `logand` | 0 or more | Bitwise AND fold over sign-extended two's complement. No arguments gives -1. |
+| `0x19` | `logior` | 0 or more | Bitwise inclusive-OR fold. No arguments gives nil. |
+| `0x1a` | `logxor` | 0 or more | Bitwise exclusive-OR fold. No arguments gives nil. |
+| `0x1b` | `lognot` | 1 | Bitwise complement, always `-(value + 1)`. |
+| `0x20` | `not` | 1 | TRUE if the argument is nil, nil otherwise. |
+| `0x21` | `any` | 0 or more | TRUE if at least one argument is not nil. No arguments gives nil. |
+| `0x22` | `all` | 0 or more | TRUE if every argument is not nil. No arguments gives TRUE. |
 
 The tree ops select, build, and compare nodes without interpreting
 them as integers:
@@ -294,6 +304,58 @@ a pair, except that a pair in a `substr` index position raises
   equal to the length are legal, so `(substr data (strlen data))` is
   nil for any atom.
 
+The bitwise ops read atoms as signed two's-complement integers, like
+the arithmetic family, and return minimally encoded integer results.
+All six require an atom in every value position and raise
+`arg_not_atom` on a pair there, except that a pair in a shift count
+position raises `bad_index` (below). None has an operand size limit.
+
+- `logand`, `logior`, `logxor` fold their arguments under bitwise
+  AND, inclusive OR, and exclusive OR of sign-extended two's
+  complement. With no arguments they return their fold identities:
+  -1 (the one-byte atom `0xff`) for `logand`, nil for the other two.
+  With one argument they return its value, minimally re-encoded.
+- `lognot` takes exactly one argument and returns its bitwise
+  complement, always `-(value + 1)`. `(lognot nil)` is -1.
+- `ash` shifts the value's integer reading: a positive count shifts
+  left, a negative count shifts right with sign extension, so a right
+  shift floors like `/`: `(ash -7 -1)` is -4, and a negative value
+  shifted right far enough settles at -1, never 0.
+- `lsh` shifts the value's byte string read as an unsigned integer,
+  redundant encoding bytes included, then encodes the result signed
+  as usual. A shift can therefore change sign and value: `(lsh -1 0)`
+  is 255 (`0x00ff`), and `(lsh 0x00ff 0)` is also 255 because the
+  unsigned reading of both spellings is 255.
+
+Shift count arguments follow the substr index rules, pinned by
+vectors: an atom of at most four bytes read as a signed integer,
+leading zero bytes legal within the cap, a pair or a longer atom
+raising `bad_index`. The count's magnitude is additionally capped at
+65535, raising `shift_too_large` beyond it in either direction. The
+checks run in consensus order, all before any charge: the value's
+atom check first (a pair value is reported before any count defect),
+then the count's shape, then the count's range.
+
+A left shift can grow an atom by at most 8191 bytes over its input,
+and the result charges plain malloc per byte, so the section 2
+threshold for building an atom the wire format cannot encode applies
+unchanged.
+
+The boolean ops test nil-ness and return the shared TRUE and nil
+constants. They are the one non-tree family that accepts pair
+arguments: any node is legal in any position, and nil is the only
+false value (the one-byte atom `0x00` and every pair are true), the
+same rule `i` applies to its selector.
+
+- `not` takes exactly one argument: TRUE if it is nil, nil otherwise.
+- `any` returns TRUE if at least one argument is not nil, and nil
+  with no arguments.
+- `all` returns nil if at least one argument is nil, and TRUE with no
+  arguments.
+- No boolean op charges malloc, and no boolean cost carries a
+  per-byte term: a large atom argument costs the same as a one-byte
+  one.
+
 ## 5. Error taxonomy
 
 Errors are consensus-relevant only as "the spend is invalid". The
@@ -310,20 +372,26 @@ informative, not normative.
 | `unknown_operator` | Operator atom not in the table | (accepted, D3) | (accepted, D3) |
 | `bad_arg_list` | Operator arguments are not a proper list | (varies) | (varies) |
 | `wrong_arg_count` | Operator arity violated | InvalidOperatorArg | (per-op message) |
-| `arg_not_atom` | An atom-only operator (`=`, the integer family, or the bytes family outside `substr`'s index positions) got a pair | InvalidOperatorArg | (per-op message) |
+| `arg_not_atom` | An atom-only operator (`=`, the integer family, the bytes family outside `substr`'s index positions, or the bitwise family outside shift count positions) got a pair | InvalidOperatorArg | (per-op message) |
 | `arg_not_pair` | `f` or `r` applied to an atom | InvalidOperatorArg: first/rest of non-cons | first/rest of non-cons |
 | `arg_too_long` | Operand exceeds a section 4 size limit | InvalidOperatorArg | (absent, the `clvm` package has no operand limits) |
-| `bad_index` | A `substr` index argument is a pair or an atom longer than four bytes | substr requires int32 args (with no leading zeros) | substr requires int32 args |
+| `bad_index` | A `substr` index or a shift count argument is a pair or an atom longer than four bytes | (per-op) requires int32 args (with no leading zeros) | (per-op) requires int32 args |
 | `index_out_of_range` | A `substr` index value is negative, past the end of the data, or an end before a start | Invalid Indices for Substring | invalid indices for substr |
+| `shift_too_large` | An `ash` or `lsh` count's magnitude exceeds 65535 | Shift too large | shift too large |
 | `div_by_zero` | Division or divmod by zero | Division by zero | div/divmod with 0 |
 | `user_raise` | The `x` operator | clvm raise | clvm raise |
 | `cost_exceeded` | Cost budget exceeded | cost exceeded or below zero | cost exceeded |
 
 One message column is actively misleading: both oracles' `bad_index`
 message claims to reject leading zeros, but both binaries accept
-leading zero bytes on a `substr` index within the four-byte cap,
-verified by probes and pinned by vectors. The message text describes
-neither oracle's behavior and must not be read back into the rule.
+leading zero bytes on a `substr` index and on a shift count within
+the four-byte cap, verified by probes and pinned by vectors. The
+message text describes neither oracle's behavior and must not be
+read back into the rule. The Python oracle additionally reports a
+pair in a shift count position with its generic "requires int args"
+message, indistinguishable from a pair in the value position, where
+the consensus oracle distinguishes the two. The diff harness carries
+a tolerance for that conflation.
 
 ## 6. Divergence from CLVM
 

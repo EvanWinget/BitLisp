@@ -1,8 +1,9 @@
 # BitLisp Cost Model
 
 Status: Phase 1 in progress. This table is normative for the evaluator
-core, the tree ops family, the arithmetic family, and the bytes and
-strings family. It inherits the
+core, the tree ops family, the arithmetic family, the bytes and
+strings family, the bitwise family, and the boolean family. It
+inherits the
 CLVM cost table for the operator intersection, verified against the
 pinned oracles by the diff harness. The weight mapping is filled with
 Phase 3 measurements.
@@ -82,8 +83,30 @@ Phase 3 measurements.
     is therefore reported even when the base cost alone would burst
     the budget, and a pair in a later argument only after every
     earlier argument's charge fits, pinned by boundary vectors.
+  - `logand`, `logior`, `logxor`: the same loop shape as `+` with the
+    log constants. The base cost accrues without a budget check, then
+    per argument, in list order: the argument's atom check, then one
+    checked charge of everything accrued so far plus that argument's
+    `LOG_COST_PER_ARG` and per-byte cost. With no arguments the base
+    cost is checked at the end. Malloc last. A pair in the second
+    argument is therefore reported only after the base cost and the
+    first argument's charge fit the budget, pinned at the exact
+    boundary by vectors.
+  - `lognot`: arity check, then the atom check, then one checked
+    charge of base plus per-byte cost, then malloc. Both checks win
+    over `cost_exceeded`.
+  - `ash`, `lsh`: every check precedes every charge, in this order:
+    arity, the value's atom check, the count's shape check (atom of
+    at most four bytes), the count's range check (magnitude at most
+    65535). Then one checked charge of the full formula, then malloc.
+    A pair value is reported before any count defect, and every check
+    wins over `cost_exceeded`, pinned by boundary vectors.
+  - `not`, `any`, `all`: arity check (`not` only), then one checked
+    charge of the operator's full cost. There are no argument checks:
+    pairs are legal boolean arguments. No malloc, the results are the
+    shared TRUE and nil constants.
 - Evaluation cost does not include deserialization. A per-byte cost on
-  the serialized program belongs to the weight mapping (section 6).
+  the serialized program belongs to the weight mapping (section 8).
 
 ## 2. Core evaluation costs
 
@@ -156,13 +179,51 @@ must not inherit that shortcut.
 Worked example, pinned by vectors: `(concat (q . "ab") (q . "cd"))`
 costs `20 + 20 + 1 + 142 + 135 * 2 + 13 * 4 = 505`.
 
-## 6. Weight mapping
+## 6. Bitwise family
+
+| Operator | Formula |
+| --- | --- |
+| `logand`, `logior`, `logxor` | `100 + 264 * n_args + 3 * total_arg_bytes + malloc(result)` |
+| `lognot` | `331 + 3 * arg_bytes + malloc(result)` |
+| `ash` | `596 + 3 * (value_bytes + result_magnitude_bytes) + malloc(result)` |
+| `lsh` | `277 + 3 * (value_bytes + result_magnitude_bytes) + malloc(result)` |
+
+Per-byte terms count argument atoms at their actual length, redundant
+encoding bytes included, like everywhere else. The shifts are the
+exception on the result side: their per-byte term counts the result's
+*magnitude* byte length (`ceil(bit_length / 8)`), one less than the
+minimal signed encoding when the top magnitude bit is set, exactly
+the accumulator rule `*` has. A result of 128 counts one magnitude
+byte there while its malloc charges the two bytes of `0x0080`. The
+shift count atom's length never enters the cost. Pinned by vectors.
+
+Worked examples, pinned by vectors: `(ash (q . 1) (q . 7))` costs
+`20 + 20 + 1 + 596 + 3 * (1 + 1) + 20 = 663`, and
+`(logand (q . 15) (q . 3))` costs
+`20 + 20 + 1 + 100 + 264 * 2 + 3 * 2 + 10 = 685`.
+
+## 7. Boolean family
+
+| Operator | Formula |
+| --- | --- |
+| `not` | `200`, flat |
+| `any`, `all` | `200 + 300 * n_args` |
+
+No boolean op charges malloc (the results are the shared TRUE and nil
+constants) and no boolean cost has a per-byte term: `not`'s cost has
+no per-argument term either, its 200 is the whole cost. Pair
+arguments are legal and charge the same as atoms.
+
+Worked example, pinned by vectors: `(any (q . 1) (q . 2))` costs
+`20 + 20 + 1 + 200 + 300 * 2 = 841`.
+
+## 8. Weight mapping
 
 TODO (Phase 3): mapping from VM cost units to Bitcoin transaction
 weight, derived from benchmark data on the measured artifacts,
 including the per-byte cost of the serialized program itself.
 
-## 7. Condition costs
+## 9. Condition costs
 
 TODO (Phase 2): per-condition base costs and the superlinear
 `CREATE_COIN` schedule.
