@@ -9,15 +9,18 @@ intersection and runs every program through three implementations:
 - clvm (Python package), the secondary oracle
 
 Success requires identical (cost, result bytes) or an identical error
-class. Six disagreements with the Python oracle are tolerated and
+class. Seven disagreements with the Python oracle are tolerated and
 counted, all library behavior rather than consensus: its policy
 rejection of negative division operands (consensus does floor
 division), its budget check running only after an operator completes,
 its immediate check of apply's cost where consensus defers the check
 to the applied program's first charge, its lack of the consensus
 operand size limits, its single message for both an improper argument
-list and f or r on an atom, and its integer conversion running before
-the arity check where consensus checks arity first. The two budget-timing tolerances
+list and f or r on an atom, its integer conversion running before
+the arity check where consensus checks arity first, and its generic
+requires-int-args message for a pair in a shift count position,
+indistinguishable from a pair in the shifted value position where
+consensus reports the two differently. The two budget-timing tolerances
 are verified per case, not assumed: the tolerating branch re-runs an
 implementation without the tight budget and requires it to reproduce
 the other side's outcome, exactly except for the recorded
@@ -41,8 +44,11 @@ arguments, and environment depth varies so that long paths can
 resolve as well as fail. Most substr programs draw their indices
 near the data atom's length, so valid slices, boundary indices,
 leading-zero index encodings, and the four-byte index cap are
-exercised rather than only the failure paths. Anything else is a
-finding and fails the run.
+exercised rather than only the failure paths. Most shift programs
+draw their counts near the legal range, so completed shifts, the
+65535 magnitude cap in both directions, the four-byte count shape,
+and redundant count spellings are exercised the same way. Anything
+else is a finding and fails the run.
 
 Usage:
     python3 tools/diff_clvm.py --count 10000 --seed 1
@@ -91,6 +97,8 @@ RS_ERRORS = {
     "concat on list": "arg_not_atom",
     "requires int32 args": "bad_index",
     "Invalid Indices": "index_out_of_range",
+    "Shift too large": "shift_too_large",
+    "lsh used on list": "arg_not_atom",
     "takes no more than": "wrong_arg_count",
     # Bare InvalidOperatorArg (no more specific fragment above) is the
     # consensus operand size limit. Keep it last: fragment matching is
@@ -117,8 +125,9 @@ PY_ERRORS = {
     "strlen on list": "arg_not_atom",
     "substr on list": "arg_not_atom",
     "concat on list": "arg_not_atom",
-    "substr requires int32 args": "bad_index",
     "invalid indices for substr": "index_out_of_range",
+    "requires int32 args": "bad_index",
+    "shift too large": "shift_too_large",
 }
 PY_POLICY_DIV = "div operator with negative operands is deprecated"
 
@@ -214,9 +223,19 @@ class Generator:
         b"\x13": 2,  # /
         b"\x14": 2,  # divmod
         b"\x15": 2,  # >
+        b"\x16": 2,  # ash
+        b"\x17": 2,  # lsh
+        b"\x18": None,  # logand
+        b"\x19": None,  # logior
+        b"\x1a": None,  # logxor
+        b"\x1b": 1,  # lognot
+        b"\x20": 1,  # not
+        b"\x21": None,  # any
+        b"\x22": None,  # all
     }
     OPCODES = sorted(ARITIES)
     SUBSTR = b"\x0c"
+    SHIFTS = (b"\x16", b"\x17")
 
     def __init__(self, rng, max_depth):
         self.rng = rng
@@ -310,6 +329,40 @@ class Generator:
         args = ((b"\x01", self.index_atom(len(data))), args)
         return (self.SUBSTR, ((b"\x01", data), args))
 
+    def count_atom(self):
+        # A shift count near the legal range so shifts frequently
+        # complete, with the 65535 magnitude cap crossed in both
+        # directions, the four-byte shape cap, and redundant
+        # spellings (zero padding for non-negative counts, 0xff
+        # padding for negative ones) inside and past the cap.
+        r = self.rng
+        roll = r.random()
+        if roll < 0.55:
+            value = r.randint(-70, 70)
+        elif roll < 0.8:
+            value = r.randint(-66000, 66000)
+        else:
+            value = r.choice((65535, -65535, 65536, -65536, r.randint(-(2**40), 2**40)))
+        atom = int_to_atom(value)
+        if r.random() < 0.15:
+            pad = b"\xff" if value < 0 else b"\x00"
+            room = 4 - len(atom)
+            if room > 0 and r.random() >= 0.2:
+                atom = pad * r.randint(1, room) + atom
+            else:
+                atom = pad * (max(room, 0) + r.randint(1, 3)) + atom
+        return atom
+
+    def shift_program(self, opcode):
+        # (ash value count) with the count drawn near the legal
+        # range, mirroring substr_program's index treatment. The
+        # value side reuses the general atom distribution, so large
+        # atoms meet near-cap counts.
+        return (
+            opcode,
+            ((b"\x01", self.atom_int()), ((b"\x01", self.count_atom()), b"")),
+        )
+
     def program(self, depth):
         r = self.rng
         roll = r.random()
@@ -334,6 +387,12 @@ class Generator:
                 args = (self.program(depth - 1), args)
             return (b"\x08", args)
         opcode = r.choice(self.OPCODES)
+        if opcode in self.SHIFTS and r.random() < 0.7:
+            # Like substr below: uncorrelated counts rarely land in
+            # the legal shift range, so most shift programs draw
+            # their counts near it. The rest go through the generic
+            # path for pair values, pair counts, and wild counts.
+            return self.shift_program(opcode)
         if opcode == self.SUBSTR and r.random() < 0.7:
             # Uncorrelated random arguments almost never form a valid
             # slice, so most substr programs are built with indices
@@ -379,6 +438,7 @@ def main():
         "py_no_operand_limit": 0,
         "py_improper_list_ambiguity": 0,
         "py_arity_check_order": 0,
+        "py_shift_count_conflation": 0,
     }
     failures = 0
 
@@ -440,7 +500,7 @@ def main():
                 break
             continue
 
-        # Secondary oracle. The four tolerated disagreements are
+        # Secondary oracle. The tolerated disagreements are
         # documented in the module docstring. Both timing tolerances
         # re-run an implementation without the tight budget and
         # require it to reproduce the other side's outcome, so a
@@ -493,6 +553,14 @@ def main():
             # iterating, before counting them.
             py_agrees = True
             stats["py_arity_check_order"] += 1
+        elif bl == ("err", "bad_index") and py == ("err", "arg_not_atom"):
+            # The Python oracle reports a pair in a shift count
+            # position with its generic requires-int-args message,
+            # indistinguishable from a pair in the shifted value
+            # position. The consensus comparison above already
+            # matched the class exactly.
+            py_agrees = True
+            stats["py_shift_count_conflation"] += 1
 
         if not py_agrees:
             failures += 1
@@ -515,6 +583,7 @@ def main():
         f"{stats['py_no_operand_limit']} tolerated py no-operand-limit, "
         f"{stats['py_improper_list_ambiguity']} tolerated py improper-list, "
         f"{stats['py_arity_check_order']} tolerated py arity-order, "
+        f"{stats['py_shift_count_conflation']} tolerated py shift-count-conflation, "
         f"{failures} failures"
     )
     return 1 if failures else 0

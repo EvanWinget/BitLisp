@@ -19,6 +19,7 @@ CODES = frozenset(
         "arg_too_long",
         "bad_index",
         "index_out_of_range",
+        "shift_too_large",
         "div_by_zero",
         "user_raise",
         "cost_exceeded",

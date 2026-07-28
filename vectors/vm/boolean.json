@@ -1,0 +1,233 @@
+{
+ "schema": "bitlisp-vector-v0",
+ "suite": "vm",
+ "spec": "VM.md sections 4 and 5 and COSTS.md section 7 (boolean family)",
+ "cases": [
+  {
+   "name": "any_worked_example",
+   "program": "ff21ffff0101ffff010280",
+   "env": "80",
+   "expect": {
+    "result": "01",
+    "cost": 841
+   }
+  },
+  {
+   "name": "not_nil_is_true",
+   "program": "ff20ffff018080",
+   "env": "80",
+   "expect": {
+    "result": "01",
+    "cost": 221
+   }
+  },
+  {
+   "name": "not_one_is_nil",
+   "program": "ff20ffff010180",
+   "env": "80",
+   "expect": {
+    "result": "80",
+    "cost": 221
+   }
+  },
+  {
+   "name": "not_0x00_is_nil",
+   "program": "ff20ffff010080",
+   "env": "80",
+   "expect": {
+    "result": "80",
+    "cost": 221
+   }
+  },
+  {
+   "name": "not_pair_is_nil",
+   "program": "ff20ffff01ff018080",
+   "env": "80",
+   "expect": {
+    "result": "80",
+    "cost": 221
+   }
+  },
+  {
+   "name": "any_no_args_is_nil",
+   "program": "ff2180",
+   "env": "80",
+   "expect": {
+    "result": "80",
+    "cost": 201
+   }
+  },
+  {
+   "name": "all_no_args_is_true",
+   "program": "ff2280",
+   "env": "80",
+   "expect": {
+    "result": "01",
+    "cost": 201
+   }
+  },
+  {
+   "name": "any_all_nil_is_nil",
+   "program": "ff21ffff0180ffff018080",
+   "env": "80",
+   "expect": {
+    "result": "80",
+    "cost": 841
+   }
+  },
+  {
+   "name": "any_finds_0x00_true",
+   "program": "ff21ffff0180ffff010080",
+   "env": "80",
+   "expect": {
+    "result": "01",
+    "cost": 841
+   }
+  },
+  {
+   "name": "any_pair_is_true",
+   "program": "ff21ffff01ff018080",
+   "env": "80",
+   "expect": {
+    "result": "01",
+    "cost": 521
+   }
+  },
+  {
+   "name": "any_nil_then_pair_true",
+   "program": "ff21ffff0180ffff01ff018080",
+   "env": "80",
+   "expect": {
+    "result": "01",
+    "cost": 841
+   }
+  },
+  {
+   "name": "all_three_atoms_true",
+   "program": "ff22ffff0101ffff0102ffff010380",
+   "env": "80",
+   "expect": {
+    "result": "01",
+    "cost": 1161
+   }
+  },
+  {
+   "name": "all_with_nil_is_nil",
+   "program": "ff22ffff0101ffff018080",
+   "env": "80",
+   "expect": {
+    "result": "80",
+    "cost": 841
+   }
+  },
+  {
+   "name": "all_pair_counts_as_true",
+   "program": "ff22ffff01ff0180ffff010180",
+   "env": "80",
+   "expect": {
+    "result": "01",
+    "cost": 841
+   }
+  },
+  {
+   "name": "any_large_atom_flat_cost",
+   "program": "ff21ffff01c12c7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f80",
+   "env": "80",
+   "expect": {
+    "result": "01",
+    "cost": 521
+   }
+  },
+  {
+   "name": "not_large_atom_flat_cost",
+   "program": "ff20ffff01c12c7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f80",
+   "env": "80",
+   "expect": {
+    "result": "80",
+    "cost": 221
+   }
+  },
+  {
+   "name": "not_no_args_wrong_arg_count",
+   "program": "ff2080",
+   "env": "80",
+   "expect": {
+    "error": "wrong_arg_count"
+   }
+  },
+  {
+   "name": "not_two_args_wrong_arg_count",
+   "program": "ff20ffff0101ffff010180",
+   "env": "80",
+   "expect": {
+    "error": "wrong_arg_count"
+   }
+  },
+  {
+   "name": "not_arity_beats_any_charge",
+   "program": "ff2080",
+   "env": "80",
+   "max_cost": 1,
+   "expect": {
+    "error": "wrong_arg_count"
+   }
+  },
+  {
+   "name": "not_full_cost_exact",
+   "program": "ff20ffff010180",
+   "env": "80",
+   "max_cost": 221,
+   "expect": {
+    "result": "80",
+    "cost": 221
+   }
+  },
+  {
+   "name": "not_full_cost_short_one",
+   "program": "ff20ffff010180",
+   "env": "80",
+   "max_cost": 220,
+   "expect": {
+    "error": "cost_exceeded"
+   }
+  },
+  {
+   "name": "any_full_cost_exact",
+   "program": "ff21ffff0101ffff010280",
+   "env": "80",
+   "max_cost": 841,
+   "expect": {
+    "result": "01",
+    "cost": 841
+   }
+  },
+  {
+   "name": "any_full_cost_short_one",
+   "program": "ff21ffff0101ffff010280",
+   "env": "80",
+   "max_cost": 840,
+   "expect": {
+    "error": "cost_exceeded"
+   }
+  },
+  {
+   "name": "all_full_cost_exact",
+   "program": "ff22ffff0101ffff0102ffff010380",
+   "env": "80",
+   "max_cost": 1161,
+   "expect": {
+    "result": "01",
+    "cost": 1161
+   }
+  },
+  {
+   "name": "all_full_cost_short_one",
+   "program": "ff22ffff0101ffff0102ffff010380",
+   "env": "80",
+   "max_cost": 1160,
+   "expect": {
+    "error": "cost_exceeded"
+   }
+  }
+ ]
+}
