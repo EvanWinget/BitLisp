@@ -1,8 +1,8 @@
 """Cost constants, inherited from the CLVM cost table.
 
-OP_DISPATCH_COST is implicit in both CLVM implementations and was
-pinned empirically: every operator application except quote charges
-it on top of the operator's own cost.
+OP_DISPATCH_COST was pinned empirically against the oracle binaries:
+every operator application except quote charges it on top of the
+operator's own cost.
 """
 
 QUOTE_COST = 20
