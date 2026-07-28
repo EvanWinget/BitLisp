@@ -369,8 +369,9 @@ def op_lognot(args, charge):
     _exactly(args, 1, "lognot")
     value = _int_arg(args[0], "lognot")
     # Both checks precede the charge, then malloc on the result,
-    # which is always -(value + 1) and never longer than the
-    # argument's minimal encoding.
+    # which is always -(value + 1): the same encoded width as the
+    # argument's minimal encoding, except nil, whose complement -1
+    # takes one byte.
     charge(costs.LOGNOT_BASE_COST + costs.LOGNOT_COST_PER_BYTE * len(args[0]))
     result = int_to_atom(~value)
     _malloc(charge, result)
@@ -385,8 +386,10 @@ SHIFT_COUNT_MAX_MAGNITUDE = 65535
 def _shift_count(arg, op_name):
     # A pair count and an oversized count atom share bad_index with
     # substr's indices, matching the consensus oracle, which reports
-    # all of them identically. Leading zero bytes are legal within
-    # the four-byte cap. The range check follows the shape check:
+    # all of them identically. Redundant encoding bytes are legal
+    # within the four-byte cap, leading zeros on a non-negative
+    # count and 0xff bytes on a negative one. The range check
+    # follows the shape check:
     # a five-byte spelling of an in-range count is bad_index, a
     # four-byte spelling of 65536 is shift_too_large.
     if not is_atom(arg) or len(arg) > INDEX_MAX_BYTES:
@@ -402,8 +405,10 @@ def _shift_count(arg, op_name):
 
 
 def _shift(args, charge, op_name, base_cost, cost_per_byte, value):
-    # Every check ran before this is called. One checked charge whose
-    # per-byte term counts the value atom's actual length plus the
+    # The caller ran the arity and value atom checks, the count
+    # checks run first here, so every check still precedes the
+    # single charge. Its per-byte term counts the value atom's
+    # actual length plus the
     # result's MAGNITUDE byte length, one less than its minimal
     # encoding when the top magnitude bit is set (a result of 128
     # counts 1 byte, its malloc charges the 2 bytes of 0x0080), the
