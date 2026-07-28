@@ -1,4 +1,4 @@
-"""The operator table: tree ops and arithmetic families.
+"""The operator table: tree ops, arithmetic, and bytes families.
 
 Each operator takes the evaluated argument list and the machine's
 charge callback, and returns the result node. The machine charges
@@ -7,10 +7,10 @@ this table, the machine handles both.
 
 The interleaving of argument validation, charges, and value checks is
 consensus-visible: near the budget boundary it decides which of
-cost_exceeded, wrong_arg_count, arg_not_atom, arg_not_pair, and
-div_by_zero is reported. Every function below performs them in the
-consensus oracle's order, and the boundary cases are pinned by
-vectors.
+cost_exceeded, wrong_arg_count, arg_not_atom, arg_not_pair,
+arg_too_long, bad_index, index_out_of_range, and div_by_zero is
+reported. Every function below performs them in the consensus
+oracle's order, and the boundary cases are pinned by vectors.
 """
 
 from . import costs
@@ -245,6 +245,89 @@ def op_gr(args, charge):
     return TRUE if left > right else NIL
 
 
+def op_grs(args, charge):
+    _exactly(args, 2, ">s")
+    # Both atom checks precede the single charge, like =. Python bytes
+    # comparison is exactly the consensus rule: unsigned lexicographic,
+    # a proper prefix less than the longer string.
+    for arg in args:
+        if not is_atom(arg):
+            raise BitLispError("arg_not_atom", ">s used on list")
+    charge(
+        costs.GRS_BASE_COST + costs.GRS_COST_PER_BYTE * (len(args[0]) + len(args[1]))
+    )
+    return TRUE if args[0] > args[1] else NIL
+
+
+# A substr index atom is capped at four bytes. Within the cap its
+# value is the ordinary signed big-endian reading, leading zero bytes
+# included: 0x0000ffff is 65535 where 0xffff is -1.
+INDEX_MAX_BYTES = 4
+
+
+def _index_arg(arg, op_name):
+    # A pair index and an oversized index atom share one error class,
+    # matching the consensus oracle, which reports both identically.
+    if not is_atom(arg) or len(arg) > INDEX_MAX_BYTES:
+        raise BitLispError(
+            "bad_index", f"{op_name} index must be an atom of at most 4 bytes"
+        )
+    return atom_to_int(arg)
+
+
+def op_substr(args, charge):
+    if len(args) not in (2, 3):
+        raise BitLispError("wrong_arg_count", "substr takes 2 or 3 arguments")
+    data = args[0]
+    if not is_atom(data):
+        raise BitLispError("arg_not_atom", "substr requires an atom")
+    start = _index_arg(args[1], "substr")
+    end = _index_arg(args[2], "substr") if len(args) == 3 else len(data)
+    if start < 0 or end < 0 or end > len(data) or end < start:
+        raise BitLispError("index_out_of_range", "invalid indices for substr")
+    # Every check precedes the flat charge. The result is a portion of
+    # an existing atom and charges no malloc.
+    charge(costs.SUBSTR_COST)
+    return data[start:end]
+
+
+def op_strlen(args, charge):
+    _exactly(args, 1, "strlen")
+    if not is_atom(args[0]):
+        raise BitLispError("arg_not_atom", "strlen requires an atom")
+    result = int_to_atom(len(args[0]))
+    # One checked charge with the malloc folded in, after the checks.
+    charge(
+        costs.STRLEN_BASE_COST
+        + costs.STRLEN_COST_PER_BYTE * len(args[0])
+        + costs.MALLOC_COST_PER_BYTE * len(result)
+    )
+    return result
+
+
+def op_concat(args, charge):
+    # The base cost accrues without a budget check, riding on the
+    # first argument's charge like op_add's. Each argument's atom
+    # check precedes its own charge, so a pair in the first argument
+    # wins over cost_exceeded and a pair in a later argument loses to
+    # an earlier argument's charge. The result's malloc is charged per
+    # input byte inside the loop, never on the joined result.
+    pending = costs.CONCAT_BASE_COST
+    pieces = []
+    for arg in args:
+        if not is_atom(arg):
+            raise BitLispError("arg_not_atom", "concat on list")
+        charge(
+            pending
+            + costs.CONCAT_COST_PER_ARG
+            + (costs.CONCAT_COST_PER_BYTE + costs.MALLOC_COST_PER_BYTE) * len(arg)
+        )
+        pending = 0
+        pieces.append(arg)
+    charge(pending)
+    return b"".join(pieces)
+
+
 def op_raise(args, charge):
     raise BitLispError("user_raise", "clvm raise")
 
@@ -257,6 +340,10 @@ OPERATORS = {
     b"\x07": op_listp,
     b"\x08": op_raise,
     b"\x09": op_eq,
+    b"\x0a": op_grs,
+    b"\x0c": op_substr,
+    b"\x0d": op_strlen,
+    b"\x0e": op_concat,
     b"\x10": op_add,
     b"\x11": op_sub,
     b"\x12": op_mul,

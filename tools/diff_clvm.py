@@ -38,8 +38,11 @@ where the charge interleaving decides the error class. Path programs
 include multi-byte values and zero-byte padding, atom sizes cross
 the 0x2000-byte floor of the 0xe0 length form, raise carries
 arguments, and environment depth varies so that long paths can
-resolve as well as fail. Anything else is a finding and fails the
-run.
+resolve as well as fail. Most substr programs draw their indices
+near the data atom's length, so valid slices, boundary indices,
+leading-zero index encodings, and the four-byte index cap are
+exercised rather than only the failure paths. Anything else is a
+finding and fails the run.
 
 Usage:
     python3 tools/diff_clvm.py --count 10000 --seed 1
@@ -82,6 +85,13 @@ RS_ERRORS = {
     "cost exceeded": "cost_exceeded",
     "Reserved operator": "reserved_operator",
     "bad encoding": "bad_encoding",
+    ">s used on list": "arg_not_atom",
+    "strlen requires an atom": "arg_not_atom",
+    "substr requires an atom": "arg_not_atom",
+    "concat on list": "arg_not_atom",
+    "requires int32 args": "bad_index",
+    "Invalid Indices": "index_out_of_range",
+    "takes no more than": "wrong_arg_count",
     # Bare InvalidOperatorArg (no more specific fragment above) is the
     # consensus operand size limit. Keep it last: fragment matching is
     # first-hit in insertion order.
@@ -103,6 +113,12 @@ PY_ERRORS = {
     "clvm raise": "user_raise",
     "cost exceeded": "cost_exceeded",
     "reserved operator": "reserved_operator",
+    ">s on list": "arg_not_atom",
+    "strlen on list": "arg_not_atom",
+    "substr on list": "arg_not_atom",
+    "concat on list": "arg_not_atom",
+    "substr requires int32 args": "bad_index",
+    "invalid indices for substr": "index_out_of_range",
 }
 PY_POLICY_DIV = "div operator with negative operands is deprecated"
 
@@ -176,10 +192,11 @@ def run_py(program, env, max_cost):
 class Generator:
     """Random programs over the implemented operator set."""
 
-    # opcode -> arity, None for variadic (0 to 4 arguments). Wrong
-    # arities, improper argument tails, and the reserved empty-atom
-    # operator are emitted at low probability so the wrong_arg_count,
-    # bad_arg_list, and reserved_operator paths stay exercised.
+    # opcode -> arity: an int, a tuple of accepted arities, or None
+    # for variadic (0 to 4 arguments). Wrong arities, improper
+    # argument tails, and the reserved empty-atom operator are emitted
+    # at low probability so the wrong_arg_count, bad_arg_list, and
+    # reserved_operator paths stay exercised.
     ARITIES = {
         b"\x03": 3,  # i
         b"\x04": 2,  # c
@@ -187,6 +204,10 @@ class Generator:
         b"\x06": 1,  # r
         b"\x07": 1,  # l
         b"\x09": 2,  # =
+        b"\x0a": 2,  # >s
+        b"\x0c": (2, 3),  # substr
+        b"\x0d": 1,  # strlen
+        b"\x0e": None,  # concat
         b"\x10": None,  # +
         b"\x11": None,  # -
         b"\x12": None,  # *
@@ -195,6 +216,7 @@ class Generator:
         b"\x15": 2,  # >
     }
     OPCODES = sorted(ARITIES)
+    SUBSTR = b"\x0c"
 
     def __init__(self, rng, max_depth):
         self.rng = rng
@@ -253,6 +275,41 @@ class Generator:
             atom = b"\x00" * r.randint(1, 3) + atom
         return atom
 
+    def index_atom(self, size):
+        # An index near [0, size] so slices frequently validate, with
+        # out-of-range, negative, and oversized values mixed in. The
+        # occasional zero-byte padding exercises the rule that leading
+        # zeros are legal on an index only within the four-byte cap.
+        r = self.rng
+        roll = r.random()
+        if roll < 0.7:
+            value = r.randint(0, size)
+        elif roll < 0.85:
+            value = r.randint(-3, size + 3)
+        else:
+            value = r.choice((-1, size + 1, 2**31, r.randint(-(2**40), 2**40)))
+        atom = int_to_atom(value)
+        if value >= 0 and r.random() < 0.15:
+            # Padding within the four-byte cap keeps an in-range value
+            # valid. A small share pads past the cap on purpose: the
+            # zero-padded spelling of an oversized index is a distinct
+            # bad_index shape the wild values above never produce.
+            room = 4 - len(atom)
+            if room > 0 and r.random() >= 0.2:
+                atom = b"\x00" * r.randint(1, room) + atom
+            else:
+                atom = b"\x00" * (max(room, 0) + r.randint(1, 3)) + atom
+        return atom
+
+    def substr_program(self):
+        r = self.rng
+        data = self.atom_int()
+        args = b""
+        for _ in range(r.randint(0, 1)):
+            args = ((b"\x01", self.index_atom(len(data))), args)
+        args = ((b"\x01", self.index_atom(len(data))), args)
+        return (self.SUBSTR, ((b"\x01", data), args))
+
     def program(self, depth):
         r = self.rng
         roll = r.random()
@@ -277,13 +334,21 @@ class Generator:
                 args = (self.program(depth - 1), args)
             return (b"\x08", args)
         opcode = r.choice(self.OPCODES)
+        if opcode == self.SUBSTR and r.random() < 0.7:
+            # Uncorrelated random arguments almost never form a valid
+            # slice, so most substr programs are built with indices
+            # drawn near the data atom's length. The rest go through
+            # the generic path below for pair data, pair indices, and
+            # wild index values.
+            return self.substr_program()
         arity = self.ARITIES[opcode]
         if arity is None:
             arg_count = r.randint(0, 4)
-        elif r.random() < 0.06:
-            arg_count = max(0, arity + r.choice((-1, 1)))
         else:
-            arg_count = arity
+            choices = arity if isinstance(arity, tuple) else (arity,)
+            arg_count = r.choice(choices)
+            if r.random() < 0.06:
+                arg_count = max(0, arg_count + r.choice((-1, 1)))
         if r.random() < 0.03:
             opcode = b""  # reserved operator, arguments still evaluate
         args = b""
