@@ -70,7 +70,10 @@ In practice this means:
    property-based invariants and theft-bug regression vectors before any
    feature work builds on them.
 5. **Nothing in Phases 0 to 2 depends on the hardened-implementation
-   language.** That decision is the Phase 3 gate.
+   language.** The language is decided: C++ (decision by Evan,
+   2026-07-29, recorded in `docs/execution-plan.md`). The remaining
+   integration questions stay at the Phase 3 gate, and no Phase 0 to 2
+   artifact may assume the language.
 
 ## Consensus mindset
 

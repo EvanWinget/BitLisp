@@ -11,7 +11,7 @@
 2. **Vectors are the source of truth between sessions.** Claude Code sessions are stateless; the vector corpus is not. Any behavior worth keeping becomes a vector the same day.
 3. **Divergence is documented, never silent.** Anywhere BitLisp differs from CLVM, the divergence table says so and why.
 4. **The novel layer gets adversarial treatment first.** The matching rules (injective output matching, mixed-tx rule, message scoping) are the only part with no external reference — they get property-based invariants and theft-bug regression vectors before feature work.
-5. **Nothing in Phases 0–2 depends on the hardened-implementation language.** That decision is the Phase 3 gate.
+5. **Nothing in Phases 0–2 depends on the hardened-implementation language.** The language is decided ahead of the gate: C++ (decision by Evan, 2026-07-29, recorded at the Phase 3 gate below). The independence rule stands unchanged: no Phase 0-2 artifact may assume the language.
 6. **Skeleton fixed, flesh just-in-time.** Binding from day 0: the ground rules, the phase ordering and dependencies, the done-criteria, and the decision gates with their pre-registered evidence. Everything else — task lists inside phases, session specs, far-phase detail — is indicative only, and is re-planned at the recurring checkpoint when the preceding done-criterion clears. Task specs for Claude Code are written the day they're executed, against the current state of the repo. Changing the skeleton requires an explicit, recorded decision; changing the flesh requires nothing.
 
 ---
@@ -43,7 +43,7 @@
 - [x] Cherry-pick from bll-consensus: CI config, vector-runner scaffolding, any generic utilities. No history fork.
 - [x] CI from day 1: pytest + vector runner + `hypothesis` property suite (empty is fine; the gate exists before the tests do).
 - [x] **Reference-material policy (no submodules, deliberately):**
-  - Oracles = released artifacts: `clvm` + `chia_rs` wheels pinned in the lockfile (dev deps only); upstream commit hashes recorded in `VM.md` provenance. Rust phase: `clvm_rs` as pinned crates.io dev-dependency.
+  - Oracles = released artifacts: `clvm` + `chia_rs` wheels pinned in the lockfile (dev deps only); upstream commit hashes recorded in `VM.md` provenance. Hardened phase: intersection diffing stays at the vector and corpus level through the Python harness and the pinned wheels, `clvm_rs` consulted as source only.
   - Chia's official test vectors vendored as **data** into `vectors/upstream/` with provenance headers (repo, commit, license). CI never fetches from the network.
   - `tools/fetch-references.sh` clones clvm/clvm_rs/chia_rs into git-ignored `references/`.
   - **Upstream sync is a governance event, never a float:** on each upstream clvm/chia_rs release, triage the changelog — *adopt* (semantics we want: spec amendment + vectors + pin bump in one reviewed commit), *take* (oracle-only bug fix: pin bump), or *decline* (Chia-specific: rationale recorded in the divergence table). Every pin bump is a commit with reasons; oracle drift is never ambient.
@@ -116,7 +116,7 @@
 - [ ] Compute actual vbyte totals vs the pre-registered thresholds (526 vb single exit @1B; amortization curve for k = 1..64; nested-pool exit).
 - [ ] Witness-compression experiments: canonical standard-layer shorthands (spec'd as a commitment-scheme option, not ad hoc), currying discipline, taproot-tree vs puzzle-tree split. Re-measure after.
 - [ ] Update evaluation doc + essay numbers; if any threshold fails post-compression, that finding goes in the essay verbatim (ground rule: publish the miss).
-- [ ] **Decision gate — hardened implementation language.** Default: Rust core (`bitlisp-core`) + `bitlisp-ffi` C-ABI + thin C++ Inquisition patch. Evidence to confirm/overturn: cargo-fuzz differential throughput vs a C++ spike; FFI surface size for the Inquisition patch; grant-reviewer feedback if available. Overturn condition: if Inquisition integration friction dominates, revert to the original C++ in-tree plan with Boost.Test.
+- [ ] **Decision gate — hardened implementation integration.** The language question is settled: C++, in tree with the deployment target (decision by Evan, 2026-07-29, a recorded skeleton change under ground rule 6). Rationale: Bitcoin Core and Bitcoin Inquisition are C++ and take consensus code without an FFI boundary, so the previous default (Rust `bitlisp-core` + `bitlisp-ffi` C-ABI + thin C++ patch) put a novel FFI seam inside consensus validation, which was itself review surface, and Inquisition integration friction was already this gate's pre-registered overturn condition. The known cost is accepted and mitigated rather than avoided: C++ parses attacker-supplied witness bytes, so the deserializer and evaluator get libFuzzer differential fuzzing against the Python reference (full corpus) and against the oracle wheels (intersection), on Core's own fuzzing model. The gate now decides the remaining structure with Phase 3 evidence: in-tree module vs standalone library consumed by the Inquisition patch, test harness (Boost.Test per Core convention), and fuzz-throughput measurement. The language ADR is still written, recording this decision, its rationale, and the gate evidence.
 
 **Done when:** zero (est.) markers remain in the evaluation doc; gate verdicts are measured; language ADR written.
 
@@ -137,8 +137,8 @@
 
 ## Phase 5 — Hardened implementation + Inquisition (post-review, contingent on Phase 4 not breaking the design)
 
-- [ ] `rust/bitlisp-core` per the language ADR; differential CI: Rust ↔ Python reference on full corpus; Rust ↔ clvm_rs on intersection; cargo-fuzz on matching layer with invariant oracles.
-- [ ] `bitlisp-ffi` C ABI; minimal Inquisition patch (new tapleaf version, validation hook, weight/cost mapping).
+- [ ] `cpp/bitlisp` per the language ADR, targeting the Bitcoin Core toolchain; differential CI: C++ ↔ Python reference on full corpus; C++ ↔ oracle wheels on intersection; libFuzzer on matching layer with invariant oracles.
+- [ ] Minimal Inquisition patch (new tapleaf version, validation hook, weight/cost mapping), no FFI layer.
 - [ ] BIP-style draft for the tapleaf commitment + validator, extracted from `/spec`.
 - [ ] Signet demo: the measured pool + offer puzzles live, exit-aggregation flow demonstrated end-to-end.
 
