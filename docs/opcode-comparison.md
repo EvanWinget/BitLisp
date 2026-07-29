@@ -111,7 +111,7 @@ bllsh operates on byte strings.
 | Capability | CLVM | bllsh | BitLisp |
 | --- | --- | --- | --- |
 | sha256 | `sha256` 0x0b | `sha256` 0x22 | `sha256` 0x0b |
-| sha256 tree hash | `sha256_tree` 0x3f, flag-gated, not in the flags-0 consensus set | absent | absent |
+| sha256 tree hash | `sha256tree` 0x3f, flag-gated today, promoted to consensus in the Chia 3.0 hard fork (CHIP-0049, in review) | absent | `sha256tree` 0x3f (divergence D9, adopted 2026-07-29) |
 | keccak256 | `keccak256` 0x3e, inside the softfork guard (extension 1) only | absent | absent (D3 unknown) |
 | ripemd160 | absent | `ripemd160` 0x23 | absent (declined, D2 record) |
 | hash160 | absent | `hash160` 0x24 | absent (declined, D2 record) |
@@ -149,9 +149,13 @@ In BitLisp that surface belongs to
 - **BitLisp relative to CLVM** is a strict curation: the shared core
   keeps CLVM's names, numbers, and semantics bit for bit, the BLS
   family, softfork guard, post-hardfork extensions, and unknown-op
-  acceptance are removed, and `secp_verify` is the single addition,
-  on 0x0f, a byte unassigned in both oracles. Every removal has a
-  rationale row in the divergence table, spec/VM.md section 6.
+  acceptance are removed, and there are two additions. `secp_verify`
+  sits on 0x0f, a byte unassigned in both oracles, and `sha256tree`
+  sits on 0x3f with upstream's own opcode, semantics, and cost
+  constants, adopted while the operator is still flag-gated there so
+  the two converge when Chia's 3.0 fork activates. Every removal and
+  addition has a rationale row in the divergence table, spec/VM.md
+  section 6.
 - **bllsh relative to CLVM** reworks the core rather than curating
   it: division is gone, the two shifts collapse into one operator,
   bitwise moves from integers to byte strings, list construction
