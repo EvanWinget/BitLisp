@@ -1,0 +1,169 @@
+{
+ "schema": "bitlisp-vector-v0",
+ "suite": "vm",
+ "spec": "VM.md sections 4 and 5 and COSTS.md section 8 (crypto family, sha256)",
+ "cases": [
+  {
+   "name": "sha256_worked_example",
+   "program": "ff0bffff01826162ffff0182636480",
+   "env": "80",
+   "expect": {
+    "result": "a088d4266fd4e6338d13b845fcf289579d209c897823b9217da3e161936f031589",
+    "cost": 724
+   }
+  },
+  {
+   "name": "sha256_zero_args_hash_empty",
+   "program": "ff0b80",
+   "env": "80",
+   "expect": {
+    "result": "a0e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "cost": 408
+   }
+  },
+  {
+   "name": "sha256_nil_arg_same_digest_more_cost",
+   "program": "ff0bffff018080",
+   "env": "80",
+   "expect": {
+    "result": "a0e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "cost": 562
+   }
+  },
+  {
+   "name": "sha256_one_arg",
+   "program": "ff0bffff0182616280",
+   "env": "80",
+   "expect": {
+    "result": "a0fb8e20fc2e4c3f248c60c39bd652f3c1347298bb977b8b4d5903b85055620603",
+    "cost": 566
+   }
+  },
+  {
+   "name": "sha256_five_args",
+   "program": "ff0bffff0161ffff0162ffff0163ffff0164ffff016580",
+   "env": "80",
+   "expect": {
+    "result": "a036bbe50ed96841d10443bcb670d6554f0a34b761be67ec9c4a8ad2c0c44ca42c",
+    "cost": 1188
+   }
+  },
+  {
+   "name": "sha256_redundant_encoding_hashes_actual_bytes",
+   "program": "ff0bffff0182000280",
+   "env": "80",
+   "expect": {
+    "result": "a0fcf0a6c700dd13e274b6fba8deea8dd9b26e4eedde3495717cac8408c9c5177f",
+    "cost": 566
+   }
+  },
+  {
+   "name": "sha256_minimal_encoding_distinct_digest",
+   "program": "ff0bffff010280",
+   "env": "80",
+   "expect": {
+    "result": "a0dbc1b4c900ffe48d575b5da5c638040125f65db0fe3e24494b76ea986457d986",
+    "cost": 564
+   }
+  },
+  {
+   "name": "sha256_64_byte_atom",
+   "program": "ff0bffff01c040000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f80",
+   "env": "80",
+   "expect": {
+    "result": "a0fdeab9acf3710362bd2658cdc9a29e8f9c757fcf9811603a8c447cd1d9151108",
+    "cost": 690
+   }
+  },
+  {
+   "name": "sha256_exact_budget_inclusive",
+   "program": "ff0bffff01826162ffff0182636480",
+   "env": "80",
+   "max_cost": 724,
+   "expect": {
+    "result": "a088d4266fd4e6338d13b845fcf289579d209c897823b9217da3e161936f031589",
+    "cost": 724
+   }
+  },
+  {
+   "name": "sha256_budget_one_below",
+   "program": "ff0bffff01826162ffff0182636480",
+   "env": "80",
+   "max_cost": 723,
+   "expect": {
+    "error": "cost_exceeded"
+   }
+  },
+  {
+   "name": "sha256_zero_args_exact_budget",
+   "program": "ff0b80",
+   "env": "80",
+   "max_cost": 408,
+   "expect": {
+    "result": "a0e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "cost": 408
+   }
+  },
+  {
+   "name": "sha256_zero_args_budget_below",
+   "program": "ff0b80",
+   "env": "80",
+   "max_cost": 407,
+   "expect": {
+    "error": "cost_exceeded"
+   }
+  },
+  {
+   "name": "sha256_pair_arg",
+   "program": "ff0bffff01ff618080",
+   "env": "80",
+   "expect": {
+    "error": "arg_not_atom"
+   }
+  },
+  {
+   "name": "sha256_pair_first_arg_beats_base_cost",
+   "program": "ff0bffff01ff6180ffff0182616280",
+   "env": "80",
+   "max_cost": 41,
+   "expect": {
+    "error": "arg_not_atom"
+   }
+  },
+  {
+   "name": "sha256_budget_beats_pair_before_dispatch",
+   "program": "ff0bffff01ff6180ffff0182616280",
+   "env": "80",
+   "max_cost": 40,
+   "expect": {
+    "error": "cost_exceeded"
+   }
+  },
+  {
+   "name": "sha256_pair_second_arg_after_first_charge",
+   "program": "ff0bffff01826162ffff01ff618080",
+   "env": "80",
+   "max_cost": 266,
+   "expect": {
+    "error": "arg_not_atom"
+   }
+  },
+  {
+   "name": "sha256_budget_beats_pair_second_arg",
+   "program": "ff0bffff01826162ffff01ff618080",
+   "env": "80",
+   "max_cost": 265,
+   "expect": {
+    "error": "cost_exceeded"
+   }
+  },
+  {
+   "name": "sha256_improper_arg_tail",
+   "program": "ff0bffff01826162826364",
+   "env": "80",
+   "expect": {
+    "error": "bad_arg_list"
+   }
+  }
+ ]
+}
