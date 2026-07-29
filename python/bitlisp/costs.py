@@ -57,6 +57,17 @@ SHA256_COST_PER_BYTE = 2
 # fixed by the operator's shape checks.
 SECP_VERIFY_COST = 1_300_000
 
+# sha256tree charges per visited node during its walk: the base cost
+# rides on the first node's charge, each visited pair charges the
+# pair cost, each visited atom charges the per-byte cost on its
+# length plus one for the leaf tag byte, and the 32-byte result
+# charges plain malloc. The constants are the consensus oracle's own
+# sha256tree, carried behind its release flag (a recorded
+# divergence: at flags 0 the oracle treats the opcode as unknown).
+SHA256TREE_BASE_COST = 270
+SHA256TREE_PAIR_COST = 460
+SHA256TREE_COST_PER_BYTE = 2
+
 GRS_BASE_COST = 117
 GRS_COST_PER_BYTE = 1
 SUBSTR_COST = 1

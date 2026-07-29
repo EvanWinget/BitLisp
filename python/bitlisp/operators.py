@@ -552,6 +552,43 @@ def op_secp_verify(args, charge):
     return TRUE
 
 
+def op_sha256tree(args, charge):
+    # The arity check is the only check and precedes every charge:
+    # any node is a legal argument, hashing structure is the
+    # operator's purpose, so there is no arg_not_atom path. The walk
+    # charges each node as it reaches it, the base cost riding on
+    # the first node's charge, because evaluation builds shared
+    # structure cheaply (one cons of a node to itself doubles the
+    # reachable tree) and only walk-time charging keeps the hashing
+    # work bounded by the budget. Sharing is never deduplicated: a
+    # node the walk reaches twice is charged and hashed twice. The
+    # stack mirrors the machine's explicit-stack rule, so argument
+    # depth is not limited by the Python recursion limit.
+    _exactly(args, 1, "sha256tree")
+    pending = costs.SHA256TREE_BASE_COST
+    hashes = []
+    stack = [(False, args[0])]
+    while stack:
+        combine, node = stack.pop()
+        if combine:
+            first = hashes.pop()
+            rest = hashes.pop()
+            hashes.append(hashlib.sha256(b"\x02" + first + rest).digest())
+        elif is_pair(node):
+            charge(pending + costs.SHA256TREE_PAIR_COST)
+            pending = 0
+            stack.append((True, None))
+            stack.append((False, node[0]))
+            stack.append((False, node[1]))
+        else:
+            charge(pending + costs.SHA256TREE_COST_PER_BYTE * (len(node) + 1))
+            pending = 0
+            hashes.append(hashlib.sha256(b"\x01" + node).digest())
+    result = hashes[0]
+    _malloc(charge, result)
+    return result
+
+
 def op_raise(args, charge):
     raise BitLispError("user_raise", "clvm raise")
 
@@ -585,4 +622,5 @@ OPERATORS = {
     b"\x20": op_not,
     b"\x21": op_any,
     b"\x22": op_all,
+    b"\x3f": op_sha256tree,
 }
