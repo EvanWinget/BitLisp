@@ -5,7 +5,8 @@
  "commit": "00c47c9bb7f1e637d37b908e6de80cc7efca3bb6",
  "license": "Apache-2.0",
  "tree_sha256": "bf6a604912a174586441e49fa5641451aed4e2d13a04f76b1e69429defcec273",
- "tree_sha256_method": "find . -type f | LC_ALL=C sort | xargs shasum -a 256 | shasum -a 256, run in this directory before this file was added",
+ "tree_sha256_method": "find . -type f -name '*.txt' | LC_ALL=C sort | xargs shasum -a 256 | shasum -a 256, run in this directory",
  "import_date": "2026-07-28",
+ "importing_commit": "e06ef3dc67b1793a885746f98b42b5eeaf802a0c",
  "notes": "Chia's official CLVM command tests, vendored verbatim from the release tag matching the pinned clvm wheel. Each .txt file holds optional leading # comments, one brun command line, and the expected stdout: 'cost = N' when -c is given, then the printed result, or a 'FAIL: message' line. Expectations were produced by clvm_tools brun over the Python clvm package, so FAIL messages and the negative-division deprecation are that library's spellings of the shared semantics. tools/run_upstream.py re-derives every expectation semantically against bitlisp and the consensus oracle instead of comparing stdout text."
 }
