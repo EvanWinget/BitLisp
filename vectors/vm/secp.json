@@ -317,6 +317,24 @@
    "expect": {
     "error": "arg_not_atom"
    }
+  },
+  {
+   "name": "secp256k1_verify_opcode_unknown_uncharged",
+   "program": "ff8413d61f0080",
+   "env": "80",
+   "max_cost": 1,
+   "expect": {
+    "error": "unknown_operator"
+   }
+  },
+  {
+   "name": "secp256r1_verify_opcode_unknown_uncharged",
+   "program": "ff841c3a8f0080",
+   "env": "80",
+   "max_cost": 1,
+   "expect": {
+    "error": "unknown_operator"
+   }
   }
  ]
 }
