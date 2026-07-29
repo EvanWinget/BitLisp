@@ -1,0 +1,108 @@
+"""BIP 340 Schnorr signature verification over secp256k1.
+
+Self-contained on purpose: the reference implementation is the spec
+artifact and carries no dependencies, so the curve arithmetic lives
+here as plain integer math in affine coordinates, the same shape the
+algorithm has in the BIP. The test suite cross-checks it against the
+official BIP 340 vectors and against libsecp256k1. This module favors
+reviewability over speed and does not run in constant time, which is
+safe for verification because every input it sees is public. A
+consensus-facing implementation must use a hardened curve library
+instead.
+"""
+
+import hashlib
+
+# The secp256k1 field prime, group order, and base point.
+P = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F
+N = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
+G = (
+    0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798,
+    0x483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8,
+)
+
+_CHALLENGE_TAG_HASH = hashlib.sha256(b"BIP0340/challenge").digest()
+
+
+def _challenge_hash(data):
+    # The BIP 340 tagged hash: the tag's digest twice, then the data.
+    return hashlib.sha256(_CHALLENGE_TAG_HASH + _CHALLENGE_TAG_HASH + data).digest()
+
+
+def lift_x(x):
+    """The even-y curve point with x coordinate `x`, or None.
+
+    None when x is not a canonical field element or no curve point
+    has that x coordinate.
+    """
+    if x >= P:
+        return None
+    y_sq = (pow(x, 3, P) + 7) % P
+    # P is congruent to 3 mod 4, so this power is a square root of
+    # y_sq exactly when y_sq is a quadratic residue.
+    y = pow(y_sq, (P + 1) // 4, P)
+    if y * y % P != y_sq:
+        return None
+    return (x, y if y % 2 == 0 else P - y)
+
+
+def point_add(a, b):
+    """Affine point addition. None is the point at infinity."""
+    if a is None:
+        return b
+    if b is None:
+        return a
+    ax, ay = a
+    bx, by = b
+    if ax == bx and (ay + by) % P == 0:
+        return None
+    if a == b:
+        lam = 3 * ax * ax * pow(2 * ay, P - 2, P) % P
+    else:
+        lam = (by - ay) * pow(bx - ax, P - 2, P) % P
+    x = (lam * lam - ax - bx) % P
+    return (x, (lam * (ax - x) - ay) % P)
+
+
+def point_mul(k, point):
+    """Double-and-add scalar multiplication of a point or None."""
+    result = None
+    while k:
+        if k & 1:
+            result = point_add(result, point)
+        point = point_add(point, point)
+        k >>= 1
+    return result
+
+
+def verify(pubkey, msg, sig):
+    """BIP 340 Verify: True exactly when sig is valid for (pubkey, msg).
+
+    pubkey is the 32-byte x-only public key and sig the 64-byte
+    signature, widths the caller guarantees. The message may be any
+    length here: BitLisp's exactly-32-bytes message rule belongs to
+    the operator layer, and keeping full BIP 340 semantics in this
+    module lets the official vectors, variable-length messages
+    included, run against it unmodified. Every value defect (a pubkey
+    that lifts to no curve point, a non-canonical r or s, a failed
+    group equation) returns False, never raises.
+    """
+    if len(pubkey) != 32 or len(sig) != 64:
+        raise ValueError("verify requires a 32-byte pubkey and a 64-byte sig")
+    point = lift_x(int.from_bytes(pubkey, "big"))
+    if point is None:
+        return False
+    r = int.from_bytes(sig[:32], "big")
+    s = int.from_bytes(sig[32:], "big")
+    if r >= P or s >= N:
+        return False
+    e = int.from_bytes(_challenge_hash(sig[:32] + pubkey + msg), "big") % N
+    # R = s*G + (-e)*point, negating a point by flipping its y. No
+    # curve point has y = 0 (the group order is an odd prime, so
+    # there is no 2-torsion), so the flip stays in range.
+    e_point = point_mul(e, point)
+    neg_e_point = None if e_point is None else (e_point[0], P - e_point[1])
+    result = point_add(point_mul(s, G), neg_e_point)
+    if result is None or result[1] % 2 != 0:
+        return False
+    return result[0] == r
