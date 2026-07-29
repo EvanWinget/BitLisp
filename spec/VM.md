@@ -1,10 +1,9 @@
 # BitLisp VM
 
 Status: Phase 1 in progress. Sections 1 to 6 are normative for the
-evaluator core, the tree ops family, the arithmetic operator family,
-and the bytes and strings family. Remaining operator families land one
-session at a time, each extending section 4 and the vector corpus
-together.
+evaluator core and for every operator family listed as implemented at
+the head of section 4. Remaining operators land one session at a
+time, each extending section 4 and the vector corpus together.
 
 The evaluator is CLVM-derived. The shared core must be bit-for-bit
 equivalent to the pinned consensus oracle (`chia-rs`, flags 0) on the
@@ -183,8 +182,9 @@ failing closed.
 
 Implemented so far: the core specials, the tree ops family, the
 arithmetic family, the bytes and strings family, the bitwise family,
-and the boolean family. The remaining family (crypto) lands in a
-later session.
+the boolean family, and the sha256 operator of the crypto family. The
+crypto family's remaining operator, `secp_verify` (divergence D2),
+lands in a later session.
 
 | Opcode | Name | Arity | Semantics |
 | --- | --- | --- | --- |
@@ -198,6 +198,7 @@ later session.
 | `0x08` | `x` raise | any | Evaluates its arguments, then raises `user_raise`. Never returns. |
 | `0x09` | `=` equal | 2 | Byte equality of two atoms: TRUE if identical, nil otherwise. A pair argument raises `arg_not_atom`. |
 | `0x0a` | `>s` greater-bytes | 2 | Unsigned lexicographic comparison of two atoms: TRUE if the first is greater, nil otherwise. |
+| `0x0b` | `sha256` | 0 or more | The SHA-256 digest of the concatenation of its atom arguments. No arguments hashes the empty string. |
 | `0x0c` | `substr` | 2 or 3 | The slice of an atom from a start index to an end index, which defaults to the atom's length. |
 | `0x0d` | `strlen` | 1 | The byte length of an atom, as a minimally encoded integer. |
 | `0x0e` | `concat` | 0 or more | The concatenation of its atom arguments. No arguments gives nil. |
@@ -375,6 +376,23 @@ same rule `i` applies to its selector.
   per-byte term: a large atom argument costs the same as a one-byte
   one.
 
+The crypto family currently holds `sha256`. Like the bytes and
+strings ops it treats atoms as raw byte strings: every argument must
+be an atom, a pair raises `arg_not_atom`, and there is no operand
+size limit.
+
+- `sha256` returns the SHA-256 digest of the concatenation of its
+  arguments in argument order, a freshly built 32-byte atom charging
+  malloc. With no arguments it hashes the empty string, and a nil
+  argument contributes no bytes but is still an argument: `(sha256)`
+  and `(sha256 nil)` return the same digest at different costs.
+- Hashing consumes each argument atom's actual bytes, redundant
+  encoding bytes included, the same bytes the per-byte cost counts:
+  `(sha256 (q . 0x0002))` hashes two bytes and its digest differs
+  from `(sha256 (q . 0x02))`.
+- The result is always exactly 32 bytes, so `sha256` can never build
+  an atom the wire format cannot encode.
+
 ## 5. Error taxonomy
 
 Errors are consensus-relevant only as "the spend is invalid". The
@@ -391,7 +409,7 @@ informative, not normative.
 | `unknown_operator` | Operator atom not in the table and not reserved | (accepted, D3) | (accepted, D3) |
 | `bad_arg_list` | Operator arguments are not a proper list | (varies) | (varies) |
 | `wrong_arg_count` | Operator arity violated | InvalidOperatorArg | (per-op message) |
-| `arg_not_atom` | An atom-only operator (`=`, the integer family, the bytes family outside `substr`'s index positions, or the bitwise family outside shift count positions) got a pair | InvalidOperatorArg | (per-op message) |
+| `arg_not_atom` | An atom-only operator (`=`, the integer family, the bytes family outside `substr`'s index positions, the bitwise family outside shift count positions, or `sha256`) got a pair | InvalidOperatorArg | (per-op message) |
 | `arg_not_pair` | `f` or `r` applied to an atom | InvalidOperatorArg: first/rest of non-cons | first/rest of non-cons |
 | `arg_too_long` | Operand exceeds a section 4 size limit | InvalidOperatorArg | (absent, the `clvm` package has no operand limits) |
 | `bad_index` | A `substr` index or a shift count argument is a pair or an atom longer than four bytes | (per-op) requires int32 args (with no leading zeros) | (per-op) requires int32 args |
@@ -422,7 +440,7 @@ pin it. No divergence exists outside this table. "Both oracles" means
 | --- | --- | --- | --- | --- | --- |
 | D1 | BLS operators | `point_add`, `pubkey_for_exp`, BLS extension ops present | absent, `unknown_operator` | Bitcoin has no BLS. Removing them removes their entire attack and cost surface. | `vm/dispatch.json` |
 | D2 | secp256k1 | `secp256k1_verify` post-hardfork op | `secp_verify`, BIP340 Schnorr (crypto family session) | Native curve, native signature scheme. | TODO Phase 1 crypto session |
-| D3 | Unknown operators, outside the reserved families of section 3.2 | Both oracles accept unknown opcodes, cost derived from the opcode bytes, result nil. Reserved atoms are rejected by both oracles and by BitLisp alike, so they sit outside this divergence. The consensus oracle also gives real semantics to opcodes BitLisp classes as unknown: `softfork` (an assert-only guard whose declared cost must match), `sha256`, `coinid`, `modpow`, `%`, the D1 BLS set, and two four-byte secp verify opcodes, none of which follow the cost-from-opcode-bytes rule | `unknown_operator` error | The operator set is closed by design. Bitcoin soft-forks at the tapleaf-version level, not through unknown-opcode acceptance. PROVISIONAL, see section 8. | `vm/dispatch.json` |
+| D3 | Unknown operators, outside the reserved families of section 3.2 | Both oracles accept unknown opcodes, cost derived from the opcode bytes, result nil. Reserved atoms are rejected by both oracles and by BitLisp alike, so they sit outside this divergence. The consensus oracle also gives real semantics to opcodes BitLisp classes as unknown: `softfork` (an assert-only guard whose declared cost must match), `coinid`, `modpow`, `%`, the D1 BLS set, and two four-byte secp verify opcodes, none of which follow the cost-from-opcode-bytes rule | `unknown_operator` error | The operator set is closed by design. Bitcoin soft-forks at the tapleaf-version level, not through unknown-opcode acceptance. PROVISIONAL, see section 8. | `vm/dispatch.json` |
 | D4 | Pair in operator position | Both oracles accept `((X) . args)` when `X` is a lone atom, a legacy apply-style rule: `X` dispatches on the arguments unevaluated, charging apply's 90. They disagree on a non-nil tail in the operator pair: `chia-rs` ignores the tail and dispatches on the head, `clvm` rejects it | `operator_not_atom` error for every pair in operator position | The legacy rule is a remnant the oracles themselves disagree on at the edges. Strict rejection of the whole family is the smaller, reviewable surface. PROVISIONAL, see section 8. | `vm/dispatch.json` |
 | D5 | Deserialization strictness | Both oracles accept non-minimal length encodings (the `0xfc` six-byte length prefix included, which is non-minimal for every size it can represent), trailing bytes, and (chia-rs) `0xfe` back-references | `bad_encoding` for all three (section 2) | Witness bytes must have exactly one accepted spelling per program. Malleability of the serialized form is a consensus hazard in the Bitcoin context. | `vm/serialize.json` |
 | D6 | `/` with negative operands | Consensus (`chia-rs`): floor division. The `clvm` package injects a policy error ("deprecated") that is not consensus | Floor division, matching consensus | Intersection parity targets the consensus oracle. The Python package's rejection is library policy, the diff harness treats it as an expected divergence. Ratified, see section 8. | `vm/arith.json` |
