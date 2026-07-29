@@ -1,11 +1,10 @@
 # BitLisp Cost Model
 
-Status: Phase 1 in progress. This table is normative for the evaluator
-core and for every operator family listed as implemented at the head
-of VM.md section 4. It inherits the
-CLVM cost table for the operator intersection, verified against the
-pinned oracles by the diff harness. The weight mapping is filled with
-Phase 3 measurements.
+Status: Phase 1 complete (2026-07-29). This table is normative for
+the evaluator core and the complete v0 operator table. It inherits
+the CLVM cost table for the operator intersection, verified against
+the pinned oracles by the diff harness. The weight mapping is filled
+with Phase 3 measurements.
 
 ## 1. General rules
 

@@ -1,8 +1,9 @@
 # BitLisp VM
 
-Status: Phase 1 in progress. Sections 1 to 6 are normative for the
-evaluator core and for every operator family listed as implemented at
-the head of section 4. The v0 operator table is complete.
+Status: Phase 1 complete (2026-07-29). Sections 1 to 6 are normative
+for the evaluator core and the complete v0 operator table. Constants
+marked PROVISIONAL and the open sub-questions in section 8 are owed
+to Phase 3.
 
 The evaluator is CLVM-derived. The shared core must be bit-for-bit
 equivalent to the pinned consensus oracle (`chia-rs`, flags 0) on the
