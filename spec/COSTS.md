@@ -138,6 +138,12 @@ Phase 3 measurements.
 | `PATH_LOOKUP_COST_PER_ZERO_BYTE` | 4 | Per leading zero byte of the path atom |
 | `MALLOC_COST_PER_BYTE` | 10 | Per byte of freshly built result atoms |
 
+The raise operator `x` has no cost of its own. The dispatch cost is
+charged at operator identification, each argument charges its own
+costs as it evaluates, and the raise follows with no further charge,
+so a budget burst by any of those charges reports `cost_exceeded`
+rather than `user_raise`. Pinned by boundary vectors.
+
 ## 3. Tree ops family
 
 No tree op charges malloc.
