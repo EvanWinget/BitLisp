@@ -1,0 +1,2 @@
+brun '(point_add (q . -1) (q . -1))'
+FAIL: point_add expects blob, got 81ff: unexpected end of buffer (-1 -1)
