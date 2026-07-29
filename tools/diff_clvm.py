@@ -99,6 +99,7 @@ RS_ERRORS = {
     "Invalid Indices": "index_out_of_range",
     "Shift too large": "shift_too_large",
     "lsh used on list": "arg_not_atom",
+    "sha256 used on list": "arg_not_atom",
     "takes no more than": "wrong_arg_count",
     # Bare InvalidOperatorArg (no more specific fragment above) is the
     # consensus operand size limit. Keep it last: fragment matching is
@@ -125,6 +126,7 @@ PY_ERRORS = {
     "strlen on list": "arg_not_atom",
     "substr on list": "arg_not_atom",
     "concat on list": "arg_not_atom",
+    "sha256 on list": "arg_not_atom",
     "invalid indices for substr": "index_out_of_range",
     "requires int32 args": "bad_index",
     "shift too large": "shift_too_large",
@@ -214,6 +216,7 @@ class Generator:
         b"\x07": 1,  # l
         b"\x09": 2,  # =
         b"\x0a": 2,  # >s
+        b"\x0b": None,  # sha256
         b"\x0c": (2, 3),  # substr
         b"\x0d": 1,  # strlen
         b"\x0e": None,  # concat

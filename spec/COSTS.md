@@ -1,9 +1,8 @@
 # BitLisp Cost Model
 
 Status: Phase 1 in progress. This table is normative for the evaluator
-core, the tree ops family, the arithmetic family, the bytes and
-strings family, the bitwise family, and the boolean family. It
-inherits the
+core and for every operator family listed as implemented at the head
+of VM.md section 4. It inherits the
 CLVM cost table for the operator intersection, verified against the
 pinned oracles by the diff harness. The weight mapping is filled with
 Phase 3 measurements.
@@ -105,8 +104,18 @@ Phase 3 measurements.
     charge of the operator's full cost. There are no argument checks:
     pairs are legal boolean arguments. No malloc, the results are the
     shared TRUE and nil constants.
+  - `sha256`: the same loop shape as `concat`. The base cost accrues
+    without a budget check, then per argument, in list order: that
+    argument's atom check, then one checked charge of everything
+    accrued so far plus that argument's `SHA256_COST_PER_ARG` and
+    per-byte cost. With no arguments the base cost is checked at
+    completion. The result's malloc is one final charge after the
+    loop. A pair in the first argument is therefore reported even
+    when the base cost alone would burst the budget, and a pair in a
+    later argument only after every earlier argument's charge fits,
+    pinned at the exact boundary by vectors.
 - Evaluation cost does not include deserialization. A per-byte cost on
-  the serialized program belongs to the weight mapping (section 8).
+  the serialized program belongs to the weight mapping (section 9).
 
 ## 2. Core evaluation costs
 
@@ -217,13 +226,27 @@ arguments are legal and charge the same as atoms.
 Worked example, pinned by vectors: `(any (q . 1) (q . 2))` costs
 `20 + 20 + 1 + 200 + 300 * 2 = 841`.
 
-## 8. Weight mapping
+## 8. Crypto family
+
+| Operator | Formula |
+| --- | --- |
+| `sha256` | `87 + 134 * n_args + 2 * total_arg_bytes + malloc(result)` |
+
+The result atom is always exactly 32 bytes, so its malloc is a flat
+320 charged after the argument loop. Per-byte terms count argument
+atoms at their actual length, redundant encoding bytes included, like
+everywhere else, and the hashed bytes are exactly the costed bytes.
+
+Worked example, pinned by vectors: `(sha256 (q . "ab") (q . "cd"))`
+costs `20 + 20 + 1 + 87 + 134 * 2 + 2 * 4 + 320 = 724`.
+
+## 9. Weight mapping
 
 TODO (Phase 3): mapping from VM cost units to Bitcoin transaction
 weight, derived from benchmark data on the measured artifacts,
 including the per-byte cost of the serialized program itself.
 
-## 9. Condition costs
+## 10. Condition costs
 
 TODO (Phase 2): per-condition base costs and the superlinear
 `CREATE_COIN` schedule.

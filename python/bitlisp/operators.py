@@ -1,5 +1,5 @@
-"""The operator table: tree, arithmetic, bytes, bitwise, and boolean
-families.
+"""The operator table: tree, arithmetic, bytes, bitwise, boolean, and
+crypto families.
 
 Each operator takes the evaluated argument list and the machine's
 charge callback, and returns the result node. The machine charges
@@ -14,6 +14,8 @@ div_by_zero is reported. Every function below performs them in the
 consensus oracle's order, and the boundary cases are pinned by
 vectors.
 """
+
+import hashlib
 
 from . import costs
 from .errors import BitLispError
@@ -483,6 +485,32 @@ def op_all(args, charge):
     return TRUE if all(arg != NIL for arg in args) else NIL
 
 
+def op_sha256(args, charge):
+    # The same loop shape as op_concat: the base cost accrues without
+    # a budget check and rides on the first argument's charge, after
+    # that argument's atom check. A pair in the first argument
+    # therefore wins over cost_exceeded, a pair in a later argument
+    # only after every earlier argument's charge fits. The digest
+    # consumes each argument atom's actual bytes, redundant encoding
+    # bytes included, exactly the bytes the per-byte cost counts. The
+    # result is always 32 bytes, one final malloc charge after the
+    # loop.
+    pending = costs.SHA256_BASE_COST
+    hasher = hashlib.sha256()
+    for arg in args:
+        if not is_atom(arg):
+            raise BitLispError("arg_not_atom", "sha256 used on list")
+        charge(
+            pending + costs.SHA256_COST_PER_ARG + costs.SHA256_COST_PER_BYTE * len(arg)
+        )
+        pending = 0
+        hasher.update(arg)
+    charge(pending)
+    result = hasher.digest()
+    _malloc(charge, result)
+    return result
+
+
 def op_raise(args, charge):
     raise BitLispError("user_raise", "clvm raise")
 
@@ -496,6 +524,7 @@ OPERATORS = {
     b"\x08": op_raise,
     b"\x09": op_eq,
     b"\x0a": op_grs,
+    b"\x0b": op_sha256,
     b"\x0c": op_substr,
     b"\x0d": op_strlen,
     b"\x0e": op_concat,
