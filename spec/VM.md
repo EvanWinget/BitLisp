@@ -488,8 +488,8 @@ snapshot refreshes follow the adopt/take/decline triage in
 
 | Oracle | Version | Pinned | Upstream commit | Notes |
 | --- | --- | --- | --- | --- |
-| `clvm` (PyPI) | 0.9.15 | 2026-07-26 | TODO on first triage | Python oracle. Carries non-consensus library policy (see D6), lacks the consensus operand size limits (section 4), checks the cost budget only after an operator completes, and checks apply's cost immediately where consensus defers the check to the applied program's first charge (section 3.2). The diff harness tolerates all four, each tagged in its output. |
-| `chia-rs` (PyPI) | 0.46.0 | 2026-07-26 | TODO on first triage | Consensus oracle, run with flags 0 |
+| `clvm` (PyPI) | 0.9.15 | 2026-07-26 | 00c47c9b | Python oracle. Carries non-consensus library policy (see D6), lacks the consensus operand size limits (section 4), checks the cost budget only after an operator completes, and checks apply's cost immediately where consensus defers the check to the applied program's first charge (section 3.2). The diff harness tolerates all four, each tagged in its output. |
+| `chia-rs` (PyPI) | 0.46.0 | 2026-07-26 | 7d487907 | Consensus oracle, run with flags 0 |
 | Chia CLVM command tests (Chia-Network/clvm) | 0.9.15 | 2026-07-28 | 00c47c9b | Official CLVM tests for the operator intersection, vendored as data in `vectors/upstream/clvm/` with a provenance file, executed by `tools/run_upstream.py` |
 | BIP 340 vectors (bitcoin/bips) | 2023-04-20 revision | 2026-07-28 | 200f9b26 | Official test vectors for `secp_verify`, vendored as data in `vectors/upstream/bip340/` with a provenance file |
 | Bitcoin Core test framework | v31.1 | 2026-07-28 | 9be056a8 | `secp_verify` differential oracle and signer, vendored verbatim in `tools/oracle/bitcoincore/` with a provenance README. The implementation Core cross-checks its consensus code with, validated against libsecp256k1 in Core's CI |
