@@ -363,10 +363,9 @@ byte, so the section 2 threshold for building an atom the wire
 format cannot encode applies unchanged.
 
 The boolean ops test nil-ness and return the shared TRUE and nil
-constants. Outside the tree ops, only they and `sha256tree` accept
-pair arguments: any node is legal in any position, and nil is the
-only false value (the one-byte atom `0x00` and every pair are true),
-the same rule `i` applies to its selector.
+constants. Any node is legal in any position, and nil is the only
+false value (the one-byte atom `0x00` and every pair are true), the
+same rule `i` applies to its selector.
 
 - `not` takes exactly one argument: TRUE if it is nil, nil otherwise.
 - `any` returns TRUE if at least one argument is not nil, and nil
@@ -469,7 +468,7 @@ informative, not normative.
 | `unknown_operator` | Operator atom not in the table and not reserved | (accepted, D3) | (accepted, D3) |
 | `bad_arg_list` | Operator arguments are not a proper list | (varies) | (varies) |
 | `wrong_arg_count` | Operator arity violated | InvalidOperatorArg | (per-op message) |
-| `arg_not_atom` | An atom-only operator (`=`, the integer family, the bytes family outside `substr`'s index positions, the bitwise family outside shift count positions, or the crypto family) got a pair | InvalidOperatorArg | (per-op message) |
+| `arg_not_atom` | An atom-only operator (`=`, the integer family, the bytes family outside `substr`'s index positions, the bitwise family outside shift count positions, or the crypto family outside `sha256tree`) got a pair | InvalidOperatorArg | (per-op message) |
 | `arg_not_pair` | `f` or `r` applied to an atom | InvalidOperatorArg: first/rest of non-cons | first/rest of non-cons |
 | `arg_too_long` | Operand exceeds a section 4 size limit | InvalidOperatorArg | (absent, the `clvm` package has no operand limits) |
 | `bad_index` | A `substr` index or a shift count argument is a pair or an atom longer than four bytes | (per-op) requires int32 args (with no leading zeros) | (per-op) requires int32 args |
@@ -507,7 +506,7 @@ pin it. No divergence exists outside this table. "Both oracles" means
 | D6 | `/` with negative operands | Consensus (`chia-rs`): floor division. The `clvm` package injects a policy error ("deprecated") that is not consensus | Floor division, matching consensus | Intersection parity targets the consensus oracle. The Python package's rejection is library policy, the diff harness treats it as an expected divergence. Ratified, see section 8. | `vm/arith.json`, upstream corpus D6 bucket |
 | D7 | Zero cost budget | Both oracles treat `max_cost = 0` as unlimited | A zero budget is a real budget, no program succeeds under it (section 3.3) | A zero sentinel meaning unlimited is a library convenience, not consensus behavior. In the Bitcoin context the budget derives from transaction weight and is never legitimately zero, and an accidental zero must fail closed rather than open. Ratified, see section 8. | `vm/dispatch.json` |
 | D8 | Resource limits outside the cost model | The consensus oracle enforces caps the cost model never sees: at most 62,500,000 atoms and as many pairs per run (deserialization spends one count per atom and two per cons, probed at the boundary: a 62.7 million node budget fails "too many pairs" before evaluation, 62.4 million deserializes), a 4 GiB atom-byte heap, 20,000,000-entry value and environment stacks, and a two-argument `substr` whose default end index passes through a signed 32-bit cast, rejecting data atoms of 2^31 bytes or more | No equivalent limits: BitLisp is bounded by the cost budget, and its deserializer by the input's size alone | Every cap sits far outside the reachable regime. The cheapest evaluation-time trigger costs about 5.6e10 against the harness budget of 1.1e10, and the deserialization trigger needs roughly 42 MB of input against Bitcoin's 4 MB witness ceiling. PROVISIONAL, see section 8: the Phase 3 budget and input-size bounds must be recorded against these thresholds, or the caps mirrored fail-closed. | none, unreachable (section 8) |
-| D9 | `sha256tree` | Deployed consensus (flags 0) treats opcode `0x3f` as an unknown operator under the D3 acceptance rule: arguments evaluate, cost derives from the opcode byte, result nil. The pinned oracle wheel carries a `sha256tree` operator at the same opcode behind its release flag, scheduled for consensus activation in Chia's next hard fork (CHIP-0049, in review) | `sha256tree` is a table operator with the wheel's semantics, cost constants, and opcode | Covenant recursion computes program commitments in-program, the pattern behind upstream's own promotion of the operator. Adopting the upstream opcode, semantics, and constants keeps the operator inside the diffable intersection once upstream activates. Decision by Evan, ratified, see section 8. | `vm/sha256tree.json` |
+| D9 | `sha256tree` | Deployed consensus (flags 0) treats opcode `0x3f` as an unknown operator under the D3 acceptance rule: arguments evaluate, cost derives from the opcode byte, result nil. The pinned oracle wheel carries a `sha256tree` operator at the same opcode behind its release flag, scheduled for consensus activation in Chia's next hard fork (CHIP-0049, in review) | `sha256tree` is a table operator with the wheel's semantics, cost constants, and opcode | Covenant recursion computes program commitments in-program, the pattern behind upstream's own promotion of the operator. Adopting the upstream opcode, semantics, and constants keeps the operator inside the diffable intersection once upstream activates. Decision by Evan, ratified, see section 8. | `vm/sha256tree.json` (BitLisp column), the oracle column pinned per run by the flags-0 leg of `tools/diff_sha256tree.py` |
 
 ## 7. Oracle provenance
 
@@ -560,14 +559,18 @@ pinned oracles never depend on it.
 The released artifact carries the operator behind its
 `ENABLE_SHA256_TREE` flag and separately exports the `tree_hash`
 puzzle-hash utility, the algorithm Chia consensus has applied to
-puzzle commitments since genesis. `tools/diff_sha256tree.py` diffs
-the operator's (result, cost) against the flag-enabled wheel at the
-exact budget boundary, the result against the utility, and the
-result against an in-language tree-hash program built from
-intersection operators and run through both pinned oracles at flags
-0. The operator is therefore pinned by released-binary evidence on
-three independent legs even though no deployed VM dispatches the
-opcode yet.
+puzzle commitments since genesis. `tools/diff_sha256tree.py` runs
+four legs per corpus: the operator's (result, cost) against the
+flag-enabled wheel at the exact budget boundary, the result against
+the utility, the result against an in-language tree-hash program
+built from intersection operators and run through both pinned
+oracles at flags 0, and the D9 oracle column itself, every generated
+program run through both oracles at flags 0, which must accept the
+opcode as unknown and return nil. The first two legs are two views
+of the one pinned wheel and only the first checks cost, so the cost
+constants rest on the flag-enabled wheel alone. The other two legs
+cross both oracles. No deployed VM dispatches the opcode yet, and
+every leg is released-binary evidence.
 
 ## 8. Design decision record
 
@@ -653,7 +656,9 @@ phase that owes the answer.
      necessary, while a shipped guard could never be removed.
 2. **D2 (crypto family curation).** RATIFIED (decisions by Evan,
    2026-07-28). The crypto family is `sha256` plus `secp_verify`,
-   nothing else, and `secp_verify` is BIP340 only.
+   nothing else, and `secp_verify` is BIP340 only. The family
+   enumeration was amended by entry 7 below: `sha256tree` joined on
+   2026-07-29, and the rest of this entry stands.
 
    - **ECDSA declined.** The consensus oracle's `secp256k1_verify`
      and `secp256r1_verify` were probed 2026-07-28: raise-style
