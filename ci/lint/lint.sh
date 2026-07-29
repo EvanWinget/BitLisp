@@ -16,9 +16,9 @@ fail() {
     FAILED=1
 }
 
-# vectors/upstream/ holds third-party material stored verbatim and is
-# exempt from every text check.
-THIRD_PARTY_PATHSPECS=(':!vectors/upstream/*')
+# vectors/upstream/ and tools/oracle/bitcoincore/ hold third-party
+# material stored verbatim and are exempt from every text check.
+THIRD_PARTY_PATHSPECS=(':!vectors/upstream/*' ':!tools/oracle/bitcoincore/*')
 TEXT_PATHSPECS=('*.md' '*.py' '*.sh' '*.yml' '*.yaml' '*.toml' '*.txt' "${THIRD_PARTY_PATHSPECS[@]}")
 
 echo "== codespell =="

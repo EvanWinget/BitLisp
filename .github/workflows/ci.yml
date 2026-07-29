@@ -70,3 +70,14 @@ jobs:
           echo "diff harness seed: ${DIFF_SEED}"
           "${RUNNER_TEMP}/venv/bin/python" tools/diff_clvm.py \
             --count 10000 --seed "${DIFF_SEED}"
+      - name: secp_verify differential, Bitcoin Core oracle
+        # secp_verify has no CLVM oracle: the differential runs
+        # against Core's vendored test-framework implementation.
+        # Reproduce locally with
+        # tools/diff_secp.py --count 40 --seed <printed seed>.
+        env:
+          DIFF_SEED: ${{ github.run_id }}
+        run: |
+          echo "diff_secp seed: ${DIFF_SEED}"
+          "${RUNNER_TEMP}/venv/bin/python" tools/diff_secp.py \
+            --count 40 --seed "${DIFF_SEED}"
