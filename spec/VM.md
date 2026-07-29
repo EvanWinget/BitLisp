@@ -2,8 +2,7 @@
 
 Status: Phase 1 in progress. Sections 1 to 6 are normative for the
 evaluator core and for every operator family listed as implemented at
-the head of section 4. Remaining operators land one session at a
-time, each extending section 4 and the vector corpus together.
+the head of section 4. The v0 operator table is complete.
 
 The evaluator is CLVM-derived. The shared core must be bit-for-bit
 equivalent to the pinned consensus oracle (`chia-rs`, flags 0) on the
@@ -74,7 +73,7 @@ atom charges `MALLOC_COST_PER_BYTE = 10` per byte, so reaching this
 rejection requires a budget of at least 10 * 2^34, about 1.7 * 10^11
 cost units. The Phase 3 weight mapping is expected to grant budgets
 far below that threshold, making the rejection unreachable in
-consensus (section 8, question 4).
+consensus (section 8, question 5).
 
 ## 3. Evaluation
 
@@ -180,11 +179,10 @@ failing closed.
 
 ## 4. Operator table
 
-Implemented so far: the core specials, the tree ops family, the
-arithmetic family, the bytes and strings family, the bitwise family,
-the boolean family, and the sha256 operator of the crypto family. The
-crypto family's remaining operator, `secp_verify` (divergence D2),
-lands in a later session.
+The operator table is complete for v0: the core specials, the tree
+ops family, the arithmetic family, the bytes and strings family, the
+bitwise family, the boolean family, and the crypto family (`sha256`
+and `secp_verify`, divergence D2).
 
 | Opcode | Name | Arity | Semantics |
 | --- | --- | --- | --- |
@@ -202,6 +200,7 @@ lands in a later session.
 | `0x0c` | `substr` | 2 or 3 | The slice of an atom from a start index to an end index, which defaults to the atom's length. |
 | `0x0d` | `strlen` | 1 | The byte length of an atom, as a minimally encoded integer. |
 | `0x0e` | `concat` | 0 or more | The concatenation of its atom arguments. No arguments gives nil. |
+| `0x0f` | `secp_verify` | 3 | BIP340 Schnorr verification over secp256k1. TRUE on a valid signature, nil on an empty signature, `secp_verify_failed` otherwise. Divergence D2. |
 | `0x10` | `+` add | 0 or more | Sum of integer arguments. No arguments gives nil (zero). |
 | `0x11` | `-` subtract | 0 or more | First argument minus the rest. No arguments gives nil, one argument returns it. |
 | `0x12` | `*` multiply | 0 or more | Product. No arguments gives 1 (`0x01`). The running product is capped at 1024 magnitude bytes (below). |
@@ -376,10 +375,10 @@ same rule `i` applies to its selector.
   per-byte term: a large atom argument costs the same as a one-byte
   one.
 
-The crypto family currently holds `sha256`. Like the bytes and
-strings ops it treats atoms as raw byte strings: every argument must
-be an atom, a pair raises `arg_not_atom`, and there is no operand
-size limit.
+The crypto family holds `sha256` and `secp_verify`. Like the bytes
+and strings ops both treat atoms as raw byte strings: every argument
+must be an atom, and a pair raises `arg_not_atom`. `sha256` has no
+operand size limit.
 
 - `sha256` returns the SHA-256 digest of the concatenation of its
   arguments in argument order, a freshly built 32-byte atom charging
@@ -392,6 +391,37 @@ size limit.
   from `(sha256 (q . 0x02))`.
 - The result is always exactly 32 bytes, so `sha256` can never build
   an atom the wire format cannot encode.
+
+`secp_verify` is the one operator with no CLVM counterpart in any
+form (divergence D2). `(secp_verify pubkey msg sig)` verifies a
+BIP340 Schnorr signature over secp256k1.
+
+- Checks run in this order, all before the operator's single charge:
+  the arity check (exactly 3, else `wrong_arg_count`), then each
+  argument's atom check in argument order (a pair raises
+  `arg_not_atom`), then each argument's shape in argument order.
+  `pubkey` must be exactly 32 bytes, an x-only public key. `msg`
+  must be exactly 32 bytes. `sig` must be the empty atom or exactly
+  64 bytes. Any other length raises `secp_verify_failed`.
+- The message is the exact 32 bytes signed, never hashed again by
+  the operator. Programs hash their data explicitly with `sha256`
+  first, keeping domain separation visible in the program (a
+  recorded curation choice, section 8: BIP348's CHECKSIGFROMSTACK
+  instead accepts arbitrary-length unhashed messages).
+- The result is tri-state, the tapscript CHECKSIG rule. An empty
+  `sig` returns nil without verification. A valid signature returns
+  TRUE. Everything else raises `secp_verify_failed`, including a
+  `pubkey` that lifts to no curve point and every signature BIP340
+  rejects. The empty-signature nil lets a program decline an
+  optional signature branch, while an invalid non-empty signature
+  can never be turned into a value, so failures cannot be ground
+  through and ignored.
+- Verification follows BIP 340's Verify algorithm exactly, pinned by
+  the official BIP340 vectors and a differential against Bitcoin
+  Core's test-framework implementation (section 7).
+- No malloc: every result is a shared constant. The single flat
+  charge precedes the empty-signature branch and the verification
+  work, so the budget gates the expensive step (COSTS.md section 1).
 
 ## 5. Error taxonomy
 
@@ -409,13 +439,14 @@ informative, not normative.
 | `unknown_operator` | Operator atom not in the table and not reserved | (accepted, D3) | (accepted, D3) |
 | `bad_arg_list` | Operator arguments are not a proper list | (varies) | (varies) |
 | `wrong_arg_count` | Operator arity violated | InvalidOperatorArg | (per-op message) |
-| `arg_not_atom` | An atom-only operator (`=`, the integer family, the bytes family outside `substr`'s index positions, the bitwise family outside shift count positions, or `sha256`) got a pair | InvalidOperatorArg | (per-op message) |
+| `arg_not_atom` | An atom-only operator (`=`, the integer family, the bytes family outside `substr`'s index positions, the bitwise family outside shift count positions, or the crypto family) got a pair | InvalidOperatorArg | (per-op message) |
 | `arg_not_pair` | `f` or `r` applied to an atom | InvalidOperatorArg: first/rest of non-cons | first/rest of non-cons |
 | `arg_too_long` | Operand exceeds a section 4 size limit | InvalidOperatorArg | (absent, the `clvm` package has no operand limits) |
 | `bad_index` | A `substr` index or a shift count argument is a pair or an atom longer than four bytes | (per-op) requires int32 args (with no leading zeros) | (per-op) requires int32 args |
 | `index_out_of_range` | A `substr` index value is negative, past the end of the data, or an end before a start | Invalid Indices for Substring | invalid indices for substr |
 | `shift_too_large` | An `ash` or `lsh` count's magnitude exceeds 65535 | Shift too large | shift too large |
 | `div_by_zero` | Division or divmod by zero | Division by zero | div/divmod with 0 |
+| `secp_verify_failed` | A `secp_verify` shape defect (pubkey not 32 bytes, message not 32 bytes, signature neither empty nor 64 bytes) or a failed BIP340 verification | (not in the intersection, D2) | (not in the intersection, D2) |
 | `user_raise` | The `x` operator | clvm raise | clvm raise |
 | `cost_exceeded` | Cost budget exceeded | cost exceeded or below zero | cost exceeded |
 
@@ -439,7 +470,7 @@ pin it. No divergence exists outside this table. "Both oracles" means
 | # | Area | CLVM behavior | BitLisp behavior | Rationale | Vectors |
 | --- | --- | --- | --- | --- | --- |
 | D1 | BLS operators | `point_add`, `pubkey_for_exp`, BLS extension ops present | absent, `unknown_operator` | Bitcoin has no BLS. Removing them removes their entire attack and cost surface. | `vm/dispatch.json` |
-| D2 | secp256k1 | `secp256k1_verify` post-hardfork op | `secp_verify`, BIP340 Schnorr (crypto family session) | Native curve, native signature scheme. | TODO Phase 1 crypto session |
+| D2 | Signature verification | `secp256k1_verify` (0x13d61f00) and `secp256r1_verify` (0x1c3a8f00) post-hardfork ops: ECDSA verifies that raise on any failure, message digest exactly 32 bytes, SEC1 compressed and uncompressed pubkeys both accepted, high-s signatures rejected (probed 2026-07-28) | `secp_verify` (0x0f), BIP340 Schnorr over secp256k1, tri-state result, both ECDSA ops absent (`unknown_operator`) | Native taproot scheme: batchable at the condition layer, non-malleable signature encoding, one curve and one scheme in the consensus core. Ratified curation, see section 8. | `vm/secp.json` |
 | D3 | Unknown operators, outside the reserved families of section 3.2 | Both oracles accept unknown opcodes, cost derived from the opcode bytes, result nil. Reserved atoms are rejected by both oracles and by BitLisp alike, so they sit outside this divergence. The consensus oracle also gives real semantics to opcodes BitLisp classes as unknown: `softfork` (an assert-only guard whose declared cost must match), `coinid`, `modpow`, `%`, the D1 BLS set, and two four-byte secp verify opcodes, none of which follow the cost-from-opcode-bytes rule | `unknown_operator` error | The operator set is closed by design. Bitcoin soft-forks at the tapleaf-version level, not through unknown-opcode acceptance. PROVISIONAL, see section 8. | `vm/dispatch.json` |
 | D4 | Pair in operator position | Both oracles accept `((X) . args)` when `X` is a lone atom, a legacy apply-style rule: `X` dispatches on the arguments unevaluated, charging apply's 90. They disagree on a non-nil tail in the operator pair: `chia-rs` ignores the tail and dispatches on the head, `clvm` rejects it | `operator_not_atom` error for every pair in operator position | The legacy rule is a remnant the oracles themselves disagree on at the edges. Strict rejection of the whole family is the smaller, reviewable surface. PROVISIONAL, see section 8. | `vm/dispatch.json` |
 | D5 | Deserialization strictness | Both oracles accept non-minimal length encodings (the `0xfc` six-byte length prefix included, which is non-minimal for every size it can represent), trailing bytes, and (chia-rs) `0xfe` back-references | `bad_encoding` for all three (section 2) | Witness bytes must have exactly one accepted spelling per program. Malleability of the serialized form is a consensus hazard in the Bitcoin context. | `vm/serialize.json` |
@@ -449,17 +480,32 @@ pin it. No divergence exists outside this table. "Both oracles" means
 
 ## 7. Oracle provenance
 
-Oracles are released artifacts pinned as dev dependencies in
-`pyproject.toml` (extra `oracles`). Pin bumps follow the
-adopt/take/decline triage in `docs/execution-plan.md`.
+Oracles are released artifacts: the wheels pinned as dev dependencies
+in `pyproject.toml` (extra `oracles`), and vendored snapshots from
+tagged upstream releases where no usable wheel exists. Pin bumps and
+snapshot refreshes follow the adopt/take/decline triage in
+`docs/execution-plan.md`.
 
 | Oracle | Version | Pinned | Upstream commit | Notes |
 | --- | --- | --- | --- | --- |
 | `clvm` (PyPI) | 0.9.15 | 2026-07-26 | TODO on first triage | Python oracle. Carries non-consensus library policy (see D6), lacks the consensus operand size limits (section 4), checks the cost budget only after an operator completes, and checks apply's cost immediately where consensus defers the check to the applied program's first charge (section 3.2). The diff harness tolerates all four, each tagged in its output. |
 | `chia-rs` (PyPI) | 0.46.0 | 2026-07-26 | TODO on first triage | Consensus oracle, run with flags 0 |
+| BIP 340 vectors (bitcoin/bips) | 2023-04-20 revision | 2026-07-28 | 200f9b26 | Official test vectors for `secp_verify`, vendored as data in `vectors/upstream/bip340/` with a provenance file |
+| Bitcoin Core test framework | v31.1 | 2026-07-28 | 9be056a8 | `secp_verify` differential oracle and signer, vendored verbatim in `tools/oracle/bitcoincore/` with a provenance README. The implementation Core cross-checks its consensus code with, validated against libsecp256k1 in Core's CI |
 
-Divergent operators are tested against their own oracles. `secp_verify`
-will use the official BIP340 vectors plus libsecp256k1 via `coincurve`.
+Divergent operators are tested against their own oracles.
+`secp_verify` runs the official BIP 340 vectors byte-for-byte in the
+unit suite and `vectors/vm/secp.json`, and `tools/diff_secp.py`
+diffs it against the Bitcoin Core implementation on
+signer-generated triples and a mutation battery. The originally
+planned `coincurve` wheel is not used: no released build supports
+the pinned Python, and the vendored oracle additionally provides
+the signer a differential needs. When a system libsecp256k1 with
+the schnorrsig module is present, `tools/diff_secp.py` adds the C
+library Bitcoin Core links as a third verifier: it re-runs the
+official vectors and votes on every generated triple. The leg is
+opportunistic on developer machines, required in CI, and the
+pinned oracles never depend on it.
 
 ## 8. Open questions for design ratification
 
@@ -519,14 +565,63 @@ these is a spec amendment plus vector update in one reviewed commit.
      program computes. The reserved-condition rule is the
      condition-layer analog of this question and gets its own
      decision in MATCHING.md.
-2. **D4 (pair operator).** Strict rejection implemented. Probing both
+2. **D2 (crypto family curation).** RATIFIED (decisions by Evan,
+   2026-07-28). The crypto family is `sha256` plus `secp_verify`,
+   nothing else, and `secp_verify` is BIP340 only.
+
+   - **ECDSA declined.** The consensus oracle's `secp256k1_verify`
+     and `secp256r1_verify` were probed 2026-07-28: raise-style
+     ECDSA verifies, digest exactly 32 bytes, SEC1 compressed and
+     uncompressed pubkeys both accepted, high-s signatures
+     rejected, flat cost (1300061 total on the k1 worked-example
+     shape). Declined because ECDSA is the wrong scheme for the
+     taproot context: it cannot be batch verified, and it drags a
+     second signature scheme's attack surface into the consensus
+     core. The r1 op adds a second curve for passkey interop that
+     v0 does not target. Adopting either later is a mechanical
+     intersection addition with the diff harness behind it, so the
+     decline is cheap to reverse, while BIP340 would always be the
+     novel work item.
+   - **Tri-state semantics** follow tapscript's CHECKSIG rule and
+     bllsh's `bip340_verify` precedent rather than Chia's
+     raise-only secp ops: an empty signature is a graceful nil, an
+     invalid non-empty signature is a hard failure.
+   - **Message exactly 32 bytes** follows bllsh and the Chia digest
+     rule. BIP348's CHECKSIGFROMSTACK instead passes
+     arbitrary-length messages unhashed to BIP 340 verification.
+     Recorded as a deliberate divergence from that design: the
+     fixed width keeps the operator surface minimal and makes
+     hashing explicit in programs, and `sha256` lands in the same
+     family.
+   - **Considered and declined:** bllsh's `secp256k1_muladd` (a
+     general EC linear-combination primitive enabling in-language
+     key tweaks and adaptor patterns, too much novel consensus
+     surface for v0), `ripemd160` and `hash160` (legacy address
+     interop only), and `keccak256`, `coinid`, `modpow`, `%`
+     (Chia-specific, remaining D3 unknowns).
+   - **Opcode 0x0f** is the lowest nonzero byte unassigned in both
+     oracles, probed 2026-07-28 under two argument shapes (integer
+     and pair arguments) to separate genuinely unknown opcodes
+     from assigned operators that return nil. Below 0x40 the
+     unassigned bytes are 0x0f, 0x1c, 0x1f, 0x23, 0x25 to 0x2f,
+     0x3e, and 0x3f. Every byte from 0x40 through 0xff is also
+     unknown to both oracles (their unknown-op cost classes differ
+     in argument sensitivity, which the probe distinguishes from
+     assignment).
+   - **Cost 1300000 is PROVISIONAL.** There is no oracle to
+     inherit from. The constant adopts the magnitude of the
+     consensus oracle's ECDSA verify pending Phase 3 measurement.
+     Phase 3 should also decide whether the empty-signature branch
+     gets a cheaper price, by analogy with tapscript, where an
+     empty signature does not count toward the sigops budget.
+3. **D4 (pair operator).** Strict rejection implemented. Probing both
    wheels (2026-07-26) corrected the record: the legacy apply-style
    rule for `((X) . args)` is in both oracles, not only chia_rs, so
    strict rejection diverges from both, and the oracles disagree
    only on a non-nil tail in the operator pair. Confirm that BitLisp
    rejects the whole family even though the lone-atom shape is
    common to both oracles.
-3. **D6 (negative division).** Floor semantics RATIFIED (decision by
+4. **D6 (negative division).** Floor semantics RATIFIED (decision by
    Evan, 2026-07-26): `/` keeps consensus floor division on negative
    operands, and the alternatives (rejecting negative operands in
    consensus, or dropping `/` for `divmod` alone) are declined. The
@@ -539,7 +634,7 @@ these is a spec amendment plus vector update in one reviewed commit.
    operands in February 2023 rather than model the settled outcome.
    BitLisp matches the consensus binary, which the diff harness
    verifies on every run.
-4. **D7 (zero budget).** Fail-closed RATIFIED (decision by Evan,
+5. **D7 (zero budget).** Fail-closed RATIFIED (decision by Evan,
    2026-07-26): a zero `max_cost` rejects every program where the
    oracles treat it as unlimited. A budget bug must reject every
    spend, a recoverable liveness failure, rather than hand out
@@ -553,7 +648,7 @@ these is a spec amendment plus vector update in one reviewed commit.
    maximum grantable budget against that threshold so the
    serializer's rejection of unrepresentable results is provably
    dead in consensus.
-5. **D8 (oracle resource caps).** Recorded, not mirrored (source
+6. **D8 (oracle resource caps).** Recorded, not mirrored (source
    audit against clvm_rs 0.18.0 with oracle probes, 2026-07-28).
    The oracle's allocator caps, interpreter stack caps, and the
    substr signed-32-bit default end are consensus behavior on the

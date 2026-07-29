@@ -19,8 +19,11 @@ dev = [
     "pytest==9.1.1",
     "hypothesis==6.161.5",
 ]
-# Oracles are released artifacts only, never vendored source. Pin bumps
-# are governance events, see CLAUDE.md and spec/VM.md provenance.
+# Wheel oracles are pinned here. Where no usable wheel exists an
+# oracle is vendored from a tagged upstream release instead (the
+# Bitcoin Core test framework under tools/oracle/). Pin bumps and
+# snapshot refreshes are governance events, see CLAUDE.md and
+# spec/VM.md provenance.
 oracles = [
     "clvm==0.9.15",
     "chia-rs==0.46.0",

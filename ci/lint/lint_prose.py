@@ -34,6 +34,7 @@ def tracked_files():
         if f.endswith(TEXT_SUFFIXES)
         and f not in EXEMPT
         and not f.startswith("vectors/upstream/")
+        and not f.startswith("tools/oracle/bitcoincore/")
     ]
 
 

@@ -1,7 +1,8 @@
 # Vendored upstream vectors
 
-Chia's official test vectors, vendored as data. CI never fetches from
-the network.
+Upstream test vectors vendored as data: Chia's official vectors for
+the operator intersection, and the official BIP 340 vectors for
+`secp_verify`. CI never fetches from the network.
 
 Every import must carry a provenance header (a `_provenance` key or an
 adjacent `.provenance.json` file) recording:

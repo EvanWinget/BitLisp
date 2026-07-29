@@ -9,15 +9,16 @@ this table, the machine handles both.
 The interleaving of argument validation, charges, and value checks is
 consensus-visible: near the budget boundary it decides which of
 cost_exceeded, wrong_arg_count, arg_not_atom, arg_not_pair,
-arg_too_long, bad_index, index_out_of_range, shift_too_large, and
-div_by_zero is reported. Every function below performs them in the
-consensus oracle's order, and the boundary cases are pinned by
-vectors.
+arg_too_long, bad_index, index_out_of_range, shift_too_large,
+div_by_zero, and secp_verify_failed is reported. Every function below
+performs them in the consensus oracle's order, except op_secp_verify,
+which has no oracle and whose order is its own normative choice. The
+boundary cases are pinned by vectors.
 """
 
 import hashlib
 
-from . import costs
+from . import costs, secp256k1
 from .errors import BitLispError
 from .sexp import NIL, TRUE, atom_to_int, int_to_atom, is_atom, is_pair
 
@@ -511,6 +512,46 @@ def op_sha256(args, charge):
     return result
 
 
+# secp_verify argument widths: an x-only public key, the exact 32
+# bytes signed (programs hash explicitly with sha256 first, the
+# operator never hashes), and a BIP 340 signature or the empty atom.
+SECP_PUBKEY_BYTES = 32
+SECP_MSG_BYTES = 32
+SECP_SIG_BYTES = 64
+
+
+def op_secp_verify(args, charge):
+    # Every check precedes the single flat charge: arity, then each
+    # argument's atom check in argument order, then each argument's
+    # shape in argument order. The empty-signature branch and the
+    # verification work come after the charge, so shape defects win
+    # over cost_exceeded and no verification outcome is reported
+    # unless the budget covers the charge.
+    _exactly(args, 3, "secp_verify")
+    for arg in args:
+        if not is_atom(arg):
+            raise BitLispError("arg_not_atom", "secp_verify used on list")
+    pubkey, msg, sig = args
+    if len(pubkey) != SECP_PUBKEY_BYTES:
+        raise BitLispError("secp_verify_failed", "secp_verify pubkey not 32 bytes")
+    if len(msg) != SECP_MSG_BYTES:
+        raise BitLispError("secp_verify_failed", "secp_verify message not 32 bytes")
+    if sig != NIL and len(sig) != SECP_SIG_BYTES:
+        raise BitLispError(
+            "secp_verify_failed", "secp_verify sig neither empty nor 64 bytes"
+        )
+    charge(costs.SECP_VERIFY_COST)
+    # Tri-state, the tapscript CHECKSIG rule: an empty signature is a
+    # graceful nil so a program can decline an optional signature
+    # branch, while an invalid non-empty signature raises and can
+    # never be turned into a value.
+    if sig == NIL:
+        return NIL
+    if not secp256k1.verify(pubkey, msg, sig):
+        raise BitLispError("secp_verify_failed", "secp_verify failed")
+    return TRUE
+
+
 def op_raise(args, charge):
     raise BitLispError("user_raise", "clvm raise")
 
@@ -528,6 +569,7 @@ OPERATORS = {
     b"\x0c": op_substr,
     b"\x0d": op_strlen,
     b"\x0e": op_concat,
+    b"\x0f": op_secp_verify,
     b"\x10": op_add,
     b"\x11": op_sub,
     b"\x12": op_mul,

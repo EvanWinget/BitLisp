@@ -70,3 +70,18 @@ jobs:
           echo "diff harness seed: ${DIFF_SEED}"
           "${RUNNER_TEMP}/venv/bin/python" tools/diff_clvm.py \
             --count 10000 --seed "${DIFF_SEED}"
+      - name: secp_verify differential, Core oracle plus libsecp256k1
+        # secp_verify has no CLVM oracle: the differential runs
+        # against Core's vendored test-framework implementation, and
+        # the system libsecp256k1 joins as a required third verifier
+        # (Ubuntu's package enables the schnorrsig module).
+        # Reproduce locally with
+        # tools/diff_secp.py --count 40 --seed <printed seed>.
+        env:
+          DIFF_SEED: ${{ github.run_id }}
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libsecp256k1-dev
+          echo "diff_secp seed: ${DIFF_SEED}"
+          "${RUNNER_TEMP}/venv/bin/python" tools/diff_secp.py \
+            --count 40 --seed "${DIFF_SEED}" --require-libsecp

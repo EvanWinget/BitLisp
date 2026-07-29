@@ -1,0 +1,9 @@
+{
+ "source_repository": "https://github.com/bitcoin/bips",
+ "source_path": "bip-0340/test-vectors.csv",
+ "commit": "200f9b26fe0a2f235a2af8b30c4be9f12f6bc9cb",
+ "license": "BSD-2-Clause",
+ "sha256": "34c9d1d9c3a88d524bc80778540dc43f8306ec249a7485293063c376db851c2d",
+ "import_date": "2026-07-28",
+ "notes": "Official BIP 340 test vectors. Rows carrying a secret key also cover signing, which BitLisp does not implement. Every row's public key, message, signature, and verification result columns drive python/tests/test_secp256k1.py, and rows 15 through 18 exercise the variable-length messages the module-level Verify supports."
+}

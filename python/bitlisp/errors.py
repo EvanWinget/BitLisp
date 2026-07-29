@@ -21,6 +21,7 @@ CODES = frozenset(
         "index_out_of_range",
         "shift_too_large",
         "div_by_zero",
+        "secp_verify_failed",
         "user_raise",
         "cost_exceeded",
     }
