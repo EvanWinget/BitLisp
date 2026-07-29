@@ -471,8 +471,8 @@ pin it. No divergence exists outside this table. "Both oracles" means
 | --- | --- | --- | --- | --- | --- |
 | D1 | BLS operators | `point_add`, `pubkey_for_exp`, BLS extension ops present | absent, `unknown_operator` | Bitcoin has no BLS. Removing them removes their entire attack and cost surface. | `vm/dispatch.json`, upstream corpus D1 bucket |
 | D2 | Signature verification | `secp256k1_verify` (0x13d61f00) and `secp256r1_verify` (0x1c3a8f00) post-hardfork ops: ECDSA verifies that raise on any failure, message digest exactly 32 bytes, SEC1 compressed and uncompressed pubkeys both accepted, high-s signatures rejected (probed 2026-07-28) | `secp_verify` (0x0f), BIP340 Schnorr over secp256k1, tri-state result, both ECDSA ops absent (`unknown_operator`) | Native taproot scheme: batchable at the condition layer, non-malleable signature encoding, one curve and one scheme in the consensus core. Ratified curation, see section 8. | `vm/secp.json` |
-| D3 | Unknown operators, outside the reserved families of section 3.2 | Both oracles accept unknown opcodes, cost derived from the opcode bytes, result nil. Reserved atoms are rejected by both oracles and by BitLisp alike, so they sit outside this divergence. The consensus oracle also gives real semantics to opcodes BitLisp classes as unknown: `softfork` (an assert-only guard whose declared cost must match), `coinid`, `modpow`, `%`, the D1 BLS set, and two four-byte secp verify opcodes, none of which follow the cost-from-opcode-bytes rule | `unknown_operator` error | The operator set is closed by design. Bitcoin soft-forks at the tapleaf-version level, not through unknown-opcode acceptance. PROVISIONAL, see section 8. | `vm/dispatch.json`, upstream corpus D3 bucket |
-| D4 | Pair in operator position | Both oracles accept `((X) . args)` when `X` is a lone atom, a legacy apply-style rule: `X` dispatches on the arguments unevaluated, charging apply's 90. They disagree on a non-nil tail in the operator pair: `chia-rs` ignores the tail and dispatches on the head, `clvm` rejects it | `operator_not_atom` error for every pair in operator position | The legacy rule is a remnant the oracles themselves disagree on at the edges. Strict rejection of the whole family is the smaller, reviewable surface. PROVISIONAL, see section 8. | `vm/dispatch.json`, upstream corpus D4 bucket |
+| D3 | Unknown operators, outside the reserved families of section 3.2 | Both oracles accept unknown opcodes, cost derived from the opcode bytes, result nil. Reserved atoms are rejected by both oracles and by BitLisp alike, so they sit outside this divergence. The consensus oracle also gives real semantics to opcodes BitLisp classes as unknown: `softfork` (an assert-only guard whose declared cost must match), `coinid`, `modpow`, `%`, the D1 BLS set, and two four-byte secp verify opcodes, none of which follow the cost-from-opcode-bytes rule | `unknown_operator` error | The operator set is closed by design. Bitcoin soft-forks at the tapleaf-version level, not through unknown-opcode acceptance. Ratified, see section 8. | `vm/dispatch.json`, upstream corpus D3 bucket |
+| D4 | Pair in operator position | Both oracles accept `((X) . args)` when `X` is a lone atom, a legacy apply-style rule: `X` dispatches on the arguments unevaluated, charging apply's 90. Both reject a proper-list tail in the operator pair, and they disagree only on an improper dotted atom tail: `chia-rs` ignores the dotted tail and dispatches on the head, `clvm` rejects it | `operator_not_atom` error for every pair in operator position | The construct adds no expressive power and its one disputed edge is silently ignored program bytes, a malleability surface. Strict rejection of the whole family is the smaller, reviewable surface. Ratified, see section 8. | `vm/dispatch.json`, upstream corpus D4 bucket |
 | D5 | Deserialization strictness | Both oracles accept non-minimal length encodings (the `0xfc` six-byte length prefix included, which is non-minimal for every size it can represent), trailing bytes, and (chia-rs) `0xfe` back-references | `bad_encoding` for all three (section 2) | Witness bytes must have exactly one accepted spelling per program. Malleability of the serialized form is a consensus hazard in the Bitcoin context. | `vm/serialize.json` |
 | D6 | `/` with negative operands | Consensus (`chia-rs`): floor division. The `clvm` package injects a policy error ("deprecated") that is not consensus | Floor division, matching consensus | Intersection parity targets the consensus oracle. The Python package's rejection is library policy, the diff harness treats it as an expected divergence. Ratified, see section 8. | `vm/arith.json`, upstream corpus D6 bucket |
 | D7 | Zero cost budget | Both oracles treat `max_cost = 0` as unlimited | A zero budget is a real budget, no program succeeds under it (section 3.3) | A zero sentinel meaning unlimited is a library convenience, not consensus behavior. In the Bitcoin context the budget derives from transaction weight and is never legitimately zero, and an accidental zero must fail closed rather than open. Ratified, see section 8. | `vm/dispatch.json` |
@@ -525,19 +525,22 @@ official vectors and votes on every generated triple. The leg is
 opportunistic on developer machines, required in CI, and the
 pinned oracles never depend on it.
 
-## 8. Open questions for design ratification
+## 8. Design decision record
 
-Decisions taken provisionally by the implementing session, to be
-ratified or overturned in an architecture session. Overturning any of
-these is a spec amendment plus vector update in one reviewed commit.
+Decisions taken during Phase 1, each ratified or explicitly left
+open. Overturning a ratified decision is a spec amendment plus
+vector update in one reviewed commit. Items marked open name the
+phase that owes the answer.
 
-1. **D3 (unknown operators).** Strict rejection implemented. Confirm
-   that BitLisp's upgrade path is new tapleaf versions and that
-   unknown-opcode acceptance stays out permanently. The alternative,
-   an in-language extension mechanism in the style of CLVM's
-   `softfork` operator, was analyzed (discussion with Evan,
-   2026-07-26) and is recorded here so ratification weighs it
-   explicitly.
+1. **D3 (unknown operators).** RATIFIED (decision by Evan,
+   2026-07-29): strict rejection stands and the operator set is
+   closed. BitLisp's upgrade path is new tapleaf versions for coins
+   created after a fork and reserved conditions for coins already
+   deployed. A CLVM-style `softfork` guard is declined for v0. The
+   alternative was analyzed twice (discussions with Evan, 2026-07-26
+   and 2026-07-29, the second with oracle probes) and the record
+   below replaces the earlier provisional entry, correcting one of
+   its claims.
 
    - CLVM's unknown-opcode acceptance is not an upgrade path for
      value-returning operators. An unknown operator evaluates its
@@ -561,28 +564,49 @@ these is a spec amendment plus vector update in one reviewed commit.
      which is the stricter-only direction a soft fork requires.
      This covers most verify-shaped features at a cost in witness
      bytes and program shape.
-   - The guard is declined for v0 on four grounds. It is largely
-     redundant with the tapleaf-version boundary, the total
-     surrender point Bitcoin already provides in the style of
-     OP_SUCCESS, where old nodes validate nothing and new semantics
-     may therefore be arbitrary, value-producing included, by soft
-     fork. Its machinery (an extension registry, a guard stack,
-     exact cost equality, state rollback so no value escapes) is
-     permanent consensus surface that must be perfect from v0,
-     against a consensus core designed to stay small enough to
-     review whole. It only benefits scripts that anticipated it,
-     since deployed programs that predate it are equally frozen
-     under either scheme. And the choice is reversible in exactly
-     one direction: a guard can be added in a later leaf version
-     once the cost model has matured, while a guard shipped in v0
-     can never be removed.
-   - Extensibility for deployed coins is planned at the condition
-     layer instead (Phase 2): conditions are inert data in a
-     program's output, so a fork can change what an unknown
-     condition means to validators without changing what any
-     program computes. The reserved-condition rule is the
-     condition-layer analog of this question and gets its own
-     decision in MATCHING.md.
+   - Probed 2026-07-29 against the consensus oracle at flags 0:
+     `softfork` (0x24) with an unrecognized extension id charges
+     the declared cost plus argument evaluation and returns nil
+     without ever touching the guarded program (garbage bytes and
+     a quoted raise both pass identically). A declared cost of
+     zero or beyond the budget fails as `cost_exceeded`, a
+     negative one fails the positive-int argument check, and the
+     two extensions live in consensus enforce exact declared-cost
+     equality. A v0 guard would therefore be small and
+     oracle-verifiable. This corrects the earlier entry here,
+     which claimed the guard's containment machinery must be
+     perfect from v0: that machinery ships with the first live
+     extension, a consensus event under any upgrade mechanism.
+   - The guard is declined on redundancy, not on risk or size.
+     Upgrades split into two jobs. Coins created after a fork can
+     commit to anything, so a new tapleaf version serves them
+     completely, value-returning operators included. Chia built
+     the guard for exactly this job because its bare puzzle-hash
+     commitments carry no version byte, leaving no other
+     soft-fork route to new VM semantics, while Bitcoin provides
+     the boundary natively. Coins already deployed are frozen at
+     their leaf version, and anything a soft fork can deliver to
+     them is verify-shaped by construction, since old nodes must
+     be able to skip it. The guard and reserved conditions
+     deliver exactly that, at the same granularity (old nodes
+     keep enforcing everything outside the unchecked region), so
+     shipping both would pay for two mechanisms doing one job.
+   - Reserved conditions are the designated mechanism for the
+     deployed-coin job. Conditions are inert data in a program's
+     output, so a fork can assign meaning to a reserved condition
+     code without changing what any program computes, and
+     enforcement only ever tightens, the stricter-only direction
+     a soft fork requires. This is the OP_NOP path that shipped
+     CLTV and CSV, and the path Chia itself uses to extend its
+     condition vocabulary. It also follows this architecture's
+     grain: verification already lives at the condition layer
+     (the AGG_SIG family), and the rule for unknown condition
+     codes has to be written in MATCHING.md either way, so the
+     reserved answer adds no new mechanism. That rule is
+     load-bearing for extensibility and is designed as such in
+     Phase 2. A guard remains addable in a later leaf version if
+     in-VM verification over program-internal values ever proves
+     necessary, while a shipped guard could never be removed.
 2. **D2 (crypto family curation).** RATIFIED (decisions by Evan,
    2026-07-28). The crypto family is `sha256` plus `secp_verify`,
    nothing else, and `secp_verify` is BIP340 only.
@@ -632,13 +656,37 @@ these is a spec amendment plus vector update in one reviewed commit.
      Phase 3 should also decide whether the empty-signature branch
      gets a cheaper price, by analogy with tapscript, where an
      empty signature does not count toward the sigops budget.
-3. **D4 (pair operator).** Strict rejection implemented. Probing both
-   wheels (2026-07-26) corrected the record: the legacy apply-style
-   rule for `((X) . args)` is in both oracles, not only chia_rs, so
-   strict rejection diverges from both, and the oracles disagree
-   only on a non-nil tail in the operator pair. Confirm that BitLisp
-   rejects the whole family even though the lone-atom shape is
-   common to both oracles.
+3. **D4 (pair operator).** RATIFIED (decision by Evan, 2026-07-29):
+   strict rejection of the whole family stands. Probes (2026-07-26,
+   sharpened 2026-07-29) settled the facts. The lone-atom shape
+   `((X) . args)` is in both oracles with identical semantics and
+   cost: `X` dispatches on its arguments unevaluated, charging
+   apply's 90 in place of quote costs, so `((+) 1 2)` gives 3 at
+   cost 845 on both wheels where `(+ (q . 1) (q . 2))` costs 796.
+   Both oracles reject a proper-list tail in the operator pair
+   and an inner pair, and the sole disagreement is an improper
+   dotted atom tail, which `chia-rs` ignores and `clvm` rejects.
+   Grounds for rejecting the family anyway:
+
+   - The construct adds no expressive power. `((X) a b)` computes
+     exactly what `(X (q . a) (q . b))` computes, differing only
+     in cost accounting.
+   - Accepting it means specifying a second dispatch mode for
+     every operator, accidental corner semantics included: both
+     oracles evaluate `((q) 1 2)` to nil at cost 91, a fossil of
+     how the apply path routes the quote atom, and the spec would
+     have to state such outcomes as normative with no design
+     rationale available.
+   - The dotted-tail edge stays a divergence under any acceptance
+     rule, because silently ignored program bytes are witness
+     malleability surface BitLisp cannot adopt.
+   - Rejection is continuous with D3, D5, and D7: a closed
+     grammar, one dispatch rule (the operator must be an atom),
+     one accepted spelling per behavior. Nothing a deployed coin
+     could want rides on the family, and the one-way door points
+     the safe direction: the family could be added in a later
+     leaf version, while removal after v0 would confiscate from
+     any coin that used it.
 4. **D6 (negative division).** Floor semantics RATIFIED (decision by
    Evan, 2026-07-26): `/` keeps consensus floor division on negative
    operands, and the alternatives (rejecting negative operands in
