@@ -12,7 +12,7 @@ why the vector was wrong (CLAUDE.md).
 | `vm/` | `vm` | (puzzle, solution) to (result, cost) or error |
 | `conditions/` | `conditions` | condition-list parsing and validation |
 | `matching/` | `matching` | tx-context matching, including the adversarial regression corpus |
-| `upstream/` | none | Chia's official vectors vendored as data, original format, provenance headers required |
+| `upstream/` | `tools/run_upstream.py` (clvm), unit suite (bip340) | Upstream vectors vendored as data, original format, provenance headers required |
 
 ## File format
 
