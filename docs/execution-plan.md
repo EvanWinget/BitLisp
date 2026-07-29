@@ -68,12 +68,14 @@
 
 - [x] Implement the evaluator in `python/bitlisp/` — own code, not a wrapper (it is the spec artifact), small and boring: cons cells, serialization, operator dispatch, cost accounting.
 - [x] Define operator set in `VM.md`: CLVM core **minus** BLS operators, **plus** `secp_verify` (BIP340, assertive semantics deferred to condition layer). Divergence table with rationale per row.
-- [ ] Inherit the CLVM cost table (`COSTS.md`); weight-mapping section stubbed for Phase 3 data.
+- [x] Inherit the CLVM cost table (`COSTS.md`); weight-mapping section stubbed for Phase 3 data.
 - [x] **Differential harness v1** (`tools/diff_clvm.py`): run every intersection program through bitlisp-python AND `clvm`/`chia_rs`; assert identical (result, cost) or identical error class.
-- [ ] Import Chia's official CLVM test vectors for the intersection; generate randomized program corpus (Claude Code task: corpus generator with size/depth knobs).
+- [x] Import Chia's official CLVM test vectors for the intersection; generate randomized program corpus (Claude Code task: corpus generator with size/depth knobs).
 - [x] Divergent operators tested against their own oracles (`secp_verify` → BIP340 official vectors + Bitcoin Core's test-framework implementation, vendored). The original `coincurve` plan was dropped for lack of a usable wheel, decision recorded in VM.md section 7.
 
 **Done when:** 100% pass on intersection vectors + 10k randomized corpus programs with zero unexplained divergence; divergence table complete.
+
+**Done 2026-07-29.** All divergence decisions ratified or explicitly assigned to Phase 3 (VM.md section 8). Verified fresh: 76 unit tests, 460 vector cases, the 832-case vendored upstream corpus, `diff_clvm.py --count 10000 --seed 20260729`, and `diff_secp.py --seed 20260729` with three verifiers, all zero failures. Cost-table audit clean in both directions after adding the raise-operator charge-order statement.
 
 **Claude Code fit:** excellent — mechanical, oracle-checked, test-first. Ideal sessions: one operator family per session (arith, bytes/strings, tree ops, crypto), each ending with vectors committed.
 

@@ -40,6 +40,17 @@ interaction documented.
 TODO. Including the superlinear `CREATE_COIN` pricing stub (design
 obligation 2). Tuning is data-driven in Phase 3.
 
+### 6. Reserved conditions
+
+TODO. Condition codes outside the assigned vocabulary. This rule is
+the designated forward-compatibility mechanism for already-deployed
+coins (VM.md section 8, D3 ratification): a reserved code is
+accepted unenforced at a fixed cost so a later soft fork can assign
+it real semantics, the OP_NOP path. The rule must fix which code
+ranges are reserved versus invalid, the cost old and new validators
+agree on forever, the unconstrained argument shape, and the policy
+stance toward reserved conditions before assignment.
+
 ## Invariants
 
 The `hypothesis` suite in `python/tests/` must enforce, over generated

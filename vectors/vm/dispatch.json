@@ -190,6 +190,24 @@
    }
   },
   {
+   "name": "raise_charges_dispatch_and_args_cost_20",
+   "program": "ff08ffff010180",
+   "env": "80",
+   "max_cost": 20,
+   "expect": {
+    "error": "cost_exceeded"
+   }
+  },
+  {
+   "name": "raise_charges_dispatch_and_args_cost_21",
+   "program": "ff08ffff010180",
+   "env": "80",
+   "max_cost": 21,
+   "expect": {
+    "error": "user_raise"
+   }
+  },
+  {
    "name": "raise_evaluates_args_first_rightmost_error",
    "program": "ff08ffff0880ffff13ffff0101ffff01808080",
    "env": "80",

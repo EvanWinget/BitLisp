@@ -1,11 +1,10 @@
 # BitLisp Cost Model
 
-Status: Phase 1 in progress. This table is normative for the evaluator
-core and for every operator family listed as implemented at the head
-of VM.md section 4. It inherits the
-CLVM cost table for the operator intersection, verified against the
-pinned oracles by the diff harness. The weight mapping is filled with
-Phase 3 measurements.
+Status: Phase 1 complete (2026-07-29). This table is normative for
+the evaluator core and the complete v0 operator table. It inherits
+the CLVM cost table for the operator intersection, verified against
+the pinned oracles by the diff harness. The weight mapping is filled
+with Phase 3 measurements.
 
 ## 1. General rules
 
@@ -137,6 +136,12 @@ Phase 3 measurements.
 | `PATH_LOOKUP_COST_PER_LEG` | 4 | Times `max(1, bit_length(path))` |
 | `PATH_LOOKUP_COST_PER_ZERO_BYTE` | 4 | Per leading zero byte of the path atom |
 | `MALLOC_COST_PER_BYTE` | 10 | Per byte of freshly built result atoms |
+
+The raise operator `x` has no cost of its own. The dispatch cost is
+charged at operator identification, each argument charges its own
+costs as it evaluates, and the raise follows with no further charge,
+so a budget burst by any of those charges reports `cost_exceeded`
+rather than `user_raise`. Pinned by boundary vectors.
 
 ## 3. Tree ops family
 
