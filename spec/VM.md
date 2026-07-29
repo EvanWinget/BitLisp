@@ -114,9 +114,11 @@ For a program `(op . args)`, in this exact sequence:
    any charge for this application.
 4. Identify the operator. Opcode matching is exact on the atom bytes:
    a redundantly encoded integer such as `0x0010` is not opcode
-   `0x10`. An atom that is neither in the operator table (section 4)
-   nor the empty atom raises `unknown_operator`, uncharged
-   (divergence D3). Otherwise (a table operator, apply, or the empty
+   `0x10`. Two atom families are **reserved**: the empty atom, and
+   every atom of two or more bytes whose first two bytes are
+   `0xff 0xff`. An atom that is neither in the operator table
+   (section 4) nor reserved raises `unknown_operator`, uncharged
+   (divergence D3). Otherwise (a table operator, apply, or a reserved
    atom) charge the dispatch cost 1 now, before any argument is
    evaluated.
 5. Evaluate each argument in the same environment, **right to left**
@@ -126,9 +128,10 @@ For a program `(op . args)`, in this exact sequence:
    order against the budget.
 6. Apply. All application-time errors come after every argument has
    evaluated, so argument errors always win:
-   - The empty atom raises `reserved_operator` here, not at
-     identification: its dispatch cost is charged and its arguments
-     evaluate first.
+   - A reserved atom (the empty atom or the `0xffff` prefix family)
+     raises `reserved_operator` here, not at identification: its
+     dispatch cost is charged and its arguments evaluate first, so a
+     raising argument's error wins.
    - `0x02` (**apply**) checks its arity (exactly 2) here, uncharged.
      Its cost 90 then accrues without an immediate budget check: the
      check rides on the applied program's first charge, so pre-charge
@@ -200,7 +203,7 @@ later session.
 | `0x0e` | `concat` | 0 or more | The concatenation of its atom arguments. No arguments gives nil. |
 | `0x10` | `+` add | 0 or more | Sum of integer arguments. No arguments gives nil (zero). |
 | `0x11` | `-` subtract | 0 or more | First argument minus the rest. No arguments gives nil, one argument returns it. |
-| `0x12` | `*` multiply | 0 or more | Product. No arguments gives 1 (`0x01`). |
+| `0x12` | `*` multiply | 0 or more | Product. No arguments gives 1 (`0x01`). The running product is capped at 1024 magnitude bytes (below). |
 | `0x13` | `/` divide | 2 | Floor division, truncating toward negative infinity. Divisor zero raises `div_by_zero`. See divergence D6. |
 | `0x14` | `divmod` | 2 | Returns the pair `(quotient . remainder)` under floor division. Divisor zero raises `div_by_zero`. |
 | `0x15` | `>` greater | 2 | Signed integer comparison. TRUE if the first argument is strictly greater. |
@@ -246,13 +249,26 @@ except `>` which returns TRUE or nil.
 
 The limit applies to the argument atom's length as given, redundant
 encoding bytes included: a 257-byte atom encoding the value 2 is
-rejected. It does not apply to intermediate values: a multiplication
-accumulator may exceed 256 bytes and keep multiplying. Ordering,
-consensus-visible and pinned by vectors:
+rejected. The running product carries its own cap: after every
+multiplication step the accumulator's magnitude byte length must not
+exceed 1024, raising `arg_too_long`. Magnitude bytes count the
+absolute value's bits divided by eight, rounded up, the same
+sign-agnostic rule the accumulator's step costs use, so a product of
+exactly 2^8191 passes at 1024 magnitude bytes even though its encoded
+atom is 1025 bytes, 2^8192 fails, and -(2^8191) passes. The cap
+tracks the running product only, never any operand, and a later
+operand cannot repair a burst cap: a product that exceeds 1024
+magnitude bytes fails at that step even when the next operand is
+zero. Ordering, consensus-visible and pinned by vectors:
 
 - `*` checks each argument's atomness and size together, argument by
   argument, in the conversion order of COSTS.md: an oversized first
   argument is reported before a pair in the second.
+- The accumulator cap is checked after each step's charge and
+  multiply, before the next argument is examined: an over-cap product
+  is reported before a pair in the following argument, and a budget
+  too small for the step's charge reports `cost_exceeded` rather than
+  the cap.
 - `/` and `divmod` check both arguments' atomness first, then both
   sizes: a pair in either argument is reported before an oversized
   operand.
@@ -371,8 +387,8 @@ informative, not normative.
 | `bad_encoding` | Deserialization fails, or a result atom has no wire encoding (section 2) | bad encoding | (varies) |
 | `path_into_atom` | Path lookup steps into an atom | path into atom | path into atom |
 | `operator_not_atom` | Pair in operator position | (accepted, D4) | in ((X)...) syntax X must be lone atom |
-| `reserved_operator` | Empty atom in operator position | Reserved operator | reserved operator |
-| `unknown_operator` | Operator atom not in the table | (accepted, D3) | (accepted, D3) |
+| `reserved_operator` | A reserved atom in operator position: the empty atom, or two or more bytes starting `0xff 0xff` | Reserved operator | reserved operator |
+| `unknown_operator` | Operator atom not in the table and not reserved | (accepted, D3) | (accepted, D3) |
 | `bad_arg_list` | Operator arguments are not a proper list | (varies) | (varies) |
 | `wrong_arg_count` | Operator arity violated | InvalidOperatorArg | (per-op message) |
 | `arg_not_atom` | An atom-only operator (`=`, the integer family, the bytes family outside `substr`'s index positions, or the bitwise family outside shift count positions) got a pair | InvalidOperatorArg | (per-op message) |
@@ -406,11 +422,12 @@ pin it. No divergence exists outside this table. "Both oracles" means
 | --- | --- | --- | --- | --- | --- |
 | D1 | BLS operators | `point_add`, `pubkey_for_exp`, BLS extension ops present | absent, `unknown_operator` | Bitcoin has no BLS. Removing them removes their entire attack and cost surface. | `vm/dispatch.json` |
 | D2 | secp256k1 | `secp256k1_verify` post-hardfork op | `secp_verify`, BIP340 Schnorr (crypto family session) | Native curve, native signature scheme. | TODO Phase 1 crypto session |
-| D3 | Unknown operators | Both oracles accept unknown opcodes, cost derived from the opcode bytes, result nil | `unknown_operator` error | The operator set is closed by design. Bitcoin soft-forks at the tapleaf-version level, not through unknown-opcode acceptance. PROVISIONAL, see section 8. | `vm/dispatch.json` |
+| D3 | Unknown operators, outside the reserved families of section 3.2 | Both oracles accept unknown opcodes, cost derived from the opcode bytes, result nil. Reserved atoms are rejected by both oracles and by BitLisp alike, so they sit outside this divergence. The consensus oracle also gives real semantics to opcodes BitLisp classes as unknown: `softfork` (an assert-only guard whose declared cost must match), `sha256`, `coinid`, `modpow`, `%`, the D1 BLS set, and two four-byte secp verify opcodes, none of which follow the cost-from-opcode-bytes rule | `unknown_operator` error | The operator set is closed by design. Bitcoin soft-forks at the tapleaf-version level, not through unknown-opcode acceptance. PROVISIONAL, see section 8. | `vm/dispatch.json` |
 | D4 | Pair in operator position | Both oracles accept `((X) . args)` when `X` is a lone atom, a legacy apply-style rule: `X` dispatches on the arguments unevaluated, charging apply's 90. They disagree on a non-nil tail in the operator pair: `chia-rs` ignores the tail and dispatches on the head, `clvm` rejects it | `operator_not_atom` error for every pair in operator position | The legacy rule is a remnant the oracles themselves disagree on at the edges. Strict rejection of the whole family is the smaller, reviewable surface. PROVISIONAL, see section 8. | `vm/dispatch.json` |
-| D5 | Deserialization strictness | Both oracles accept non-minimal length encodings, trailing bytes, and (chia-rs) `0xfe` back-references | `bad_encoding` for all three (section 2) | Witness bytes must have exactly one accepted spelling per program. Malleability of the serialized form is a consensus hazard in the Bitcoin context. | `vm/serialize.json` |
+| D5 | Deserialization strictness | Both oracles accept non-minimal length encodings (the `0xfc` six-byte length prefix included, which is non-minimal for every size it can represent), trailing bytes, and (chia-rs) `0xfe` back-references | `bad_encoding` for all three (section 2) | Witness bytes must have exactly one accepted spelling per program. Malleability of the serialized form is a consensus hazard in the Bitcoin context. | `vm/serialize.json` |
 | D6 | `/` with negative operands | Consensus (`chia-rs`): floor division. The `clvm` package injects a policy error ("deprecated") that is not consensus | Floor division, matching consensus | Intersection parity targets the consensus oracle. The Python package's rejection is library policy, the diff harness treats it as an expected divergence. Ratified, see section 8. | `vm/arith.json` |
 | D7 | Zero cost budget | Both oracles treat `max_cost = 0` as unlimited | A zero budget is a real budget, no program succeeds under it (section 3.3) | A zero sentinel meaning unlimited is a library convenience, not consensus behavior. In the Bitcoin context the budget derives from transaction weight and is never legitimately zero, and an accidental zero must fail closed rather than open. Ratified, see section 8. | `vm/dispatch.json` |
+| D8 | Resource limits outside the cost model | The consensus oracle enforces caps the cost model never sees: at most 62,500,000 atoms and as many pairs per run (deserialization spends one count per atom and two per cons, probed at the boundary: a 62.7 million node budget fails "too many pairs" before evaluation, 62.4 million deserializes), a 4 GiB atom-byte heap, 20,000,000-entry value and environment stacks, and a two-argument `substr` whose default end index passes through a signed 32-bit cast, rejecting data atoms of 2^31 bytes or more | No equivalent limits: BitLisp is bounded by the cost budget, and its deserializer by the input's size alone | Every cap sits far outside the reachable regime. The cheapest evaluation-time trigger costs about 5.6e10 against the harness budget of 1.1e10, and the deserialization trigger needs roughly 42 MB of input against Bitcoin's 4 MB witness ceiling. PROVISIONAL, see section 8: the Phase 3 budget and input-size bounds must be recorded against these thresholds, or the caps mirrored fail-closed. | none, unreachable (section 8) |
 
 ## 7. Oracle provenance
 
@@ -518,3 +535,19 @@ these is a spec amendment plus vector update in one reviewed commit.
    maximum grantable budget against that threshold so the
    serializer's rejection of unrepresentable results is provably
    dead in consensus.
+5. **D8 (oracle resource caps).** Recorded, not mirrored (source
+   audit against clvm_rs 0.18.0 with oracle probes, 2026-07-28).
+   The oracle's allocator caps, interpreter stack caps, and the
+   substr signed-32-bit default end are consensus behavior on the
+   Chia side that no BitLisp vector can currently reach: the
+   evaluation-time triggers need several times the harness budget
+   and the deserialization trigger needs about ten times the witness
+   ceiling. Two ways to close the row, to be decided with the Phase
+   3 budget mapping. Either record the maximum grantable budget and
+   the embedding's input-size bound and prove every cap unreachable,
+   making the row permanently dead the way section 2 argues the wire
+   cap dead, or mirror the caps fail-closed so the two
+   implementations agree even in regimes no transaction can produce.
+   Mirroring the deserializer's node budget is the strongest
+   candidate since its trigger is input size, not cost, and the
+   input-size bound belongs to the embedding rather than this spec.

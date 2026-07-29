@@ -35,8 +35,10 @@ def _int_arg(arg, op_name, max_bytes=None):
 
 # Consensus operand size limits. Multiplication limits every operand,
 # division limits the numerator and, more loosely, the divisor.
-# Addition, subtraction, and comparison are unlimited.
+# Addition, subtraction, and comparison are unlimited. Multiplication
+# additionally caps its running product's magnitude byte length.
 MUL_OPERAND_MAX_BYTES = 256
+MUL_ACCUMULATOR_MAX_BYTES = 1024
 DIV_NUMERATOR_MAX_BYTES = 256
 DIV_DIVISOR_MAX_BYTES = 1024
 
@@ -190,6 +192,16 @@ def op_mul(args, charge):
         pending = 0
         acc *= value
         acc_len = (acc.bit_length() + 7) // 8
+        # The cap is on magnitude bytes, the same sign-agnostic count
+        # the step costs use: exactly 2^8191 passes at 1024 even
+        # though its signed encoding takes 1025 bytes. Checked after
+        # the step's charge and before the next argument, so an
+        # over-cap product beats a pair in the following argument and
+        # loses to cost_exceeded, and a later zero cannot repair it.
+        if acc_len > MUL_ACCUMULATOR_MAX_BYTES:
+            raise BitLispError(
+                "arg_too_long", "* accumulator exceeds 1024 magnitude bytes"
+            )
     charge(pending)
     result = int_to_atom(acc)
     _malloc(charge, result)
