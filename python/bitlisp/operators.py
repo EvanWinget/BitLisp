@@ -11,8 +11,9 @@ consensus-visible: near the budget boundary it decides which of
 cost_exceeded, wrong_arg_count, arg_not_atom, arg_not_pair,
 arg_too_long, bad_index, index_out_of_range, shift_too_large,
 div_by_zero, and secp_verify_failed is reported. Every function below
-performs them in the consensus oracle's order, and the boundary cases
-are pinned by vectors.
+performs them in the consensus oracle's order, except op_secp_verify,
+which has no oracle and whose order is its own normative choice. The
+boundary cases are pinned by vectors.
 """
 
 import hashlib

@@ -4,7 +4,8 @@ Self-contained on purpose: the reference implementation is the spec
 artifact and carries no dependencies, so the curve arithmetic lives
 here as plain integer math in affine coordinates, the same shape the
 algorithm has in the BIP. The test suite cross-checks it against the
-official BIP 340 vectors and against libsecp256k1. This module favors
+official BIP 340 vectors and against Bitcoin Core's test-framework
+implementation of the same algorithm. This module favors
 reviewability over speed and does not run in constant time, which is
 safe for verification because every input it sees is public. A
 consensus-facing implementation must use a hardened curve library

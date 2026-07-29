@@ -1,7 +1,9 @@
 # Minimal stub of the two test_framework.util helpers the vendored
-# Core files import. Both are used only by the embedded unittest
-# classes in those files, which BitLisp never runs. Semantics match
-# upstream.
+# Core files import. assert_not_equal runs on live paths (field
+# division in crypto/secp256k1.py and the nonce check in key.py's
+# sign_schnorr), so its semantics must and do match upstream exactly.
+# random_bitflip is used only by the embedded self-tests, which
+# BitLisp never runs.
 
 import random
 

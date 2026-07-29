@@ -67,11 +67,11 @@
 **Goal:** a minimal Python evaluator whose shared core is bit-for-bit CLVM-equivalent, with divergences enumerated.
 
 - [x] Implement the evaluator in `python/bitlisp/` — own code, not a wrapper (it is the spec artifact), small and boring: cons cells, serialization, operator dispatch, cost accounting.
-- [ ] Define operator set in `VM.md`: CLVM core **minus** BLS operators, **plus** `secp_verify` (BIP340, assertive semantics deferred to condition layer). Divergence table with rationale per row.
+- [x] Define operator set in `VM.md`: CLVM core **minus** BLS operators, **plus** `secp_verify` (BIP340, assertive semantics deferred to condition layer). Divergence table with rationale per row.
 - [ ] Inherit the CLVM cost table (`COSTS.md`); weight-mapping section stubbed for Phase 3 data.
 - [x] **Differential harness v1** (`tools/diff_clvm.py`): run every intersection program through bitlisp-python AND `clvm`/`chia_rs`; assert identical (result, cost) or identical error class.
 - [ ] Import Chia's official CLVM test vectors for the intersection; generate randomized program corpus (Claude Code task: corpus generator with size/depth knobs).
-- [x] Divergent operators tested against their own oracles (`secp_verify` → BIP340 official vectors + Bitcoin Core's test-framework implementation, vendored; the original `coincurve` plan was dropped for lack of a usable wheel — decision recorded in VM.md section 7).
+- [x] Divergent operators tested against their own oracles (`secp_verify` → BIP340 official vectors + Bitcoin Core's test-framework implementation, vendored). The original `coincurve` plan was dropped for lack of a usable wheel, decision recorded in VM.md section 7.
 
 **Done when:** 100% pass on intersection vectors + 10k randomized corpus programs with zero unexplained divergence; divergence table complete.
 

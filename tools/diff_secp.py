@@ -9,10 +9,11 @@ mutation battery derived from it, and every verdict must agree. The
 operator layer runs the same cases end to end, checking the tri-state
 result, the flat cost, and the error classes.
 
-Any disagreement fails the run and prints the triple, so a failure
-reproduces with the printed seed:
+Any disagreement fails the run and prints the disagreeing case. The
+summary line includes the seed, so a failure reproduces with the same
+seed and a count at least as large:
 
-    tools/diff_secp.py --count 300 --seed <seed>
+    tools/diff_secp.py --count 100 --seed <seed>
 """
 
 import argparse
@@ -140,7 +141,7 @@ def run(count, seed):
     for failure in failures:
         print(f"MISMATCH {failure}")
     print(
-        f"diff_secp: {valid} valid triples, {mutated} mutations, "
+        f"diff_secp: seed {seed}, {valid} valid triples, {mutated} mutations, "
         f"{shape} operator shape cases, {len(failures)} failures"
     )
     return 1 if failures else 0

@@ -5,7 +5,8 @@ vendored verbatim as the `secp_verify` differential oracle. This is
 the code Core itself uses to cross-check its consensus signing and
 verification, continuously validated against libsecp256k1 in Core's
 own CI. It is test tooling only: nothing under `python/bitlisp/`
-imports it, and `tools/diff_secp.py` is its only consumer.
+imports it. Its consumers are `tools/diff_secp.py` and the randomized
+invariants in `python/tests/test_secp256k1.py`.
 
 ## Provenance
 
@@ -23,9 +24,10 @@ Vendored verbatim:
 
 Ours, not upstream: the two `__init__.py` files and
 `test_framework/util.py`, a minimal stub of the two helpers the
-vendored files import for their embedded self-tests, so the verbatim
-files resolve their imports without dragging in Core's full test
-utility module.
+vendored files import, so the verbatim files resolve their imports
+without dragging in Core's full test utility module. One of the
+stubbed helpers (`assert_not_equal`) runs on live verification and
+signing paths, so the stub reproduces upstream semantics exactly.
 
 The vendored files are exempt from repository lint, like
 `vectors/upstream/`. Refreshing this snapshot is an upstream pin bump
