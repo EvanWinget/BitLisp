@@ -497,10 +497,13 @@ snapshot refreshes follow the adopt/take/decline triage in
 The intersection is additionally pinned by Chia's official CLVM
 command tests, vendored at the release tag matching the pinned `clvm`
 wheel. The runner re-derives every expectation semantically rather
-than comparing tool output, requires the consensus oracle to
-reproduce every success expectation, and sorts every case BitLisp
+than comparing tool output, and sorts every case BitLisp
 intentionally rejects into a divergence bucket that asserts the exact
-BitLisp outcome under its table row (D1, D3, D4, D6). One case, the
+BitLisp outcome under its table row (D1, D3, D4, D6). The consensus
+oracle must reproduce every success expectation, the divergence
+buckets included, where it is the only implementation that can
+confirm the file: the single exception is the `py_limits` case below,
+which no limit-enforcing implementation reproduces. One case, the
 `power-1` exponentiation, records the corpus's own provenance limit:
 its expectation came from the Python `clvm` package, which lacks the
 consensus operand size limits, and bitlisp and the consensus oracle
