@@ -500,7 +500,12 @@ diffs it against the Bitcoin Core implementation on
 signer-generated triples and a mutation battery. The originally
 planned `coincurve` wheel is not used: no released build supports
 the pinned Python, and the vendored oracle additionally provides
-the signer a differential needs.
+the signer a differential needs. When a system libsecp256k1 with
+the schnorrsig module is present, `tools/diff_secp.py` adds the C
+library Bitcoin Core links as a third verifier: it re-runs the
+official vectors and votes on every generated triple. The leg is
+opportunistic on developer machines, required in CI, and the
+pinned oracles never depend on it.
 
 ## 8. Open questions for design ratification
 

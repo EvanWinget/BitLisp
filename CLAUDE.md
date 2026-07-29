@@ -87,9 +87,11 @@ a spec decision rather than picking a plausible reading.
 
 ## Reference material policy
 
-- Oracles are released artifacts only: the `clvm` and `chia-rs` wheels
-  pinned in `pyproject.toml` under the `oracles` extra. Provenance is
-  recorded in `spec/VM.md`.
+- Oracles are released artifacts: the `clvm` and `chia-rs` wheels
+  pinned in `pyproject.toml` under the `oracles` extra, and, where no
+  usable wheel exists, snapshots vendored verbatim from tagged
+  upstream releases (the Bitcoin Core test framework under
+  `tools/oracle/`). Provenance is recorded in `spec/VM.md`.
 - Chia test vectors are vendored as data into `vectors/upstream/` with
   provenance headers. CI never fetches from the network.
 - `tools/fetch-references.sh` clones upstream repos into git-ignored
