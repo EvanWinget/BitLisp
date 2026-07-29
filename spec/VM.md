@@ -480,17 +480,27 @@ pin it. No divergence exists outside this table. "Both oracles" means
 
 ## 7. Oracle provenance
 
-Oracles are released artifacts pinned as dev dependencies in
-`pyproject.toml` (extra `oracles`). Pin bumps follow the
-adopt/take/decline triage in `docs/execution-plan.md`.
+Oracles are released artifacts: the wheels pinned as dev dependencies
+in `pyproject.toml` (extra `oracles`), and vendored snapshots from
+tagged upstream releases where no usable wheel exists. Pin bumps and
+snapshot refreshes follow the adopt/take/decline triage in
+`docs/execution-plan.md`.
 
 | Oracle | Version | Pinned | Upstream commit | Notes |
 | --- | --- | --- | --- | --- |
 | `clvm` (PyPI) | 0.9.15 | 2026-07-26 | TODO on first triage | Python oracle. Carries non-consensus library policy (see D6), lacks the consensus operand size limits (section 4), checks the cost budget only after an operator completes, and checks apply's cost immediately where consensus defers the check to the applied program's first charge (section 3.2). The diff harness tolerates all four, each tagged in its output. |
 | `chia-rs` (PyPI) | 0.46.0 | 2026-07-26 | TODO on first triage | Consensus oracle, run with flags 0 |
+| BIP 340 vectors (bitcoin/bips) | 2023-04-20 revision | 2026-07-28 | 200f9b26 | Official test vectors for `secp_verify`, vendored as data in `vectors/upstream/bip340/` with a provenance file |
+| Bitcoin Core test framework | v31.1 | 2026-07-28 | 9be056a8 | `secp_verify` differential oracle and signer, vendored verbatim in `tools/oracle/bitcoincore/` with a provenance README. The implementation Core cross-checks its consensus code with, validated against libsecp256k1 in Core's CI |
 
-Divergent operators are tested against their own oracles. `secp_verify`
-will use the official BIP340 vectors plus libsecp256k1 via `coincurve`.
+Divergent operators are tested against their own oracles.
+`secp_verify` runs the official BIP 340 vectors byte-for-byte in the
+unit suite and `vectors/vm/secp.json`, and `tools/diff_secp.py`
+diffs it against the Bitcoin Core implementation on
+signer-generated triples and a mutation battery. The originally
+planned `coincurve` wheel is not used: no released build supports
+the pinned Python, and the vendored oracle additionally provides
+the signer a differential needs.
 
 ## 8. Open questions for design ratification
 

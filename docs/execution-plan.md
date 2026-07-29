@@ -71,7 +71,7 @@
 - [ ] Inherit the CLVM cost table (`COSTS.md`); weight-mapping section stubbed for Phase 3 data.
 - [x] **Differential harness v1** (`tools/diff_clvm.py`): run every intersection program through bitlisp-python AND `clvm`/`chia_rs`; assert identical (result, cost) or identical error class.
 - [ ] Import Chia's official CLVM test vectors for the intersection; generate randomized program corpus (Claude Code task: corpus generator with size/depth knobs).
-- [ ] Divergent operators tested against their own oracles (`secp_verify` → BIP340 official vectors + libsecp256k1 via `coincurve`).
+- [x] Divergent operators tested against their own oracles (`secp_verify` → BIP340 official vectors + Bitcoin Core's test-framework implementation, vendored; the original `coincurve` plan was dropped for lack of a usable wheel — decision recorded in VM.md section 7).
 
 **Done when:** 100% pass on intersection vectors + 10k randomized corpus programs with zero unexplained divergence; divergence table complete.
 
