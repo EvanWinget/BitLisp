@@ -5,11 +5,19 @@ import sys
 from pathlib import Path
 
 import pytest
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(REPO_ROOT / "python"))
+sys.path.insert(0, str(REPO_ROOT / "tools" / "oracle" / "bitcoincore"))
 
 from bitlisp.secp256k1 import G, N, P, lift_x, point_mul, verify  # noqa: E402
+from test_framework.key import (  # noqa: E402
+    compute_xonly_pubkey,
+    sign_schnorr,
+    verify_schnorr,
+)
 
 VECTORS_CSV = REPO_ROOT / "vectors" / "upstream" / "bip340" / "test-vectors.csv"
 
@@ -85,3 +93,47 @@ def test_group_order():
     # group order, and (n - 1) * G is the generator's negation.
     assert point_mul(N, G) is None
     assert point_mul(N - 1, G) == (G[0], P - G[1])
+
+
+# Randomized invariants against the vendored Bitcoin Core oracle,
+# which also provides the signer this verify-only module lacks. The
+# example counts stay modest because one verification costs about
+# 110 ms in this module.
+
+
+@settings(max_examples=15, deadline=None)
+@given(
+    secret=st.integers(min_value=1, max_value=N - 1),
+    msg=st.binary(min_size=32, max_size=32),
+    aux=st.binary(min_size=32, max_size=32),
+)
+def test_core_signed_triples_verify(secret, msg, aux):
+    privkey = secret.to_bytes(32, "big")
+    pubkey, _ = compute_xonly_pubkey(privkey)
+    sig = sign_schnorr(privkey, msg, aux=aux)
+    assert verify(pubkey, msg, sig) is True
+    assert verify_schnorr(pubkey, sig, msg) is True
+
+
+@settings(max_examples=15, deadline=None)
+@given(
+    secret=st.integers(min_value=1, max_value=N - 1),
+    msg=st.binary(min_size=32, max_size=32),
+    bit=st.integers(min_value=0, max_value=(32 + 32 + 64) * 8 - 1),
+)
+def test_any_single_bit_corruption_rejects_and_agrees(secret, msg, bit):
+    # One flipped bit anywhere in the (pubkey, msg, sig) triple must
+    # reject, and the module must agree with the Core oracle on it.
+    privkey = secret.to_bytes(32, "big")
+    pubkey, _ = compute_xonly_pubkey(privkey)
+    sig = sign_schnorr(privkey, msg, aux=bytes(32))
+    corrupted = bytearray(pubkey + msg + sig)
+    corrupted[bit // 8] ^= 1 << (bit % 8)
+    pubkey, msg, sig = (
+        bytes(corrupted[0:32]),
+        bytes(corrupted[32:64]),
+        bytes(corrupted[64:128]),
+    )
+    ours = verify(pubkey, msg, sig)
+    assert ours is False
+    assert verify_schnorr(pubkey, sig, msg) is ours
