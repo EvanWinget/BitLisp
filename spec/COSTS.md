@@ -114,6 +114,15 @@ Phase 3 measurements.
     when the base cost alone would burst the budget, and a pair in a
     later argument only after every earlier argument's charge fits,
     pinned at the exact boundary by vectors.
+  - `secp_verify`: every check precedes the single flat charge, in
+    this order: arity, then each argument's atom check in argument
+    order, then each argument's shape check in argument order
+    (pubkey width, message width, signature width). The
+    empty-signature branch and the verification work come after the
+    charge. A shape defect therefore wins over `cost_exceeded`, and
+    neither the empty-signature nil nor a verification outcome is
+    ever reported when the budget cannot cover the charge, pinned by
+    boundary vectors.
 - Evaluation cost does not include deserialization. A per-byte cost on
   the serialized program belongs to the weight mapping (section 9).
 
@@ -231,14 +240,29 @@ Worked example, pinned by vectors: `(any (q . 1) (q . 2))` costs
 | Operator | Formula |
 | --- | --- |
 | `sha256` | `87 + 134 * n_args + 2 * total_arg_bytes + malloc(result)` |
+| `secp_verify` | `1300000`, flat, no malloc (PROVISIONAL) |
 
-The result atom is always exactly 32 bytes, so its malloc is a flat
-320 charged after the argument loop. Per-byte terms count argument
-atoms at their actual length, redundant encoding bytes included, like
-everywhere else, and the hashed bytes are exactly the costed bytes.
+The sha256 result atom is always exactly 32 bytes, so its malloc is a
+flat 320 charged after the argument loop. Per-byte terms count
+argument atoms at their actual length, redundant encoding bytes
+included, like everywhere else, and the hashed bytes are exactly the
+costed bytes.
 
-Worked example, pinned by vectors: `(sha256 (q . "ab") (q . "cd"))`
-costs `20 + 20 + 1 + 87 + 134 * 2 + 2 * 4 + 320 = 724`.
+`secp_verify` has no per-byte term because every argument width is
+fixed by its shape checks, and no malloc because every result is a
+shared constant. The constant is PROVISIONAL: the operator has no
+CLVM oracle to inherit from, so the value adopts the magnitude of the
+consensus oracle's ECDSA verify pending the Phase 3 measurement
+recorded in VM.md section 8. The empty-signature branch charges the
+same flat cost in v0, with a cheaper price explicitly left as a
+Phase 3 question there.
+
+Worked examples, pinned by vectors: `(sha256 (q . "ab") (q . "cd"))`
+costs `20 + 20 + 1 + 87 + 134 * 2 + 2 * 4 + 320 = 724`, and a
+`secp_verify` application on three quoted arguments costs
+`20 * 3 + 1 + 1300000 = 1300061` when it returns, the same total for
+a valid signature and for an empty one. The failing path charges
+identically before it raises `secp_verify_failed`.
 
 ## 9. Weight mapping
 
