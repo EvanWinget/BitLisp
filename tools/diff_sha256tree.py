@@ -3,24 +3,29 @@
 
 Deployed consensus at flags 0 treats opcode 0x3f as unknown (a
 recorded divergence), so the operator cannot ride the intersection
-harness. It is pinned against the released oracle artifacts on three
+harness. It is pinned against the released oracle artifacts on four
 legs instead:
 
 1. The pinned consensus wheel dispatches the same operator behind its
    ENABLE_SHA256_TREE release flag. Every generated program runs
    through bitlisp and the flag-enabled wheel, and the (cost, result)
    or error class must match exactly, including at budgets within a
-   few units of the measured cost, where the charge interleaving
-   decides the outcome.
+   few units of the measured cost, where the budget boundary decides
+   the outcome. This is the only leg that checks cost, so the cost
+   constants rest on the flag-enabled wheel alone.
 2. The wheel separately exports the tree_hash puzzle-hash utility,
    the algorithm Chia consensus has applied to puzzle commitments
    since genesis. Every hashed tree's result must equal the utility's
-   digest.
+   digest. Legs 1 and 2 are two views of the one pinned wheel.
 3. An in-language tree-hash program built from intersection operators
    (a, i, l, c, sha256, paths) runs through bitlisp and both pinned
    oracles at flags 0, and every implementation's result must equal
    the operator's. This leg ties the operator to semantics every
    deployed binary can confirm without the flag.
+4. The divergence itself: every generated program also runs through
+   both oracles at flags 0, which must accept the opcode as unknown
+   and return nil. This pins the recorded oracle-side behavior, that
+   deployed consensus does not dispatch 0x3f, on every run.
 
 The generator draws leaf-heavy and pair-heavy trees, atom sizes that
 cross the one-byte and length-prefixed serialization forms, redundant
@@ -199,6 +204,7 @@ def main():
         "in_language": 0,
         "arity": 0,
         "exponential": 0,
+        "flags0": 0,
     }
 
     def fail(kind, detail):
@@ -224,6 +230,23 @@ def main():
             fail("full", f"#{i} prog={program.hex()} env={env.hex()} {bl} vs {rs}")
             continue
         stats["full"] += 1
+
+        # Leg 4: at flags 0 both oracles must treat 0x3f as an
+        # unknown operator, accepted with result nil, the oracle side
+        # of the recorded divergence. Costs are not compared, the
+        # unknown-op charge has nothing to do with the operator's.
+        # Guarded on success so an erroring argument's failure is
+        # never misread as unknown-op rejection.
+        if bl[0] == "ok":
+            rs0 = run_rs(program, env, MAX_COST, 0)
+            py0 = run_py(program, env, MAX_COST)
+            if rs0[0] != "ok" or rs0[2] != "80" or py0[0] != "ok" or py0[2] != "80":
+                fail(
+                    "flags0",
+                    f"#{i} prog={program.hex()} env={env.hex()} rs={rs0} py={py0}",
+                )
+            else:
+                stats["flags0"] += 1
 
         if bl[0] == "ok":
             budget = bl[1] + rng.choice((-2, -1, 0))
@@ -296,13 +319,14 @@ def main():
     if bl != rs or bl != ("err", "cost_exceeded"):
         fail("exponential", f"k={k} budget={budget} {bl} vs {rs}")
     else:
-        stats["exponential"] = 1
+        stats["exponential"] += 1
 
     print(
         f"diff_sha256tree: seed={args.seed}, {stats['full']} full, "
-        f"{stats['boundary']} boundary, {stats['utility']} utility, "
-        f"{stats['in_language']} in-language, {stats['arity']} arity, "
-        f"{stats['exponential']} exponential, {failures} failures"
+        f"{stats['flags0']} flags0, {stats['boundary']} boundary, "
+        f"{stats['utility']} utility, {stats['in_language']} in-language, "
+        f"{stats['arity']} arity, {stats['exponential']} exponential, "
+        f"{failures} failures"
     )
     return 1 if failures else 0
 
