@@ -9,8 +9,11 @@ texts are parsed with the reader below, serialized canonically, and the
 expectation becomes (cost, result bytes) or a bitlisp error class
 mapped from the FAIL message. bitlisp must then reproduce the
 expectation exactly, and on every success expectation the consensus
-oracle (chia_rs, flags 0) must reproduce it too, so a file whose
-expectation drifted from consensus cannot pass silently.
+oracle (chia_rs, flags 0) must reproduce it too, the single py_limits
+case below excepted, so a file whose expectation drifted from
+consensus cannot pass silently. That includes the divergence-bucket
+success cases: where bitlisp rejects by design, the consensus oracle
+still has to produce the file's exact (cost, result).
 
 Cases bitlisp intentionally rejects fall into divergence buckets, each
 asserting the exact BitLisp outcome rather than skipping:
@@ -19,8 +22,7 @@ asserting the exact BitLisp outcome rather than skipping:
   unknown_operator.
 - D3: programs dispatching any other operator outside the BitLisp
   table (unknown opcodes the oracles accept, their malformed-opcode
-  and argument errors, and softfork) must raise unknown_operator or,
-  for the 0xffff-prefixed family, reserved_operator.
+  and argument errors, and softfork) must raise unknown_operator.
 - D4: programs with a pair in operator position must raise
   operator_not_atom.
 - D6: negative division, which the Python clvm package rejects as
@@ -37,16 +39,6 @@ Cases whose expected FAIL is a text-reader error ("missing )",
 "illegal dot expression") pin the upstream assembler, not the VM. They
 land in a reader bucket: this runner's reader must reject them too,
 and a program our reader rejects that upstream executed fails the run.
-
-Two FAIL spellings are ambiguous in the corpus, the same conflation
-the diff harness documents: the Python oracle reports an improper
-argument list with the message it uses for f or r on an atom, so
-"first/rest of non-cons" accepts either arg_not_pair or bad_arg_list.
-
-The consensus cross-check runs only where the file expects success and
-the program stays inside the BitLisp operator table. Divergence-bucket
-programs leave the intersection by definition, and --strict cases pin
-a clvm_tools tool mode rather than consensus behavior.
 
 Any case that fits no bucket is a finding and fails the run.
 
@@ -148,6 +140,18 @@ FAIL_RULES = (
 )
 
 DIVERGENCE_BUCKETS = ("D1", "D3", "D4", "D6")
+
+# Specific chia_rs argument-error fragments. The operand size limit is
+# the bare InvalidOperatorArg carrying none of these, matched with the
+# same last-resort discipline the diff harness applies.
+RS_SPECIFIC_ARG_ERRORS = (
+    "Requires Int Argument",
+    "requires an atom",
+    "used on list",
+    "concat on list",
+    "requires int32",
+    "Invalid Indices",
+)
 
 
 class ReaderError(Exception):
@@ -265,7 +269,6 @@ class Case:
         if not args or args[0] != "brun":
             raise CaseError(f"not a brun command: {self.command}")
         self.show_cost = False
-        self.strict = False
         self.dump = False
         self.verbose = False
         self.max_cost = None
@@ -276,7 +279,10 @@ class Case:
             if arg in ("-c", "--cost"):
                 self.show_cost = True
             elif arg == "--strict":
-                self.strict = True
+                # Only changes which FAIL spelling the file records:
+                # strict brun rejects unknown operators that bitlisp
+                # rejects unconditionally.
+                pass
             elif arg in ("-n", "--no-keywords"):
                 pass  # changes brun's result printing, not its semantics
             elif arg in ("-d", "--dump"):
@@ -285,7 +291,10 @@ class Case:
                 self.verbose = True
             elif arg in ("-m", "--max-cost"):
                 i += 1
-                self.max_cost = int(args[i])
+                try:
+                    self.max_cost = int(args[i])
+                except IndexError, ValueError:
+                    raise CaseError(f"bad max cost: {self.command}") from None
                 if self.max_cost <= 0:
                     raise CaseError(f"non-positive max cost: {self.command}")
             elif arg.startswith("--backend"):
@@ -369,7 +378,10 @@ def run_consensus(program_bytes, env_bytes, max_cost):
 def expected_result_bytes(case):
     _, result_text = case.expected
     if case.dump:
-        return bytes.fromhex(result_text)
+        try:
+            return bytes.fromhex(result_text)
+        except ValueError:
+            raise CaseError(f"bad dump hex: {result_text!r}") from None
     return serialize(read_text(result_text))
 
 
@@ -396,6 +408,8 @@ def judge(case):
                 raise CaseError(f"expected divergence {kind}, bitlisp gave {bucket}")
             if bucket == "D6":
                 check_d6(case, outcome, program_bytes, env_bytes, budget)
+            elif case.expected[0] == "ok":
+                check_consensus_reproduces(case, program_bytes, env_bytes, budget)
             return bucket
         if kind is not None:
             raise CaseError(f"expected divergence {kind}, bitlisp gave {outcome}")
@@ -404,9 +418,16 @@ def judge(case):
         if outcome == ("err", "arg_too_long"):
             # The corpus expectation predates the consensus operand
             # limits, which the Python clvm package never enforced.
-            # bitlisp must agree with the consensus oracle instead.
+            # bitlisp must agree with the consensus oracle instead. A
+            # bare InvalidOperatorArg with no more specific fragment is
+            # the oracle's operand size limit, so any of its argument
+            # errors carrying a specific fragment does not qualify.
             consensus = run_consensus(program_bytes, env_bytes, budget)
-            if consensus[0] == "err" and "InvalidOperatorArg" in consensus[1]:
+            if (
+                consensus[0] == "err"
+                and "InvalidOperatorArg" in consensus[1]
+                and not any(f in consensus[1] for f in RS_SPECIFIC_ARG_ERRORS)
+            ):
                 return "py_limits"
             raise CaseError(f"arg_too_long but consensus oracle gave {consensus}")
         if outcome[0] != "ok":
@@ -427,10 +448,6 @@ def judge(case):
     code = outcome[1]
     if code == kind:
         return "match"
-    if kind == "arg_not_pair" and code == "bad_arg_list":
-        # The corpus spells an improper argument list with the
-        # f/r-on-atom message, so either code satisfies it.
-        return "match"
     raise CaseError(f"expected {kind}, bitlisp raised {code}")
 
 
@@ -442,7 +459,7 @@ def divergence_bucket(case, outcome):
     if outcome[0] != "err":
         return None
     code = outcome[1]
-    if code in ("unknown_operator", "reserved_operator"):
+    if code == "unknown_operator":
         bls = ("point_add", "pubkey_for_exp")
         return "D1" if any(name in case.command for name in bls) else "D3"
     if code == "operator_not_atom":
@@ -456,6 +473,23 @@ def check_d6(case, outcome, program_bytes, env_bytes, budget):
     consensus = run_consensus(program_bytes, env_bytes, budget)
     if consensus != outcome:
         raise CaseError(f"D6 consensus mismatch: bitlisp {outcome}, oracle {consensus}")
+
+
+def check_consensus_reproduces(case, program_bytes, env_bytes, budget):
+    """A divergence-bucket success expectation is still consensus behavior.
+
+    bitlisp rejects these programs by design, so the file's (cost,
+    result) can only be validated against the consensus oracle, and a
+    drifted expectation must fail loudly rather than ride the bucket.
+    """
+    expected = expected_result_bytes(case)
+    consensus = run_consensus(program_bytes, env_bytes, budget)
+    if consensus[0] != "ok" or consensus[2] != expected:
+        raise CaseError(f"consensus oracle does not reproduce the file: {consensus}")
+    if case.expected_cost is not None and consensus[1] != case.expected_cost:
+        raise CaseError(
+            f"consensus cost {consensus[1]} != expected {case.expected_cost}"
+        )
 
 
 def main():

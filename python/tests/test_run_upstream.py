@@ -140,6 +140,17 @@ class TestCaseParsing:
         with pytest.raises(CaseError):
             case_from(tmp_path, "brun -z '(q . 1)'\n()\n")
 
+    def test_malformed_max_cost_is_a_finding(self, tmp_path):
+        with pytest.raises(CaseError):
+            case_from(tmp_path, "brun '(q . 1)' -m\n1\n")
+        with pytest.raises(CaseError):
+            case_from(tmp_path, "brun -m ten '(q . 1)'\n1\n")
+
+    def test_corrupt_dump_hex_is_a_finding(self, tmp_path):
+        case = case_from(tmp_path, "brun -d '(q . 1)'\nzz\n")
+        with pytest.raises(CaseError):
+            judge(case)
+
     def test_trailing_output_without_verbose_is_a_finding(self, tmp_path):
         with pytest.raises(CaseError):
             case_from(tmp_path, "brun '(q . 1)'\n1\nsurprise\n")
@@ -175,23 +186,34 @@ class TestJudge:
         case = case_from(tmp_path, "brun -c '(0x03f )'\ncost = 2\n()\n")
         assert judge(case) == "D3"
 
+    def test_drifted_unknown_op_expectation_is_a_finding(self, tmp_path):
+        # bitlisp rejects the operator either way, so only the
+        # consensus oracle can catch the corrupted cost.
+        case = case_from(tmp_path, "brun -c '(0x03f )'\ncost = 3\n()\n")
+        with pytest.raises(CaseError):
+            judge(case)
+
 
 def test_full_corpus_is_clean():
-    """Every vendored case judges into a bucket with no findings."""
+    """Every vendored case judges into its pinned bucket, no findings.
+
+    The counts are exact so a case silently migrating between buckets,
+    or a match case being absorbed into one, fails here even though the
+    standalone runner's exit code cannot see it.
+    """
     buckets = {}
     for path in sorted(CORPUS.rglob("*.txt")):
         buckets.setdefault(judge(Case(path)), []).append(path.name)
-    assert sorted(buckets) == [
-        "D1",
-        "D3",
-        "D4",
-        "D6",
-        "match",
-        "py_limits",
-        "reader",
-    ]
+    assert {name: len(cases) for name, cases in buckets.items()} == {
+        "match": 691,
+        "D1": 31,
+        "D3": 91,
+        "D4": 5,
+        "D6": 7,
+        "py_limits": 1,
+        "reader": 6,
+    }
     assert buckets["py_limits"] == ["power-1.txt"]
-    assert len(buckets["match"]) == 691
 
 
 def test_vendored_tree_matches_provenance_digest():
