@@ -59,6 +59,12 @@ jobs:
       - name: Vector corpus
         run: |
           "${RUNNER_TEMP}/venv/bin/python" tools/run_vectors.py
+      - name: Upstream corpus
+        # Chia's official CLVM command tests, vendored in
+        # vectors/upstream/clvm/. Also exercised by the unit suite,
+        # kept standalone so the bucket summary lands in the log.
+        run: |
+          "${RUNNER_TEMP}/venv/bin/python" tools/run_upstream.py
       - name: Differential harness, 10k programs
         # The Phase 1 done-criterion gate. The seed varies per run so
         # regressions cannot hide behind one fixed slice, and it is
