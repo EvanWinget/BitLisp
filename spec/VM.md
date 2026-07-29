@@ -182,8 +182,8 @@ failing closed.
 
 The operator table is complete for v0: the core specials, the tree
 ops family, the arithmetic family, the bytes and strings family, the
-bitwise family, the boolean family, and the crypto family (`sha256`
-and `secp_verify`, divergence D2).
+bitwise family, the boolean family, and the crypto family (`sha256`,
+`secp_verify`, and `sha256tree`, divergences D2 and D9).
 
 | Opcode | Name | Arity | Semantics |
 | --- | --- | --- | --- |
@@ -217,6 +217,7 @@ and `secp_verify`, divergence D2).
 | `0x20` | `not` | 1 | TRUE if the argument is nil, nil otherwise. |
 | `0x21` | `any` | 0 or more | TRUE if at least one argument is not nil. No arguments gives nil. |
 | `0x22` | `all` | 0 or more | TRUE if every argument is not nil. No arguments gives TRUE. |
+| `0x3f` | `sha256tree` | 1 | The tree hash of its argument, atom or pair: an atom hashes as SHA-256 of `0x01` then the atom's bytes, a pair as SHA-256 of `0x02` then the first child's hash then the rest child's hash. Divergence D9. |
 
 The tree ops select, build, and compare nodes without interpreting
 them as integers:
@@ -362,10 +363,10 @@ byte, so the section 2 threshold for building an atom the wire
 format cannot encode applies unchanged.
 
 The boolean ops test nil-ness and return the shared TRUE and nil
-constants. They are the one non-tree family that accepts pair
-arguments: any node is legal in any position, and nil is the only
-false value (the one-byte atom `0x00` and every pair are true), the
-same rule `i` applies to its selector.
+constants. Outside the tree ops, only they and `sha256tree` accept
+pair arguments: any node is legal in any position, and nil is the
+only false value (the one-byte atom `0x00` and every pair are true),
+the same rule `i` applies to its selector.
 
 - `not` takes exactly one argument: TRUE if it is nil, nil otherwise.
 - `any` returns TRUE if at least one argument is not nil, and nil
@@ -376,10 +377,11 @@ same rule `i` applies to its selector.
   per-byte term: a large atom argument costs the same as a one-byte
   one.
 
-The crypto family holds `sha256` and `secp_verify`. Like the bytes
-and strings ops both treat atoms as raw byte strings: every argument
-must be an atom, and a pair raises `arg_not_atom`. `sha256` has no
-operand size limit.
+The crypto family holds `sha256`, `secp_verify`, and `sha256tree`.
+The first two treat atoms as raw byte strings, like the bytes and
+strings ops: every argument must be an atom, and a pair raises
+`arg_not_atom`. `sha256tree` hashes structure, so its single argument
+may be any node. Neither hashing operator has an operand size limit.
 
 - `sha256` returns the SHA-256 digest of the concatenation of its
   arguments in argument order, a freshly built 32-byte atom charging
@@ -392,6 +394,33 @@ operand size limit.
   from `(sha256 (q . 0x02))`.
 - The result is always exactly 32 bytes, so `sha256` can never build
   an atom the wire format cannot encode.
+
+`(sha256tree X)` returns the 32-byte **tree hash** of the node X
+(divergence D9), a content address for a whole tree:
+
+- An atom's tree hash is the SHA-256 digest of the byte `0x01`
+  followed by the atom's bytes, so nil's tree hash digests the single
+  byte `0x01`. A pair's tree hash is the SHA-256 digest of the byte
+  `0x02` followed by the first child's tree hash then the rest
+  child's tree hash, 65 bytes in all.
+- The two tag bytes separate leaves from pairs, and the fixed 32-byte
+  child-hash width makes the pair form unambiguous, so distinct trees
+  have distinct hashes up to SHA-256 collision resistance.
+- Exactly one argument, which may be any node. There is no
+  `arg_not_atom` path, and no operand size or depth limit, the cost
+  budget is the only bound. The arity check precedes every charge, so
+  `wrong_arg_count` wins over `cost_exceeded` when both would fire.
+- Atoms hash their actual bytes as given, redundant encoding bytes
+  included, like `sha256`: the tree hashes of `0x0002` and `0x02`
+  differ.
+- Cost accrues per visited node during the walk, checked at every
+  charge, and the walk follows structure without deduplicating
+  sharing: a pair built as `(c X X)` reaches X twice, and both visits
+  charge. Charging as the walk proceeds is load-bearing for
+  soundness, not only for cost accounting. COSTS.md sections 1 and 8
+  state the rule and the work-amplification hazard it closes.
+- The result is a freshly built 32-byte atom charging malloc, so
+  `sha256tree` can never build an atom the wire format cannot encode.
 
 `secp_verify` is the one operator with no CLVM counterpart in any
 form (divergence D2). `(secp_verify pubkey msg sig)` verifies a
@@ -478,6 +507,7 @@ pin it. No divergence exists outside this table. "Both oracles" means
 | D6 | `/` with negative operands | Consensus (`chia-rs`): floor division. The `clvm` package injects a policy error ("deprecated") that is not consensus | Floor division, matching consensus | Intersection parity targets the consensus oracle. The Python package's rejection is library policy, the diff harness treats it as an expected divergence. Ratified, see section 8. | `vm/arith.json`, upstream corpus D6 bucket |
 | D7 | Zero cost budget | Both oracles treat `max_cost = 0` as unlimited | A zero budget is a real budget, no program succeeds under it (section 3.3) | A zero sentinel meaning unlimited is a library convenience, not consensus behavior. In the Bitcoin context the budget derives from transaction weight and is never legitimately zero, and an accidental zero must fail closed rather than open. Ratified, see section 8. | `vm/dispatch.json` |
 | D8 | Resource limits outside the cost model | The consensus oracle enforces caps the cost model never sees: at most 62,500,000 atoms and as many pairs per run (deserialization spends one count per atom and two per cons, probed at the boundary: a 62.7 million node budget fails "too many pairs" before evaluation, 62.4 million deserializes), a 4 GiB atom-byte heap, 20,000,000-entry value and environment stacks, and a two-argument `substr` whose default end index passes through a signed 32-bit cast, rejecting data atoms of 2^31 bytes or more | No equivalent limits: BitLisp is bounded by the cost budget, and its deserializer by the input's size alone | Every cap sits far outside the reachable regime. The cheapest evaluation-time trigger costs about 5.6e10 against the harness budget of 1.1e10, and the deserialization trigger needs roughly 42 MB of input against Bitcoin's 4 MB witness ceiling. PROVISIONAL, see section 8: the Phase 3 budget and input-size bounds must be recorded against these thresholds, or the caps mirrored fail-closed. | none, unreachable (section 8) |
+| D9 | `sha256tree` | Deployed consensus (flags 0) treats opcode `0x3f` as an unknown operator under the D3 acceptance rule: arguments evaluate, cost derives from the opcode byte, result nil. The pinned oracle wheel carries a `sha256tree` operator at the same opcode behind its release flag, scheduled for consensus activation in Chia's next hard fork (CHIP-0049, in review) | `sha256tree` is a table operator with the wheel's semantics, cost constants, and opcode | Covenant recursion computes program commitments in-program, the pattern behind upstream's own promotion of the operator. Adopting the upstream opcode, semantics, and constants keeps the operator inside the diffable intersection once upstream activates. Decision by Evan, ratified, see section 8. | `vm/sha256tree.json` |
 
 ## 7. Oracle provenance
 
@@ -525,6 +555,19 @@ library Bitcoin Core links as a third verifier: it re-runs the
 official vectors and votes on every generated triple. The leg is
 opportunistic on developer machines, required in CI, and the
 pinned oracles never depend on it.
+
+`sha256tree` is tested against the pinned consensus wheel itself.
+The released artifact carries the operator behind its
+`ENABLE_SHA256_TREE` flag and separately exports the `tree_hash`
+puzzle-hash utility, the algorithm Chia consensus has applied to
+puzzle commitments since genesis. `tools/diff_sha256tree.py` diffs
+the operator's (result, cost) against the flag-enabled wheel at the
+exact budget boundary, the result against the utility, and the
+result against an in-language tree-hash program built from
+intersection operators and run through both pinned oracles at flags
+0. The operator is therefore pinned by released-binary evidence on
+three independent legs even though no deployed VM dispatches the
+opcode yet.
 
 ## 8. Design decision record
 
@@ -731,3 +774,51 @@ phase that owes the answer.
    Mirroring the deserializer's node budget is the strongest
    candidate since its trigger is input size, not cost, and the
    input-size bound belongs to the embedding rather than this spec.
+7. **D9 (sha256tree adoption).** RATIFIED (decision by Evan,
+   2026-07-29): `sha256tree` joins the v0 table at `0x3f` with the
+   pinned wheel's semantics and cost constants.
+
+   - In-language tree hashing (recursive `sha256` over the leaf and
+     pair tags) is expressible with the v0 intersection, so the
+     operator adds cost efficiency and witness compactness, not
+     capability. It was adopted anyway because the demand is
+     structural: covenant recursion computes a child program's
+     commitment in-program, the dominant pattern in Chia's deployed
+     puzzles, and upstream is promoting the same operator to
+     consensus (CHIP-0049) on that evidence. Carrying the recursive
+     program in every witness that needs it spends bytes exactly
+     where the witness-size obligation is tightest.
+   - Opcode `0x3f` matches the upstream assignment, so the operator
+     joins the diffable intersection when upstream activates. The
+     probe record in the D2 entry above lists `0x3f` among the bytes
+     unassigned in both oracles: that statement described flags-0
+     dispatch and stands, the wheel carries the operator behind a
+     release flag.
+   - Semantics and constants were verified against the pinned wheel
+     by probe on 2026-07-29 (tree hashes, totals at the exact budget
+     boundary, arity errors, flags-0 unknown acceptance) and are
+     pinned continuously by `tools/diff_sha256tree.py` (section 7).
+     CHIP-0049 is still in review upstream, so a constants change
+     before activation is possible: that lands as an ordinary
+     pin-bump triage, adopt or keep, one reviewed commit, and Phase 3
+     re-measures every inherited constant regardless.
+   - The algorithm is Chia's puzzle-hash tree hash unchanged. A
+     tagged-hash variant with a protocol-specific prefix was
+     considered and declined: it would forfeit the released-binary
+     oracle and the future intersection to buy cross-protocol domain
+     separation the commitment context already provides. Recorded
+     consequence: a BitLisp node and a Chia node with equal trees
+     share a tree hash.
+   - The per-node charge rule exists to close a work-amplification
+     hazard, not only to price the hashing. Evaluation builds shared
+     structure cheaply: `(c 1 1)` doubles the environment reachable
+     from its result for one 50-cost cons, and k nested applies of
+     that shape, a few hundred cost units each, reach 2^k visited
+     nodes for build cost linear in k. The wire format's lack of
+     back-references is no defense, because the sharing is built by
+     evaluation, never spelled in the witness. The walk charges
+     every visited node as it is reached and stops at
+     `cost_exceeded`, bounding the work a budget can buy. An
+     implementation that hashes first and charges after is open to
+     unbounded work under a small budget, the same hazard class as
+     the substr copy-on-slice note in COSTS.md section 5.
