@@ -417,8 +417,8 @@ BIP340 Schnorr signature over secp256k1.
   can never be turned into a value, so failures cannot be ground
   through and ignored.
 - Verification follows BIP 340's Verify algorithm exactly, pinned by
-  the official BIP340 vectors and a libsecp256k1 differential
-  (section 7).
+  the official BIP340 vectors and a differential against Bitcoin
+  Core's test-framework implementation (section 7).
 - No malloc: every result is a shared constant. The single flat
   charge precedes the empty-signature branch and the verification
   work, so the budget gates the expensive step (COSTS.md section 1).
@@ -439,7 +439,7 @@ informative, not normative.
 | `unknown_operator` | Operator atom not in the table and not reserved | (accepted, D3) | (accepted, D3) |
 | `bad_arg_list` | Operator arguments are not a proper list | (varies) | (varies) |
 | `wrong_arg_count` | Operator arity violated | InvalidOperatorArg | (per-op message) |
-| `arg_not_atom` | An atom-only operator (`=`, the integer family, the bytes family outside `substr`'s index positions, the bitwise family outside shift count positions, or `sha256`) got a pair | InvalidOperatorArg | (per-op message) |
+| `arg_not_atom` | An atom-only operator (`=`, the integer family, the bytes family outside `substr`'s index positions, the bitwise family outside shift count positions, or the crypto family) got a pair | InvalidOperatorArg | (per-op message) |
 | `arg_not_pair` | `f` or `r` applied to an atom | InvalidOperatorArg: first/rest of non-cons | first/rest of non-cons |
 | `arg_too_long` | Operand exceeds a section 4 size limit | InvalidOperatorArg | (absent, the `clvm` package has no operand limits) |
 | `bad_index` | A `substr` index or a shift count argument is a pair or an atom longer than four bytes | (per-op) requires int32 args (with no leading zeros) | (per-op) requires int32 args |
