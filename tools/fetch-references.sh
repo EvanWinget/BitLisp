@@ -20,6 +20,7 @@ clone() {
 clone https://github.com/Chia-Network/clvm.git clvm
 clone https://github.com/Chia-Network/clvm_rs.git clvm_rs
 clone https://github.com/Chia-Network/chia_rs.git chia_rs
+clone https://github.com/ajtowns/bllsh.git bllsh
 
 echo
 echo "Done. These checkouts are git-ignored and are not a build input."

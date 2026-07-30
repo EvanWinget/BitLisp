@@ -29,7 +29,7 @@ Every file outside `upstream/` is one JSON object in the
 ```
 
 The `spec` field cites the spec section the cases pin. Case shapes are
-suite-specific (`conditions` and `matching` land in Phase 2).
+suite-specific.
 
 ## vm case shape
 
@@ -56,6 +56,56 @@ Every intersection case was cross-checked against the consensus oracle
 cases were cross-checked against the same wheel with its sha256tree
 release flag enabled) pin BitLisp behavior that intentionally
 differs, each cites its divergence row.
+
+## conditions case shape
+
+```json
+{
+    "name": "unique within the file",
+    "conditions": "<hex, strict canonical serialization of the list node>",
+    "expect": {"parsed": []}
+}
+```
+
+`expect` is either `{"parsed": [...]}` with one JSON object per parsed
+condition (`{"opcode", "script_pubkey", "amount"}` for CREATE_COIN,
+`{"opcode", "cost", "args": ["<hex node>"]}` for reserved conditions)
+or `{"error": "<code>"}`. Every rejection rule in CONDITIONS.md
+section 1 and MATCHING.md rule 6 has at least one case.
+
+## matching case shape
+
+```json
+{
+    "name": "unique within the file",
+    "tx": {
+        "version": 2,
+        "locktime": 0,
+        "inputs": [
+            {
+                "txid": "<hex, 32 bytes>",
+                "index": 0,
+                "script_pubkey": "<hex>",
+                "amount": 60000,
+                "sequence": 4294967295,
+                "conditions": "<hex node>"
+            }
+        ],
+        "outputs": [{"script_pubkey": "<hex>", "amount": 50000}]
+    },
+    "expect": {"valid": true}
+}
+```
+
+`sequence` is optional and defaults to 4294967295. An input without a
+`conditions` key is a non-BitLisp input, one with the key is a BitLisp
+input whose puzzle evaluation produced that condition list. `expect`
+is `{"valid": true}` or `{"error": "<code>"}`. The transaction must
+satisfy the model's base rules (value conservation, ranges, distinct
+outpoints): a case violating them is a malformed vector, not an
+invalid spend. The adversarial regression corpus opens with the
+duplicate-CREATE_COIN theft case as vector #1 in
+`matching/create-coin.json`, per MATCHING.md rule 1.
 
 Run the corpus with `python3 tools/run_vectors.py`. A vector file whose
 suite has no runner yet fails loudly rather than being skipped.

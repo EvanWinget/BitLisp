@@ -1,8 +1,9 @@
 """Error taxonomy.
 
 Errors are consensus-relevant only as "the spend is invalid". The
-classes exist so vectors and the diff harness can assert that BitLisp
-fails for the same reason as the oracles.
+classes exist so vectors can pin the reason a spend fails: oracle
+parity for the VM codes, the named rejection rule for the condition
+and matching codes, which have no oracle.
 """
 
 CODES = frozenset(
@@ -24,6 +25,12 @@ CODES = frozenset(
         "secp_verify_failed",
         "user_raise",
         "cost_exceeded",
+        "bad_condition_list",
+        "bad_condition_opcode",
+        "bad_condition_arity",
+        "bad_condition_arg",
+        "reserved_cost_too_low",
+        "unsatisfied_output_claim",
     }
 )
 
