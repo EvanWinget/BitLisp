@@ -25,7 +25,7 @@ the vectors, and the diff harness.
 | D5 | Deserialization strictness | Both oracles accept non-minimal length encodings (the `0xfc` six-byte length prefix included, which is non-minimal for every size it can represent), trailing bytes, and (chia-rs) `0xfe` back-references | `bad_encoding` for all three (VM.md section 2) | Witness bytes must have exactly one accepted spelling per program. Malleability of the serialized form is a consensus hazard in the Bitcoin context. | `vm/serialize.json` |
 | D6 | `/` with negative operands | Consensus (`chia-rs`): floor division. The `clvm` package injects a policy error ("deprecated") that is not consensus | Floor division, matching consensus | Intersection parity targets the consensus oracle. The Python package's rejection is library policy, the diff harness treats it as an expected divergence. Ratified, see section 3. | `vm/arith.json`, upstream corpus D6 bucket |
 | D7 | Zero cost budget | Both oracles treat `max_cost = 0` as unlimited | A zero budget is a real budget, no program succeeds under it (VM.md section 3.3) | A zero sentinel meaning unlimited is a library convenience, not consensus behavior. In the Bitcoin context the budget derives from transaction weight and is never legitimately zero, and an accidental zero must fail closed rather than open. Ratified, see section 3. | `vm/dispatch.json` |
-| D8 | Resource limits outside the cost model | The consensus oracle enforces caps the cost model never sees: at most 62,500,000 atoms and as many pairs per run (deserialization spends one count per atom and two per cons, probed at the boundary: a 62.7 million node budget fails "too many pairs" before evaluation, 62.4 million deserializes), a 4 GiB atom-byte heap, 20,000,000-entry value and environment stacks, and a two-argument `substr` whose default end index passes through a signed 32-bit cast, rejecting data atoms of 2^31 bytes or more | No equivalent limits: BitLisp is bounded by the cost budget, and its deserializer by the input's size alone | Every cap sits far outside the reachable regime. The cheapest evaluation-time trigger costs about 5.6e10 against the harness budget of 1.1e10, and the deserialization trigger needs roughly 42 MB of input against Bitcoin's 4 MB witness ceiling. PROVISIONAL, see section 3: the Phase 3 budget and input-size bounds must be recorded against these thresholds, or the caps mirrored fail-closed. | none, unreachable (section 3) |
+| D8 | Resource limits outside the cost model | The consensus oracle enforces caps the cost model never sees: at most 62,500,000 atoms and as many pairs per run (deserialization spends one count per atom and two per cons, probed at the boundary: a 62.7 million node budget fails "too many pairs" before evaluation, 62.4 million deserializes), a 4 GiB atom-byte heap, 20,000,000-entry value and environment stacks, and a two-argument `substr` whose default end index passes through a signed 32-bit cast, rejecting data atoms of 2^31 bytes or more | No equivalent limits: BitLisp is bounded by the cost budget, and its deserializer by the input's size alone | Every cap sits far outside the reachable regime. The cheapest evaluation-time trigger costs about 5.6e10 against the harness budget of 1.1e10, and the deserialization trigger needs roughly 42 MB of input against Bitcoin's 4 MB witness ceiling. PROVISIONAL, see section 3: the Phase 4 budget and input-size bounds must be recorded against these thresholds, or the caps mirrored fail-closed. | none, unreachable (section 3) |
 | D9 | `sha256tree` | Deployed consensus (flags 0) treats opcode `0x3f` as an unknown operator under the D3 acceptance rule: arguments evaluate, cost derives from the opcode byte, result nil. The pinned oracle wheel carries a `sha256tree` operator at the same opcode behind its release flag, scheduled for consensus activation in Chia's next hard fork (CHIP-0049, in review) | `sha256tree` is a table operator with the wheel's semantics, cost constants, and opcode | Covenant recursion computes program commitments in-program, the pattern behind upstream's own promotion of the operator. Adopting the upstream opcode, semantics, and constants keeps the operator inside the diffable intersection once upstream activates. Decision by Evan, ratified, see section 3. | `vm/sha256tree.json` (BitLisp column), the oracle column pinned per run by the flags-0 leg of `tools/diff_sha256tree.py` |
 
 ## 2. Oracle provenance
@@ -221,8 +221,8 @@ phase that owes the answer.
      assignment).
    - **Cost 1300000 is PROVISIONAL.** There is no oracle to
      inherit from. The constant adopts the magnitude of the
-     consensus oracle's ECDSA verify pending Phase 3 measurement.
-     Phase 3 should also decide whether the empty-signature branch
+     consensus oracle's ECDSA verify pending Phase 4 measurement.
+     Phase 4 should also decide whether the empty-signature branch
      gets a cheaper price, by analogy with tapscript, where an
      empty signature does not count toward the sigops budget.
 3. **D4 (pair operator).** RATIFIED (decision by Evan, 2026-07-29):
@@ -279,7 +279,7 @@ phase that owes the answer.
    records the bound without enforcing it). The bound interacts with
    serialization: a budget below 10 * 2^34 makes a result atom too
    long for the wire format unbuildable (VM.md section 2), and the
-   u64 bound alone does not. The Phase 3 weight mapping should record
+   u64 bound alone does not. The Phase 4 weight mapping should record
    its maximum grantable budget against that threshold so the
    serializer's rejection of unrepresentable results is provably
    dead in consensus.
@@ -325,7 +325,7 @@ phase that owes the answer.
      pinned continuously by `tools/diff_sha256tree.py` (section 2).
      CHIP-0049 is still in review upstream, so a constants change
      before activation is possible: that lands as an ordinary
-     pin-bump triage, adopt or keep, one reviewed commit, and Phase 3
+     pin-bump triage, adopt or keep, one reviewed commit, and Phase 4
      re-measures every inherited constant regardless.
    - The algorithm is Chia's puzzle-hash tree hash unchanged. A
      tagged-hash variant with a protocol-specific prefix was

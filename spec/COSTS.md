@@ -4,7 +4,7 @@ Status: Phase 1 complete (2026-07-29). This table is normative for
 the evaluator core and the complete v0 operator table. It inherits
 the CLVM cost table for the operator intersection, verified against
 the pinned oracles by the diff harness. The weight mapping is filled
-with Phase 3 measurements.
+with Phase 4 measurements.
 
 ## 1. General rules
 
@@ -270,12 +270,12 @@ costed bytes.
 fixed by its shape checks, and no malloc because every result is a
 shared constant. The constant is PROVISIONAL: the operator has no
 CLVM oracle to inherit from, so the value adopts the magnitude of the
-consensus oracle's ECDSA verify pending the Phase 3 measurement
+consensus oracle's ECDSA verify pending the Phase 4 measurement
 recorded in the VM record's D2 entry
 ([docs/vm-record.md](../docs/vm-record.md)). The
 empty-signature branch charges the
 same flat cost in v0, with a cheaper price explicitly left as a
-Phase 3 question there.
+Phase 4 question there.
 
 `sha256tree`'s per-byte term prices each visited atom's actual bytes
 plus one, the leaf tag byte, at `sha256`'s 2 per byte. The pair
@@ -315,7 +315,7 @@ four bytes for
 
 ## 9. Weight mapping
 
-TODO (Phase 3): mapping from VM cost units to Bitcoin transaction
+TODO (Phase 4): mapping from VM cost units to Bitcoin transaction
 weight, derived from benchmark data on the measured artifacts,
 including the per-byte cost of the serialized program itself.
 

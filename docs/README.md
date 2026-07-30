@@ -14,4 +14,4 @@
   and the novel-layer register. Cited by CLAUDE.md ground rule 3.
 - [opcode-comparison.md](opcode-comparison.md): informative side-by-side
   of the CLVM, bllsh, and BitLisp operator sets.
-- Essay drafts land here in Phase 4.
+- Essay drafts land here in Phase 5.

@@ -53,7 +53,7 @@ SHA256_COST_PER_ARG = 134
 SHA256_COST_PER_BYTE = 2
 # PROVISIONAL: secp_verify has no CLVM oracle to inherit from. The
 # value adopts the magnitude of the consensus oracle's ECDSA verify
-# pending the Phase 3 measurement. Flat: every argument width is
+# pending the Phase 4 measurement. Flat: every argument width is
 # fixed by the operator's shape checks.
 SECP_VERIFY_COST = 1_300_000
 

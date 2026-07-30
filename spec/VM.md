@@ -3,7 +3,7 @@
 Status: Phase 1 complete (2026-07-29). This document is normative for
 the evaluator core and the complete v0 operator table. Constants
 marked PROVISIONAL and the open questions in the VM record's design
-decision record are owed to Phase 3.
+decision record are owed to Phase 4.
 
 The evaluator is CLVM-derived. The shared core must be bit-for-bit
 equivalent to the pinned consensus oracle (`chia-rs`, flags 0) on the
@@ -76,9 +76,9 @@ construction. Evaluation can only build an oversized atom as a
 freshly allocated operator result, and every freshly built result
 atom charges `MALLOC_COST_PER_BYTE = 10` per byte, so reaching this
 rejection requires a budget of at least 10 * 2^34, about 1.7 * 10^11
-cost units. The Phase 3 weight mapping is expected to grant budgets
+cost units. The Phase 4 weight mapping is expected to grant budgets
 far below that threshold, making the rejection unreachable in
-consensus (a Phase 3 question, recorded in the VM record's D7 entry).
+consensus (a Phase 4 question, recorded in the VM record's D7 entry).
 
 ## 3. Evaluation
 
@@ -159,7 +159,7 @@ equals `max_cost` exactly succeeds. Exceeding it raises
 
 `max_cost` is a nonnegative integer. In the consensus interface it is
 an unsigned 64-bit quantity, derived from transaction weight in the
-Phase 3 mapping. The Python reference accepts any nonnegative Python
+Phase 4 mapping. The Python reference accepts any nonnegative Python
 integer and does not enforce the 64-bit bound, the hardened
 implementation will. A budget of zero is a real budget: every program
 charges at least once before completing, so no program succeeds under
