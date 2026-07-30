@@ -92,7 +92,7 @@ interaction documented.
 ### 5. Per-condition costing
 
 TODO. Including the superlinear `CREATE_COIN` pricing stub (design
-obligation 2). Tuning is data-driven in Phase 3.
+obligation 2). Tuning is data-driven in Phase 4.
 
 ### 6. Reserved conditions
 

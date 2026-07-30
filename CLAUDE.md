@@ -79,11 +79,13 @@ In practice this means:
    (`spec/MATCHING.md`) have no external reference. They get
    property-based invariants and theft-bug regression vectors before any
    feature work builds on them.
-5. **Nothing in Phases 0 to 2 depends on the hardened-implementation
+5. **Nothing in Phases 0 to 3 depends on the hardened-implementation
    language.** The language is decided: C++ (decision by Evan,
    2026-07-29, recorded in `docs/execution-plan.md`). The remaining
-   integration questions stay at the Phase 3 gate, and no Phase 0 to 2
-   artifact may assume the language.
+   integration questions stay at the Phase 4 gate, and no Phase 0 to 3
+   artifact may assume the language. Phase 3 (the authoring language
+   and compiler, added 2026-07-30) is tooling, not consensus, and is
+   covered by the same independence rule.
 
 ## Consensus mindset
 

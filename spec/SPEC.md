@@ -18,7 +18,7 @@ condition list, conditions are matched against the transaction context.
 ## 2. Leaf version and commitment
 
 TODO: new tapleaf version number, puzzle hash commitment scheme, whether
-standard-layer shorthands are part of the commitment scheme (Phase 3
+standard-layer shorthands are part of the commitment scheme (Phase 4
 experiment feeds this).
 
 ## 3. Witness structure
