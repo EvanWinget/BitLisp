@@ -105,6 +105,11 @@
 **Reference material for this phase (recorded 2026-07-29, per Evan):**
 
 - **Condition costing has five years of deployed CLVM learnings: read them before designing ours.** Chia's deployed per-condition costs are the baseline, and CHIP-0049 (the Chia 3.0 hard fork, in review) revises them: a base cost of 500 per condition beyond the first 100 of each coin spend, announcement conditions always priced, and the hard 1,024-announcement cap removed in favor of pricing. That direction is consistent with obligation 2's pricing approach, applied by the team with production data. Two decisions to make deliberately rather than inherit: whether a per-spend free tier (their first-100 carve-out) is acceptable or a cliff we reject, and which precedent prices our tx-scoped SEND/RECV_MESSAGE conditions. Ours port Chia's SEND_MESSAGE and RECEIVE_MESSAGE (CHIP-0025), the announcements' successors, and CHIP-0049's always-priced exception enumerates only the four announcement codes, leaving Chia's own message conditions on the free tier, so the precedent is split and must be chosen, not assumed.
+- **Taproot output construction: out of the VM (ratified), the condition-layer form open (decide in CONDITIONS.md).** bllsh ships `secp256k1_muladd`, a general EC linear-combination operator, largely so programs can verify taproot tweaks in-language. BitLisp will meet the same need when covenant recursion constructs a successor coin whose scriptPubKey is taproot(internal key, tree). The conditions-architecture candidate is a condition form that commits to the taproot components and lets the one hardened validator compute the tweak natively, keeping EC arithmetic out of the consensus VM. Decide the form when CONDITIONS.md v0 is drafted, and record the muladd decline rationale next to it (the D2 entry in `docs/vm-record.md` already records the v0 decline).
+
+**Done when:** invariant suite green over large generated corpora; adversarial corpus ≥ 50 hand-designed vectors each citing a MATCHING.md rule; a reviewer can read MATCHING.md alone and predict every vector's outcome.
+
+**Claude Code fit:** strong for implementation + invariant/corpus generation; **design decisions stay in Fable 5 sessions** (this chat) and land in spec prose before Claude Code touches them. Session pattern: Fable 5 designs a matching rule → spec commit → Claude Code implements + generates vectors → Fable 5 reviews divergence reports.
 
 ---
 
@@ -123,11 +128,6 @@
 **Done when:** all four benchmark puzzles compile, run on the reference VM, and are pinned as vectors, the compiler test suite is green in CI, and a language reference doc exists that a puzzle author can use without reading the compiler.
 
 **Claude Code fit:** strong. Parser, macro expander, and code emitter are mechanical and test-first. Language-design decisions stay in Fable 5 sessions and land in the language reference doc before Claude Code implements them, the same boundary the spec provides for consensus code.
-- **Taproot output construction: out of the VM (ratified), the condition-layer form open (decide in CONDITIONS.md).** bllsh ships `secp256k1_muladd`, a general EC linear-combination operator, largely so programs can verify taproot tweaks in-language. BitLisp will meet the same need when covenant recursion constructs a successor coin whose scriptPubKey is taproot(internal key, tree). The conditions-architecture candidate is a condition form that commits to the taproot components and lets the one hardened validator compute the tweak natively, keeping EC arithmetic out of the consensus VM. Decide the form when CONDITIONS.md v0 is drafted, and record the muladd decline rationale next to it (the D2 entry in `docs/vm-record.md` already records the v0 decline).
-
-**Done when:** invariant suite green over large generated corpora; adversarial corpus ≥ 50 hand-designed vectors each citing a MATCHING.md rule; a reviewer can read MATCHING.md alone and predict every vector's outcome.
-
-**Claude Code fit:** strong for implementation + invariant/corpus generation; **design decisions stay in Fable 5 sessions** (this chat) and land in spec prose before Claude Code touches them. Session pattern: Fable 5 designs a matching rule → spec commit → Claude Code implements + generates vectors → Fable 5 reviews divergence reports.
 
 ---
 
