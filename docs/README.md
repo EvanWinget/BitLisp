@@ -5,6 +5,9 @@
   the evaluation doc this repo executes against. The section 7 design
   obligations and the section 8 confidence table are citable from spec
   and CLAUDE.md.
+- [vm-record.md](vm-record.md): the VM record behind spec/VM.md, the
+  divergence table, the oracle provenance, and the design decision
+  record. Cited by CLAUDE.md ground rule 3.
 - [opcode-comparison.md](opcode-comparison.md): informative side-by-side
   of the CLVM, bllsh, and BitLisp operator sets.
 - Essay drafts land here in Phase 4.
