@@ -16,12 +16,12 @@ consensus-ready. The phased plan is in
 
 | Path | Contents |
 | --- | --- |
-| `spec/` | The specification. `SPEC.md` (architecture), `VM.md` (evaluator + divergence table), `CONDITIONS.md` (condition vocabulary), `MATCHING.md` (tx matching rules), `COSTS.md` (cost model) |
+| `spec/` | The specification. `SPEC.md` (architecture), `VM.md` (evaluator), `CONDITIONS.md` (condition vocabulary), `MATCHING.md` (tx matching rules), `COSTS.md` (cost model) |
 | `python/bitlisp/` | Python reference implementation, the executable spec artifact |
 | `vectors/` | Test vector corpus: `vm/`, `conditions/`, `matching/`, plus `upstream/` for vendored Chia vectors |
 | `tools/` | Vector runner, corpus generators, measurement tooling |
 | `ci/` | Lint tooling with pinned versions |
-| `docs/` | Evaluation doc and essay drafts |
+| `docs/` | Evaluation doc, execution plan, the VM record (divergence table, oracle provenance, design decisions), essay drafts |
 
 ## Running the suite
 

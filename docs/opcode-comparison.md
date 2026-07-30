@@ -9,7 +9,7 @@ Sources, as read on 2026-07-29:
 
 - **CLVM**: the consensus operator set as dispatched by the pinned
   consensus oracle `chia-rs` 0.46.0 (upstream commit `7d487907`,
-  provenance in spec/VM.md section 7), cross-read against the
+  provenance in [vm-record.md](vm-record.md)), cross-read against the
   `clvm_rs` dispatch table in `references/`. Flag-gated and
   guard-only operators are marked.
 - **bllsh**: Anthony Towns' bll implementation,
@@ -154,8 +154,8 @@ In BitLisp that surface belongs to
   sits on 0x3f with upstream's own opcode, semantics, and cost
   constants, adopted while the operator is still flag-gated there so
   the two converge when Chia's 3.0 fork activates. Every removal and
-  addition has a rationale row in the divergence table, spec/VM.md
-  section 6.
+  addition has a rationale row in the divergence table in
+  [vm-record.md](vm-record.md).
 - **bllsh relative to CLVM** reworks the core rather than curating
   it: division is gone, the two shifts collapse into one operator,
   bitwise moves from integers to byte strings, list construction
@@ -165,7 +165,8 @@ In BitLisp that surface belongs to
   verification over secp256k1. BitLisp's `secp_verify` follows
   bllsh's `bip340_verify` precedent for tri-state semantics (empty
   signature returns nil, invalid signature raises), a debt recorded
-  in the D2 decision record. CLVM is the outlier with raise-only
+  in the D2 entry of [vm-record.md](vm-record.md). CLVM is the
+  outlier with raise-only
   ECDSA.
 - **What only BitLisp has** is mostly not visible in an opcode
   table: the closed operator set, strict canonical deserialization,

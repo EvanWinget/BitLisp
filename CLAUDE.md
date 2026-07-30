@@ -59,12 +59,16 @@ In practice this means:
 
 1. **Spec before code.** No consensus-relevant behavior lands in
    `python/bitlisp/` without a section in `spec/` it can cite. Every PR
-   touching semantics references its spec section.
+   touching semantics references its spec section. The spec states
+   behavior only, and stays complete enough on its own to predict
+   every vector's outcome. Rationale, oracle provenance, and decision
+   records live in `docs/` (for the VM, `docs/vm-record.md`).
 2. **Vectors are the source of truth between sessions.** Sessions are
    stateless, the vector corpus is not. Any behavior worth keeping becomes
    a vector in `vectors/` the same day.
 3. **Divergence is documented, never silent.** Anywhere BitLisp differs
-   from CLVM, the divergence table in `spec/VM.md` says so and why.
+   from CLVM, the divergence table in `docs/vm-record.md` says so and
+   why.
 4. **The novel layer gets adversarial treatment first.** The matching rules
    (`spec/MATCHING.md`) have no external reference. They get
    property-based invariants and theft-bug regression vectors before any
@@ -94,7 +98,7 @@ a spec decision rather than picking a plausible reading.
   pinned in `pyproject.toml` under the `oracles` extra, and, where no
   usable wheel exists, snapshots vendored verbatim from tagged
   upstream releases (the Bitcoin Core test framework under
-  `tools/oracle/`). Provenance is recorded in `spec/VM.md`.
+  `tools/oracle/`). Provenance is recorded in `docs/vm-record.md`.
 - Chia test vectors are vendored as data into `vectors/upstream/` with
   provenance headers. CI never fetches from the network.
 - `tools/fetch-references.sh` clones upstream repos into git-ignored

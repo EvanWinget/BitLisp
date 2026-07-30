@@ -44,7 +44,8 @@ obligation 2). Tuning is data-driven in Phase 3.
 
 TODO. Condition codes outside the assigned vocabulary. This rule is
 the designated forward-compatibility mechanism for already-deployed
-coins (VM.md section 8, D3 ratification): a reserved code is
+coins (the D3 ratification in
+[docs/vm-record.md](../docs/vm-record.md)): a reserved code is
 accepted unenforced at a fixed cost so a later soft fork can assign
 it real semantics, the OP_NOP path. The rule must fix which code
 ranges are reserved versus invalid, the cost old and new validators
