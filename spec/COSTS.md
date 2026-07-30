@@ -271,7 +271,9 @@ fixed by its shape checks, and no malloc because every result is a
 shared constant. The constant is PROVISIONAL: the operator has no
 CLVM oracle to inherit from, so the value adopts the magnitude of the
 consensus oracle's ECDSA verify pending the Phase 3 measurement
-recorded in VM.md section 8. The empty-signature branch charges the
+recorded in the VM record's D2 entry
+([docs/vm-record.md](../docs/vm-record.md)). The
+empty-signature branch charges the
 same flat cost in v0, with a cheaper price explicitly left as a
 Phase 3 question there.
 
