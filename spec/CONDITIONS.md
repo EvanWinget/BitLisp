@@ -81,6 +81,12 @@ under MATCHING.md rule 1: k conditions carrying identical content
 require k distinct output slots. Two identical CREATE_COIN conditions
 from one input are two claims.
 
+The `amount` is part of the demanded content, not a debit from the
+spending input. Matching never tracks which input's value funds which
+slot. Value conservation is enforced transaction-wide by Bitcoin's
+base rules, and an input's own value is unrelated to the amounts its
+conditions claim.
+
 **Arguments.** `scriptPubKey` is an atom of 1 to 10,000 bytes. The
 empty atom is rejected (`bad_condition_arg`). `amount` is a minimally
 encoded integer with 0 <= amount <= 2,100,000,000,000,000 (MAX_MONEY,
