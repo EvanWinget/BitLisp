@@ -68,7 +68,9 @@ In practice this means:
    a vector in `vectors/` the same day.
 3. **Divergence is documented, never silent.** Anywhere BitLisp differs
    from CLVM, the divergence table in `docs/vm-record.md` says so and
-   why.
+   why. Anywhere the condition layer differs from Chia's deployed
+   condition semantics, the table in `docs/condition-record.md` says
+   so and why.
 4. **The novel layer gets adversarial treatment first.** The matching rules
    (`spec/MATCHING.md`) have no external reference. They get
    property-based invariants and theft-bug regression vectors before any

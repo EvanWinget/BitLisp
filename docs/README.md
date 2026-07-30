@@ -8,6 +8,10 @@
 - [vm-record.md](vm-record.md): the VM record behind spec/VM.md, the
   divergence table, the oracle provenance, and the design decision
   record. Cited by CLAUDE.md ground rule 3.
+- [condition-record.md](condition-record.md): the Phase 2 counterpart
+  behind spec/CONDITIONS.md and spec/MATCHING.md, the
+  divergence-from-Chia table, reference provenance, decision record,
+  and the novel-layer register. Cited by CLAUDE.md ground rule 3.
 - [opcode-comparison.md](opcode-comparison.md): informative side-by-side
   of the CLVM, bllsh, and BitLisp operator sets.
 - Essay drafts land here in Phase 4.
