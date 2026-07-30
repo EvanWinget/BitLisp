@@ -76,13 +76,43 @@ def all_claims(input_claims):
 
 @given(input_specs, output_lists)
 def test_validity_is_multiset_containment(input_claims, outputs):
-    """Rule 1's spec statement, restated independently: valid exactly
-    when no content is claimed more times than slots carry it."""
+    """Rule 1's counting formulation, restated. This restates the
+    matcher's own algorithm, so it pins the implementation against
+    drift but cannot judge the algorithm. The assignment-search test
+    below is the independent judge."""
     tx = build_tx(input_claims, outputs)
     claimed = Counter(all_claims(input_claims))
     slots = Counter(outputs)
     expected = all(count <= slots[content] for content, count in claimed.items())
     assert is_valid(tx) == expected
+
+
+def _injective_assignment_exists(claims, slots):
+    """Literal backtracking search for an injective claim-to-slot
+    assignment, trying assignments one at a time. Deliberately naive
+    and deliberately sharing no code or idea with the matcher's
+    counting: this is the other formulation of rule 1, implemented as
+    written."""
+    if not claims:
+        return True
+    first, rest = claims[0], claims[1:]
+    for i, slot in enumerate(slots):
+        if slot == first:
+            if _injective_assignment_exists(rest, slots[:i] + slots[i + 1 :]):
+                return True
+    return False
+
+
+@given(input_specs, output_lists)
+def test_counting_agrees_with_assignment_search(input_claims, outputs):
+    """Rule 1 states two formulations and calls them equivalent:
+    multiset containment (what the matcher computes) and the
+    existence of an injective assignment (what this search computes).
+    They must never disagree."""
+    tx = build_tx(input_claims, outputs)
+    assert is_valid(tx) == _injective_assignment_exists(
+        all_claims(input_claims), list(outputs)
+    )
 
 
 @given(input_specs, output_lists, st.randoms(use_true_random=False))
