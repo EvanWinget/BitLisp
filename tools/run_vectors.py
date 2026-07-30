@@ -121,25 +121,210 @@ def run_vm_case(case):
         raise VectorError(f"expected {expect}, got {outcome}")
 
 
-def run_vm(envelope, path):
-    names = set()
-    for index, case in enumerate(envelope["cases"]):
-        name = case.get("name", f"case {index}")
-        if name in names:
-            raise VectorError(f"{path}: duplicate case name {name!r}")
-        names.add(name)
-        try:
-            run_vm_case(case)
-        except VectorError as exc:
-            raise VectorError(f"{path}: {name}: {exc}") from None
-        except (KeyError, ValueError) as exc:
-            raise VectorError(f"{path}: {name}: malformed case: {exc!r}") from None
+def _condition_json(cond):
+    """The pinned JSON form of one parsed condition."""
+    from bitlisp import serialize
+    from bitlisp.conditions import CreateCoin
+
+    if isinstance(cond, CreateCoin):
+        return {
+            "opcode": cond.opcode,
+            "script_pubkey": cond.script_pubkey.hex(),
+            "amount": cond.amount,
+        }
+    return {
+        "opcode": cond.opcode,
+        "cost": cond.cost,
+        "args": [serialize(arg).hex() for arg in cond.args],
+    }
 
 
-# Suite runners land with their implementations: conditions and
-# matching in Phase 2. Each takes (envelope, path) and raises
-# VectorError on the first failing case.
-RUNNERS = {"vm": run_vm}
+def run_conditions_case(case):
+    """One conditions case: parse a serialized condition-list node.
+
+    Case shape, closed like the envelope:
+        {
+            "name": "<unique within the file>",
+            "conditions": "<hex, strict canonical serialization>",
+            "expect": {"parsed": [<condition JSON>]}
+                      or {"error": "<bitlisp error code>"}
+        }
+
+    Condition JSON is {"opcode", "script_pubkey", "amount"} for
+    CREATE_COIN and {"opcode", "cost", "args": [<hex node>]} for
+    reserved conditions.
+    """
+    from bitlisp import BitLispError, deserialize, parse_conditions
+    from bitlisp.errors import CODES
+
+    required = {"name", "conditions", "expect"}
+    keys = set(case)
+    if missing := required - keys:
+        raise VectorError(f"missing keys {sorted(missing)}")
+    if extra := keys - required:
+        raise VectorError(f"unknown keys {sorted(extra)}")
+    expect = case["expect"]
+    if not isinstance(expect, dict) or set(expect) not in ({"parsed"}, {"error"}):
+        raise VectorError("expect must be exactly {parsed} or {error}")
+    if "error" in expect and expect["error"] not in CODES:
+        raise VectorError(f"unknown expected error code {expect['error']!r}")
+    try:
+        node = deserialize(bytes.fromhex(case["conditions"]))
+    except BitLispError as exc:
+        raise VectorError(f"conditions field does not deserialize: {exc}") from None
+    try:
+        parsed = parse_conditions(node)
+        outcome = {"parsed": [_condition_json(c) for c in parsed]}
+    except BitLispError as exc:
+        outcome = {"error": exc.code}
+    if outcome != expect:
+        raise VectorError(f"expected {expect}, got {outcome}")
+
+
+def _tx_from_json(obj):
+    """Builds the transaction model from a matching case's tx object.
+
+    Parses each input's optional serialized condition list. A
+    BitLispError from condition parsing is a case outcome (the spend
+    is invalid), so it propagates to the caller. Everything else
+    wrong with the tx object is a malformed vector: unknown or
+    missing keys, a conditions field that does not deserialize (the
+    matching stage receives already-materialized evaluation results,
+    so a serialization failure is not a possible outcome here), and
+    ValueError from any model constructor."""
+    from bitlisp import (
+        BitLispError,
+        Transaction,
+        TxInput,
+        TxOutput,
+        deserialize,
+        parse_conditions,
+    )
+
+    required = {"version", "locktime", "inputs", "outputs"}
+    keys = set(obj)
+    if missing := required - keys:
+        raise VectorError(f"tx missing keys {sorted(missing)}")
+    if extra := keys - required:
+        raise VectorError(f"tx unknown keys {sorted(extra)}")
+    decoded_inputs = []
+    for entry in obj["inputs"]:
+        entry_required = {"txid", "index", "script_pubkey", "amount"}
+        entry_keys = set(entry)
+        if missing := entry_required - entry_keys:
+            raise VectorError(f"input missing keys {sorted(missing)}")
+        if extra := entry_keys - entry_required - {"sequence", "conditions"}:
+            raise VectorError(f"input unknown keys {sorted(extra)}")
+        conditions = None
+        if "conditions" in entry:
+            try:
+                node = deserialize(bytes.fromhex(entry["conditions"]))
+            except BitLispError as exc:
+                raise VectorError(
+                    f"conditions field does not deserialize: {exc}"
+                ) from None
+            conditions = parse_conditions(node)
+        decoded_inputs.append((entry, conditions))
+    for entry in obj["outputs"]:
+        entry_keys = set(entry)
+        if missing := {"script_pubkey", "amount"} - entry_keys:
+            raise VectorError(f"output missing keys {sorted(missing)}")
+        if extra := entry_keys - {"script_pubkey", "amount"}:
+            raise VectorError(f"output unknown keys {sorted(extra)}")
+    try:
+        return Transaction(
+            version=obj["version"],
+            locktime=obj["locktime"],
+            inputs=tuple(
+                TxInput(
+                    txid=bytes.fromhex(entry["txid"]),
+                    index=entry["index"],
+                    script_pubkey=bytes.fromhex(entry["script_pubkey"]),
+                    amount=entry["amount"],
+                    sequence=entry.get("sequence", 0xFFFFFFFF),
+                    conditions=conditions,
+                )
+                for entry, conditions in decoded_inputs
+            ),
+            outputs=tuple(
+                TxOutput(bytes.fromhex(o["script_pubkey"]), o["amount"])
+                for o in obj["outputs"]
+            ),
+        )
+    except ValueError as exc:
+        raise VectorError(f"tx violates the model's base rules: {exc}") from None
+
+
+def run_matching_case(case):
+    """One matching case: validate a transaction's condition lists.
+
+    Case shape, closed like the envelope:
+        {
+            "name": "<unique within the file>",
+            "tx": {
+                "version": <int>, "locktime": <int>,
+                "inputs": [{"txid": "<hex>", "index": <int>,
+                            "script_pubkey": "<hex>", "amount": <int>,
+                            "sequence": <int, optional, default 0xffffffff>,
+                            "conditions": "<hex node, optional>"}],
+                "outputs": [{"script_pubkey": "<hex>", "amount": <int>}]
+            },
+            "expect": {"valid": true} or {"error": "<bitlisp error code>"}
+        }
+
+    An input without a conditions key is a non-BitLisp input. An
+    input with one is a BitLisp input whose puzzle evaluation
+    produced that condition list.
+    """
+    from bitlisp import BitLispError, validate_transaction
+    from bitlisp.errors import CODES
+
+    required = {"name", "tx", "expect"}
+    keys = set(case)
+    if missing := required - keys:
+        raise VectorError(f"missing keys {sorted(missing)}")
+    if extra := keys - required:
+        raise VectorError(f"unknown keys {sorted(extra)}")
+    expect = case["expect"]
+    if not isinstance(expect, dict) or set(expect) not in ({"valid"}, {"error"}):
+        raise VectorError("expect must be exactly {valid} or {error}")
+    if "valid" in expect and expect["valid"] is not True:
+        raise VectorError("expect.valid must be true, invalidity pins an error code")
+    if "error" in expect and expect["error"] not in CODES:
+        raise VectorError(f"unknown expected error code {expect['error']!r}")
+    try:
+        tx = _tx_from_json(case["tx"])
+        validate_transaction(tx)
+        outcome = {"valid": True}
+    except BitLispError as exc:
+        outcome = {"error": exc.code}
+    if outcome != expect:
+        raise VectorError(f"expected {expect}, got {outcome}")
+
+
+def _make_suite_runner(case_runner):
+    def run_suite(envelope, path):
+        names = set()
+        for index, case in enumerate(envelope["cases"]):
+            name = case.get("name", f"case {index}")
+            if name in names:
+                raise VectorError(f"{path}: duplicate case name {name!r}")
+            names.add(name)
+            try:
+                case_runner(case)
+            except VectorError as exc:
+                raise VectorError(f"{path}: {name}: {exc}") from None
+            except (KeyError, ValueError) as exc:
+                raise VectorError(f"{path}: {name}: malformed case: {exc!r}") from None
+
+    return run_suite
+
+
+RUNNERS = {
+    "vm": _make_suite_runner(run_vm_case),
+    "conditions": _make_suite_runner(run_conditions_case),
+    "matching": _make_suite_runner(run_matching_case),
+}
 
 
 def run_file(path):
