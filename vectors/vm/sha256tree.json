@@ -1,7 +1,7 @@
 {
  "schema": "bitlisp-vector-v0",
  "suite": "vm",
- "spec": "VM.md sections 4 and 6 (divergence D9) and COSTS.md sections 1 and 8 (sha256tree)",
+ "spec": "VM.md section 4 (divergence D9) and COSTS.md sections 1 and 8 (sha256tree)",
  "cases": [
   {
    "name": "nil_leaf_worked_example",

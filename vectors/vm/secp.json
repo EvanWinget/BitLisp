@@ -1,7 +1,7 @@
 {
  "schema": "bitlisp-vector-v0",
  "suite": "vm",
- "spec": "VM.md sections 4, 5, and 6 and COSTS.md section 8 (crypto family, secp_verify, divergence D2)",
+ "spec": "VM.md sections 4 and 5 and COSTS.md section 8 (crypto family, secp_verify, divergence D2)",
  "cases": [
   {
    "name": "bip340_0_valid",
