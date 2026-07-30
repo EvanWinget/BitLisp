@@ -112,7 +112,18 @@ Section 4 registers the rules that have no external reference at all.
    out of consensus. The spec makes the restriction normative text
    so relaxing it requires amending visible prose plus a recorded
    decision here.
-5. **Invariant direction correction.** The Phase 0 stub stated that
+5. **Curation notes stay in the spec.** RATIFIED (decision by Evan,
+   2026-07-29). The Phase 0 stub planned a curation note on every
+   vocabulary entry, and the later spec-purity rule (spec states
+   behavior only, rationale in docs) arguably forbade it. Resolved
+   in favor of the notes: obligation 4 wants the curation visible
+   where the vocabulary is, so entries keep a brief note and this
+   record keeps the full rationale. CLAUDE.md ground rule 1 records
+   the exception.
+6. **RESERVED_COST_FLOOR stays at 500.** RATIFIED (decision by Evan,
+   2026-07-29). The CHIP-0049 per-condition base cost stands as the
+   provisional floor, revisited when rule 5's costing design lands.
+7. **Invariant direction correction.** The Phase 0 stub stated that
    removing a condition never turns an invalid transaction valid.
    Under rule 1 that is false (removing one of two over-claims
    restores validity) and the true property is the reverse
