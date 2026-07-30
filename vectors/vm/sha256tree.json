@@ -1,0 +1,194 @@
+{
+ "schema": "bitlisp-vector-v0",
+ "suite": "vm",
+ "spec": "VM.md sections 4 and 6 (divergence D9) and COSTS.md sections 1 and 8 (sha256tree)",
+ "cases": [
+  {
+   "name": "nil_leaf_worked_example",
+   "program": "ff3fffff018080",
+   "env": "80",
+   "expect": {
+    "result": "a04bf5122f344554c53bde2ebb8cd2b7e3d1600ad631c385a5d7cce23c7785459a",
+    "cost": 613
+   }
+  },
+  {
+   "name": "list_worked_example",
+   "program": "ff3fffff01ff826162ff8263648080",
+   "env": "80",
+   "expect": {
+    "result": "a0cc4dfd790f10aa8891ba1f939ad9749f67216b0da1392bf005faa5d0d3f7c765",
+    "cost": 1545
+   }
+  },
+  {
+   "name": "one_byte_atom",
+   "program": "ff3fffff010780",
+   "env": "80",
+   "expect": {
+    "result": "a0ca6c6588fa01171b200740344d354e8548b7470061fb32a34f4feee470ec281f",
+    "cost": 615
+   }
+  },
+  {
+   "name": "thirty_three_byte_atom",
+   "program": "ff3fffff01a1000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f2080",
+   "env": "80",
+   "expect": {
+    "result": "a0f3bda57ba54ba36b0e594d62929eabbb4ebff19ed7b7ac59ea5eb45b8eeda2de",
+    "cost": 679
+   }
+  },
+  {
+   "name": "redundant_encoding_two_bytes",
+   "program": "ff3fffff0182000280",
+   "env": "80",
+   "expect": {
+    "result": "a016305a6b2292e931665a34089864ee3fcc24171c81551f152cf4d1db0dd6122d",
+    "cost": 617
+   }
+  },
+  {
+   "name": "minimal_encoding_one_byte",
+   "program": "ff3fffff010280",
+   "env": "80",
+   "expect": {
+    "result": "a0a12871fee210fb8619291eaea194581cbd2531e4b23759d225f6806923f63222",
+    "cost": 615
+   }
+  },
+  {
+   "name": "simple_pair",
+   "program": "ff3fffff01ff616280",
+   "env": "80",
+   "expect": {
+    "result": "a0ddf7d5e743e693e9a9bde3c22082fc8776c215616943488c9ae75affcd91dbca",
+    "cost": 1079
+   }
+  },
+  {
+   "name": "swapped_pair_differs",
+   "program": "ff3fffff01ff626180",
+   "env": "80",
+   "expect": {
+    "result": "a021c95f199fc30b38419f654eea4e6d87a59f774e46657c7ecd9757560eb7ba7f",
+    "cost": 1079
+   }
+  },
+  {
+   "name": "nested_left",
+   "program": "ff3fffff01ffff61626380",
+   "env": "80",
+   "expect": {
+    "result": "a0890c749cefaeb80d8fd17954bff3b34ce217f8a30af1a8b035e015ecbf3a78b1",
+    "cost": 1543
+   }
+  },
+  {
+   "name": "nested_right",
+   "program": "ff3fffff01ff61ff626380",
+   "env": "80",
+   "expect": {
+    "result": "a0d08f3f683951f120e10a4e6c021ebd5e5cd3e3855db2b7208d87c9992771affb",
+    "cost": 1543
+   }
+  },
+  {
+   "name": "argument_from_env_path",
+   "program": "ff3fff0180",
+   "env": "ff826162ff82636480",
+   "expect": {
+    "result": "a0cc4dfd790f10aa8891ba1f939ad9749f67216b0da1392bf005faa5d0d3f7c765",
+    "cost": 1569
+   }
+  },
+  {
+   "name": "composed_hash_of_hash",
+   "program": "ff3fffff3fffff01836162638080",
+   "env": "80",
+   "expect": {
+    "result": "a06c669f95b6ad7dc40e773854d5f017bd5e870f739a49c2ac2f743026dfa4a6c0",
+    "cost": 1276
+   }
+  },
+  {
+   "name": "shared_subtree_charged_twice",
+   "program": "ff3fffff04ff01ff018080",
+   "env": "ff826162826364",
+   "expect": {
+    "result": "a0085cc3e6b2f9dd204ce8845a59420d8874b86b3ff4bb28a65f0c4d503656852e",
+    "cost": 2134
+   }
+  },
+  {
+   "name": "budget_exact_succeeds",
+   "program": "ff3fffff01ff826162ff8263648080",
+   "env": "80",
+   "max_cost": 1545,
+   "expect": {
+    "result": "a0cc4dfd790f10aa8891ba1f939ad9749f67216b0da1392bf005faa5d0d3f7c765",
+    "cost": 1545
+   }
+  },
+  {
+   "name": "budget_one_short_cost_exceeded",
+   "program": "ff3fffff01ff826162ff8263648080",
+   "env": "80",
+   "max_cost": 1544,
+   "expect": {
+    "error": "cost_exceeded"
+   }
+  },
+  {
+   "name": "zero_args_wrong_arg_count",
+   "program": "ff3f80",
+   "env": "80",
+   "expect": {
+    "error": "wrong_arg_count"
+   }
+  },
+  {
+   "name": "two_args_wrong_arg_count",
+   "program": "ff3fffff0161ffff016280",
+   "env": "80",
+   "expect": {
+    "error": "wrong_arg_count"
+   }
+  },
+  {
+   "name": "arity_check_wins_over_budget",
+   "program": "ff3f80",
+   "env": "80",
+   "max_cost": 1,
+   "expect": {
+    "error": "wrong_arg_count"
+   }
+  },
+  {
+   "name": "zero_budget_dispatch_bursts",
+   "program": "ff3f80",
+   "env": "80",
+   "max_cost": 0,
+   "expect": {
+    "error": "cost_exceeded"
+   }
+  },
+  {
+   "name": "raising_argument_wins",
+   "program": "ff3fffff088080",
+   "env": "80",
+   "expect": {
+    "error": "user_raise"
+   }
+  },
+  {
+   "name": "exponential_shared_env_fails_fast",
+   "program": "ff3fffff02ffff01ff02ffff01ff02ffff01ff02ffff01ff02ffff01ff02ffff01ff02ffff01ff02ffff01ff02ffff01ff02ffff01ff02ffff01ff02ffff01ff02ffff01ff02ffff01ff02ffff01ff02ffff01ff02ffff01ff02ffff01ff02ffff01ff02ffff01ff02ffff01ff02ffff01ff02ffff01ff02ffff01ff02ffff01ff02ffff01ff02ffff01ff02ffff01ff02ffff01ff02ffff01ff02ffff01ff02ffff01ff02ffff01ff02ffff01ff02ffff01ff02ffff01ff02ffff01ff02ffff01ff02ffff01ff02ffff0101ffff04ff01ff018080ffff04ff01ff018080ffff04ff01ff018080ffff04ff01ff018080ffff04ff01ff018080ffff04ff01ff018080ffff04ff01ff018080ffff04ff01ff018080ffff04ff01ff018080ffff04ff01ff018080ffff04ff01ff018080ffff04ff01ff018080ffff04ff01ff018080ffff04ff01ff018080ffff04ff01ff018080ffff04ff01ff018080ffff04ff01ff018080ffff04ff01ff018080ffff04ff01ff018080ffff04ff01ff018080ffff04ff01ff018080ffff04ff01ff018080ffff04ff01ff018080ffff04ff01ff018080ffff04ff01ff018080ffff04ff01ff018080ffff04ff01ff018080ffff04ff01ff018080ffff04ff01ff018080ffff04ff01ff018080ffff04ff01ff018080ffff04ff01ff018080ffff04ff01ff018080ffff04ff01ff018080ffff04ff01ff018080ffff04ff01ff018080ffff04ff01ff018080ffff04ff01ff018080ffff04ff01ff018080ffff04ff01ff01808080",
+   "env": "8473656564",
+   "max_cost": 500000,
+   "expect": {
+    "error": "cost_exceeded"
+   }
+  }
+ ]
+}

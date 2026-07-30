@@ -52,8 +52,10 @@ interleaving rules they pin are in `spec/COSTS.md` section 1.
 Every intersection case was cross-checked against the consensus oracle
 (`chia-rs`, flags 0) when it was written. Divergence cases
 (`vm/serialize.json` strictness, unknown and pair operators in
-`vm/dispatch.json`) pin BitLisp behavior that intentionally differs,
-each cites its divergence row.
+`vm/dispatch.json`, and all of `vm/sha256tree.json`, whose success
+cases were cross-checked against the same wheel with its sha256tree
+release flag enabled) pin BitLisp behavior that intentionally
+differs, each cites its divergence row.
 
 Run the corpus with `python3 tools/run_vectors.py`. A vector file whose
 suite has no runner yet fails loudly rather than being skipped.

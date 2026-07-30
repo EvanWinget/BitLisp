@@ -91,3 +91,16 @@ jobs:
           echo "diff_secp seed: ${DIFF_SEED}"
           "${RUNNER_TEMP}/venv/bin/python" tools/diff_secp.py \
             --count 40 --seed "${DIFF_SEED}" --require-libsecp
+      - name: sha256tree differential, flag-gated oracle
+        # sha256tree sits outside the flags-0 intersection (divergence
+        # D9): the differential runs against the pinned wheel's
+        # flag-enabled operator, its tree_hash utility, and an
+        # in-language tree-hash program on both oracles at flags 0.
+        # Reproduce locally with
+        # tools/diff_sha256tree.py --count 400 --seed <printed seed>.
+        env:
+          DIFF_SEED: ${{ github.run_id }}
+        run: |
+          echo "diff_sha256tree seed: ${DIFF_SEED}"
+          "${RUNNER_TEMP}/venv/bin/python" tools/diff_sha256tree.py \
+            --count 400 --seed "${DIFF_SEED}"

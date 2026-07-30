@@ -122,6 +122,18 @@ with Phase 3 measurements.
     neither the empty-signature nil nor a verification outcome is
     ever reported when the budget cannot cover the charge, pinned by
     boundary vectors.
+  - `sha256tree`: the arity check precedes every charge. The base
+    cost accrues without a budget check and rides on the first
+    visited node's charge (every tree has at least one node). Then
+    one checked charge per visited node: a pair charges the pair
+    cost when the walk reaches it, an atom charges the per-byte cost
+    on its length plus one, the leaf tag byte. The traversal order
+    among nodes is not consensus-visible: the only error a walk
+    charge can raise is `cost_exceeded` and the total is
+    order-independent, so an implementation may walk in any order
+    provided it charges each node as the walk reaches it (the
+    soundness rule in section 8). The result's malloc is one final
+    checked charge after the walk.
 - Evaluation cost does not include deserialization. A per-byte cost on
   the serialized program belongs to the weight mapping (section 9).
 
@@ -246,6 +258,7 @@ Worked example, pinned by vectors: `(any (q . 1) (q . 2))` costs
 | --- | --- |
 | `sha256` | `87 + 134 * n_args + 2 * total_arg_bytes + malloc(result)` |
 | `secp_verify` | `1300000`, flat, no malloc (PROVISIONAL) |
+| `sha256tree` | `270 + 460 * n_pairs + 2 * (n_atoms + total_atom_bytes) + malloc(result)`, counting every visited node: a node the walk reaches twice counts twice |
 
 The sha256 result atom is always exactly 32 bytes, so its malloc is a
 flat 320 charged after the argument loop. Per-byte terms count
@@ -262,12 +275,41 @@ recorded in VM.md section 8. The empty-signature branch charges the
 same flat cost in v0, with a cheaper price explicitly left as a
 Phase 3 question there.
 
+`sha256tree`'s per-byte term prices each visited atom's actual bytes
+plus one, the leaf tag byte, at `sha256`'s 2 per byte. The pair
+constant 460 covers a pair node's own SHA-256 invocation, whose input
+is always the tag byte and two 32-byte child hashes. The result atom
+is always exactly 32 bytes, so its malloc is a flat 320 charged after
+the walk. The constants are the consensus oracle's own, carried
+behind its release flag (divergence D9), and every visited node
+counts: the walk follows structure without deduplicating sharing, so
+a subtree reachable twice is charged twice.
+
+`sha256tree`'s per-node charging is load-bearing for more than the
+error class at the budget boundary. Evaluation builds shared
+structure cheaply: `(c 1 1)` doubles the environment reachable from
+its result for one 50-cost cons, and k nested applies of that shape,
+a few hundred cost units each, reach 2^k visited nodes for build
+cost linear in k. The sharing is built by evaluation, never spelled
+in the witness, so canonical serialization is no defense. An
+implementation must charge each node as the walk reaches it and stop
+at `cost_exceeded`, doing exactly the budget's worth of hashing.
+Hashing the whole tree before charging does unbounded work under a
+small budget, a validation denial of service, the same hazard class
+as the copy-on-slice note in section 5.
+
 Worked examples, pinned by vectors: `(sha256 (q . "ab") (q . "cd"))`
 costs `20 + 20 + 1 + 87 + 134 * 2 + 2 * 4 + 320 = 724`, and a
 `secp_verify` application on three quoted arguments costs
 `20 * 3 + 1 + 1300000 = 1300061` when it returns, the same total for
 a valid signature and for an empty one. The failing path charges
 identically before it raises `secp_verify_failed`.
+
+`sha256tree` worked examples, pinned by vectors: `(sha256tree (q))`
+hashes nil at `20 + 1 + 270 + 2 * 1 + 320 = 613`, and
+`(sha256tree (q "ab" "cd"))` walks two pairs and three atoms holding
+four bytes for
+`20 + 1 + 270 + 460 * 2 + 2 * (3 + 4) + 320 = 1545`.
 
 ## 9. Weight mapping
 

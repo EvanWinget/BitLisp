@@ -67,7 +67,7 @@
 **Goal:** a minimal Python evaluator whose shared core is bit-for-bit CLVM-equivalent, with divergences enumerated.
 
 - [x] Implement the evaluator in `python/bitlisp/` — own code, not a wrapper (it is the spec artifact), small and boring: cons cells, serialization, operator dispatch, cost accounting.
-- [x] Define operator set in `VM.md`: CLVM core **minus** BLS operators, **plus** `secp_verify` (BIP340, assertive semantics deferred to condition layer). Divergence table with rationale per row.
+- [x] Define operator set in `VM.md`: CLVM core **minus** BLS operators, **plus** `secp_verify` (BIP340, assertive semantics deferred to condition layer). Divergence table with rationale per row. Amended after the Phase 1 close: `sha256tree` adopted 2026-07-29 (decision by Evan, VM.md divergence D9).
 - [x] Inherit the CLVM cost table (`COSTS.md`); weight-mapping section stubbed for Phase 3 data.
 - [x] **Differential harness v1** (`tools/diff_clvm.py`): run every intersection program through bitlisp-python AND `clvm`/`chia_rs`; assert identical (result, cost) or identical error class.
 - [x] Import Chia's official CLVM test vectors for the intersection; generate randomized program corpus (Claude Code task: corpus generator with size/depth knobs).
