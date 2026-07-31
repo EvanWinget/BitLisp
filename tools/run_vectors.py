@@ -124,7 +124,7 @@ def run_vm_case(case):
 def _condition_json(cond):
     """The pinned JSON form of one parsed condition."""
     from bitlisp import serialize
-    from bitlisp.conditions import CreateOutput
+    from bitlisp.conditions import CreateOutput, CreateOutputTaproot, Reserved
 
     if isinstance(cond, CreateOutput):
         return {
@@ -132,11 +132,21 @@ def _condition_json(cond):
             "script_pubkey": cond.script_pubkey.hex(),
             "amount": cond.amount,
         }
-    return {
-        "opcode": cond.opcode,
-        "cost": cond.cost,
-        "args": [serialize(arg).hex() for arg in cond.args],
-    }
+    if isinstance(cond, CreateOutputTaproot):
+        return {
+            "opcode": cond.opcode,
+            "internal_key": cond.internal_key.hex(),
+            "merkle_root": cond.merkle_root.hex(),
+            "amount": cond.amount,
+            "script_pubkey": cond.script_pubkey.hex(),
+        }
+    if isinstance(cond, Reserved):
+        return {
+            "opcode": cond.opcode,
+            "cost": cond.cost,
+            "args": [serialize(arg).hex() for arg in cond.args],
+        }
+    raise VectorError(f"no JSON form for condition type {type(cond).__name__}")
 
 
 def run_conditions_case(case):
@@ -151,8 +161,10 @@ def run_conditions_case(case):
         }
 
     Condition JSON is {"opcode", "script_pubkey", "amount"} for
-    CREATE_OUTPUT and {"opcode", "cost", "args": [<hex node>]} for
-    reserved conditions.
+    CREATE_OUTPUT, {"opcode", "internal_key", "merkle_root", "amount",
+    "script_pubkey"} for CREATE_OUTPUT_TAPROOT with script_pubkey the
+    derived taproot script, and {"opcode", "cost", "args":
+    [<hex node>]} for reserved conditions.
     """
     from bitlisp import BitLispError, deserialize, parse_conditions
     from bitlisp.errors import CODES

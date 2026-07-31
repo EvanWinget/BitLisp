@@ -69,9 +69,11 @@ differs, each cites its divergence row.
 
 `expect` is either `{"parsed": [...]}` with one JSON object per parsed
 condition (`{"opcode", "script_pubkey", "amount"}` for CREATE_OUTPUT,
-`{"opcode", "cost", "args": ["<hex node>"]}` for reserved conditions)
-or `{"error": "<code>"}`. Every rejection rule in CONDITIONS.md
-section 1 and MATCHING.md rule 6 has at least one case.
+`{"opcode", "internal_key", "merkle_root", "amount", "script_pubkey"}`
+for CREATE_OUTPUT_TAPROOT with `script_pubkey` the derived taproot
+script, `{"opcode", "cost", "args": ["<hex node>"]}` for reserved
+conditions) or `{"error": "<code>"}`. Every rejection rule in
+CONDITIONS.md section 1 and MATCHING.md rule 6 has at least one case.
 
 ## matching case shape
 

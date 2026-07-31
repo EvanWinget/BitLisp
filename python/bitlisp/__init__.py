@@ -6,7 +6,13 @@ differential testing against the consensus oracle where one exists,
 and by property-based invariants where none does.
 """
 
-from .conditions import MAX_MONEY, CreateOutput, Reserved, parse_conditions
+from .conditions import (
+    MAX_MONEY,
+    CreateOutput,
+    CreateOutputTaproot,
+    Reserved,
+    parse_conditions,
+)
 from .errors import CODES, BitLispError
 from .machine import run, run_serialized
 from .matching import validate_transaction
@@ -20,6 +26,7 @@ __all__ = [
     "BitLispError",
     "CODES",
     "CreateOutput",
+    "CreateOutputTaproot",
     "MAX_MONEY",
     "NIL",
     "Reserved",

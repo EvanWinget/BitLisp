@@ -1,13 +1,14 @@
-"""BIP 340 Schnorr signature verification over secp256k1.
+"""BIP 340 Schnorr verification and BIP 341 output-key derivation.
 
 Self-contained on purpose: the reference implementation is the spec
-artifact and carries no dependencies, so the curve arithmetic lives
-here as plain integer math in affine coordinates, the same shape the
-algorithm has in the BIP. The test suite cross-checks it against the
-official BIP 340 vectors and against Bitcoin Core's test-framework
-implementation of the same algorithm. This module favors
-reviewability over speed and does not run in constant time, which is
-safe for verification because every input it sees is public. A
+artifact and carries no dependencies, so the secp256k1 arithmetic
+lives here as plain integer math in affine coordinates, the same
+shape the algorithms have in the BIPs. The test suite cross-checks
+both jobs against the official BIP 340 and BIP 341 vectors and
+against Bitcoin Core's test-framework implementations. This module
+favors reviewability over speed and does not run in constant time,
+which is safe here because every input it sees, signatures under
+verification and taproot tweak inputs alike, is public. A
 consensus-facing implementation must use a hardened curve library
 instead.
 """
@@ -23,11 +24,56 @@ G = (
 )
 
 _CHALLENGE_TAG_HASH = hashlib.sha256(b"BIP0340/challenge").digest()
+_TWEAK_TAG_HASH = hashlib.sha256(b"TapTweak").digest()
 
 
 def _challenge_hash(data):
     # The BIP 340 tagged hash: the tag's digest twice, then the data.
     return hashlib.sha256(_CHALLENGE_TAG_HASH + _CHALLENGE_TAG_HASH + data).digest()
+
+
+def _tap_tweak_scalar(internal_key, merkle_root):
+    """The taproot tweak scalar: the TapTweak tagged hash of the
+    internal key followed by the merkle root, as an integer.
+
+    An empty merkle_root leaves the internal key alone, which is the
+    key-only tweak of an output committing to no script tree.
+    """
+    data = _TWEAK_TAG_HASH + _TWEAK_TAG_HASH + internal_key + merkle_root
+    return int.from_bytes(hashlib.sha256(data).digest(), "big")
+
+
+def _apply_tweak(point, t):
+    """The x-only bytes of point + t*G, or None.
+
+    None when t is not below the group order or the sum is the point
+    at infinity. Both are rejected rather than reduced or folded, so
+    a caller never sees a key derived from out-of-range inputs.
+    """
+    if t >= N:
+        return None
+    tweaked = point_add(point, point_mul(t, G))
+    if tweaked is None:
+        return None
+    return tweaked[0].to_bytes(32, "big")
+
+
+def taproot_output_key(internal_key, merkle_root):
+    """The 32-byte x-only taproot output key, or None.
+
+    internal_key is 32 bytes and merkle_root 0 or 32 bytes, widths
+    the caller guarantees. Every value defect (an internal key that
+    lifts to no curve point, a tweak scalar at or above the group
+    order, a tweaked point at infinity) returns None, never raises.
+    """
+    if len(internal_key) != 32 or len(merkle_root) not in (0, 32):
+        raise ValueError(
+            "taproot_output_key requires a 32-byte key and a 0- or 32-byte root"
+        )
+    point = lift_x(int.from_bytes(internal_key, "big"))
+    if point is None:
+        return None
+    return _apply_tweak(point, _tap_tweak_scalar(internal_key, merkle_root))
 
 
 def lift_x(x):
