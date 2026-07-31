@@ -1,6 +1,6 @@
 # BitLisp Conditions
 
-Status: in progress. Section 1 and the CREATE_COIN entry are
+Status: in progress. Section 1 and the CREATE_OUTPUT entry are
 normative. The remaining vocabulary v0 entries land across Phase 2,
 each with semantics, arguments, cost, matching rule reference, and a
 curation note per design obligation 4.
@@ -61,16 +61,16 @@ block without a vocabulary entry are invalid, not reserved:
 
 | opcode | condition |
 | --- | --- |
-| `0x01` | `CREATE_COIN` |
+| `0x01` | `CREATE_OUTPUT` |
 
 Planned entries, unassigned and invalid until their sections land:
-`CREATE_COIN_TAPROOT`, the secp `AGG_SIG` family with program-composed
+`CREATE_OUTPUT_TAPROOT`, the secp `AGG_SIG` family with program-composed
 messages, `ASSERT_HEIGHT_ABSOLUTE`, `ASSERT_HEIGHT_RELATIVE`,
 `ASSERT_SECONDS_ABSOLUTE`, `ASSERT_SECONDS_RELATIVE`, the `ASSERT_MY_*`
 family, `SEND_MESSAGE` and `RECV_MESSAGE` (transaction-scoped),
 `RESERVE_FEE`, `ASSERT_OUTPUT_COUNT`, and `ASSERT_FEE_LE`.
 
-### CREATE_COIN (`0x01`)
+### CREATE_OUTPUT (`0x01`)
 
 `(0x01 scriptPubKey amount)`
 
@@ -78,7 +78,7 @@ family, `SEND_MESSAGE` and `RECV_MESSAGE` (transaction-scoped),
 slot whose content is exactly (`scriptPubKey`, `amount`), and claims
 that slot. Claims are matched injectively across the whole transaction
 under MATCHING.md rule 1: k conditions carrying identical content
-require k distinct output slots. Two identical CREATE_COIN conditions
+require k distinct output slots. Two identical CREATE_OUTPUT conditions
 from one input are two claims.
 
 The `amount` is part of the demanded content, not a debit from the
@@ -96,7 +96,10 @@ in satoshis). Exactly two arguments, both atoms.
 
 **Matching rule.** MATCHING.md rule 1.
 
-**Curation note.** Ported from Chia with two deliberate changes,
+**Curation note.** Ported from Chia's CREATE_COIN, renamed because
+the condition claims a transaction output slot and names no coin
+type (decision recorded in the condition record), with two
+deliberate changes,
 recorded as divergences C1 and C2 in the condition record
 (`docs/condition-record.md`). First, the argument is full script bytes
 rather than a puzzle hash, because a Bitcoin output may carry any

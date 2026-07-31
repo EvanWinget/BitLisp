@@ -47,7 +47,7 @@ script is simply an unmatched slot.
 
 An **output claim** is a pair (`scriptPubKey`, `amount`) demanded of
 the transaction's outputs. Each vocabulary entry states whether it
-produces a claim. CREATE_COIN produces exactly one claim, its own
+produces a claim. CREATE_OUTPUT produces exactly one claim, its own
 argument pair.
 
 Let C be the multiset of all output claims produced by all BitLisp
@@ -91,7 +91,7 @@ interaction documented.
 
 ### 5. Per-condition costing
 
-TODO. Including the superlinear `CREATE_COIN` pricing stub (design
+TODO. Including the superlinear `CREATE_OUTPUT` pricing stub (design
 obligation 2). Tuning is data-driven in Phase 4.
 
 ### 6. Reserved conditions
