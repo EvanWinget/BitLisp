@@ -36,6 +36,14 @@ Section 4 registers the rules that have no external reference at all.
   is acceptable, and which precedent prices tx-scoped
   SEND_MESSAGE and RECV_MESSAGE (the CHIP-0049 precedent is split,
   see `docs/execution-plan.md` Phase 2 notes).
+- **BIP341 wallet test vectors** are vendored as data into
+  `vectors/upstream/bip341/` with a provenance sibling, and are the
+  primary tweak-derivation oracle for CREATE_OUTPUT_TAPROOT. The
+  vendored Bitcoin Core test framework carries no named taproot
+  constructor, but its generic tagged-hash and x-only tweak
+  primitives compose into a second runnable oracle, and the test
+  suite runs the derivation differentially against that composition
+  alongside the official vector pins.
 - **bllsh** (AJ Towns' introspection Lisp) was cloned into
   git-ignored `references/` on 2026-07-29 and read for the
   CREATE_COIN_TAPROOT evaluation, under the reading guardrails
@@ -105,6 +113,23 @@ Section 4 registers the rules that have no external reference at all.
      signature verification."
    The condition enters the v0 vocabulary in its own PR immediately
    after the opening one. Its commit discloses the bllsh reading.
+
+   Addendum (2026-07-31, decisions by Evan, landed with the
+   CREATE_OUTPUT_TAPROOT PR). Key-path-only handling uses the
+   empty-root sentinel: one opcode, `merkle_root` exactly 0 or 32
+   bytes, the empty atom committing to no script tree. A separate
+   key-only opcode and declining key-path-only entirely were both
+   considered and declined. The sentinel is unambiguous because a
+   real root is always exactly 32 bytes, and it keeps one BIP341
+   concept in one vocabulary entry. Two of the entry's rejection
+   branches, a tweak scalar at or above the group order and a
+   tweaked point at infinity, are unreachable by any constructible
+   vector because both require hash-preimage control, roughly a
+   2^-128 event. They are pinned by contrived-scalar unit tests
+   through the implementation's application-step seam. This is a
+   recorded exception to "every error path is a vector," accepted so
+   the corpus gap is deliberate rather than an oversight. The tweak
+   oracle provenance is recorded in section 2.
 4. **Rule 1 equality-only matching.** RATIFIED (decision by Evan,
    2026-07-29, as part of the rule 1 draft). Claims match slots by
    exact content equality only, which collapses injective matching
