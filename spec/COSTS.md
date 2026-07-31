@@ -322,4 +322,4 @@ including the per-byte cost of the serialized program itself.
 ## 10. Condition costs
 
 TODO (Phase 2): per-condition base costs and the superlinear
-`CREATE_COIN` schedule.
+`CREATE_OUTPUT` schedule.

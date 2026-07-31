@@ -11,14 +11,14 @@ decision, never an implementation choice.
 
 from collections import Counter
 
-from .conditions import CreateCoin
+from .conditions import CreateOutput
 from .errors import BitLispError
 
 
 def output_claims(conditions):
     """The (scriptPubKey, amount) claims a condition list produces."""
     return [
-        (c.script_pubkey, c.amount) for c in conditions if isinstance(c, CreateCoin)
+        (c.script_pubkey, c.amount) for c in conditions if isinstance(c, CreateOutput)
     ]
 
 

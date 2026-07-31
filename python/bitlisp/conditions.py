@@ -20,18 +20,18 @@ MAX_MONEY = 2_100_000_000_000_000
 MAX_SCRIPT_PUBKEY_SIZE = 10_000
 RESERVED_COST_FLOOR = 500
 
-CREATE_COIN = 0x01
+CREATE_OUTPUT = 0x01
 _RESERVED_START = 0x80
 
 
 @dataclass(frozen=True)
-class CreateCoin:
+class CreateOutput:
     """Claims one output slot with exactly this content."""
 
     script_pubkey: bytes
     amount: int
 
-    opcode = CREATE_COIN
+    opcode = CREATE_OUTPUT
 
 
 @dataclass(frozen=True)
@@ -62,10 +62,10 @@ def _parse_int(atom, what):
     return value
 
 
-def _parse_create_coin(args):
+def _parse_create_output(args):
     if len(args) != 2:
         raise BitLispError(
-            "bad_condition_arity", f"CREATE_COIN takes 2 arguments, got {len(args)}"
+            "bad_condition_arity", f"CREATE_OUTPUT takes 2 arguments, got {len(args)}"
         )
     script_pubkey, amount_atom = args
     if not is_atom(script_pubkey):
@@ -76,10 +76,10 @@ def _parse_create_coin(args):
             f"scriptPubKey must be 1 to {MAX_SCRIPT_PUBKEY_SIZE} bytes, "
             f"got {len(script_pubkey)}",
         )
-    amount = _parse_int(amount_atom, "CREATE_COIN amount")
+    amount = _parse_int(amount_atom, "CREATE_OUTPUT amount")
     if not 0 <= amount <= MAX_MONEY:
         raise BitLispError("bad_condition_arg", f"amount out of range: {amount}")
-    return CreateCoin(script_pubkey, amount)
+    return CreateOutput(script_pubkey, amount)
 
 
 def _parse_reserved(opcode, args):
@@ -111,8 +111,8 @@ def _parse_condition(node):
     args = items[1:]
     if opcode >= _RESERVED_START:
         return _parse_reserved(opcode, args)
-    if opcode == CREATE_COIN:
-        return _parse_create_coin(args)
+    if opcode == CREATE_OUTPUT:
+        return _parse_create_output(args)
     raise BitLispError("bad_condition_opcode", f"invalid opcode {opcode:#04x}")
 
 

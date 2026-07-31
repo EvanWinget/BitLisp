@@ -15,9 +15,9 @@ Section 4 registers the rules that have no external reference at all.
 
 | id | area | Chia (deployed) | BitLisp | rationale | vectors |
 | --- | --- | --- | --- | --- | --- |
-| C1 | CREATE_COIN target | 32-byte puzzle hash | full scriptPubKey bytes, 1 to 10,000 | A Bitcoin output carries any script, and exits to non-BitLisp outputs are ordinary. A hash would also block the validator from comparing against the transaction's actual outputs without a reveal. Ratified 2026-07-29. | `matching/create-coin.json` |
+| C1 | CREATE_COIN target | 32-byte puzzle hash | full scriptPubKey bytes, 1 to 10,000 | A Bitcoin output carries any script, and exits to non-BitLisp outputs are ordinary. A hash would also block the validator from comparing against the transaction's actual outputs without a reveal. Ratified 2026-07-29. | `matching/create-output.json` |
 | C2 | CREATE_COIN memos | optional third argument, wallet-discovery hints | declined, strict arity two | The discovery job does not exist under output-script scanning. Consensus-carried bytes with no consensus meaning are a deliberate non-affordance (design obligation 4, inscription counterargument recorded there). A memo-bearing variant stays reachable through the reserved tier. Ratified 2026-07-29. | `conditions/encoding.json` arity cases |
-| C3 | duplicate CREATE_COIN within one spend | rejected (child coin ids would collide) | valid, two claims requiring two distinct slots | Chia's rejection exists because its content-derived coin ids make identical children the same coin. Bitcoin output identity is positional, so identical slots are meaningful and routine (batch payouts). Counting under rule 1 handles them. Ratified 2026-07-29. | `matching/create-coin.json` duplicate cases |
+| C3 | duplicate CREATE_COIN within one spend | rejected (child coin ids would collide) | valid, two claims requiring two distinct slots | Chia's rejection exists because its content-derived coin ids make identical children the same coin. Bitcoin output identity is positional, so identical slots are meaningful and routine (batch payouts). Counting under rule 1 handles them. Ratified 2026-07-29. | `matching/create-output.json` duplicate cases |
 | C4 | unknown condition opcodes | ignored and unenforced, zero cost for one-byte opcodes, a computed cost table for larger opcodes (verified in chia_rs `compute_unknown_condition_cost`, 2026-07-29) | three tiers: assigned, invalid, reserved 0x80 to 0xff with declared cost and a floor | Invalid-by-default matches the consensus mindset (reject the ambiguous case). The reserved tier is the deliberate forward-compatibility hatch, priced so old and new validators agree forever. Ratified 2026-07-29, four sub-decisions in section 3. | `conditions/encoding.json` tier cases |
 
 ## 2. Reference provenance
@@ -123,7 +123,21 @@ Section 4 registers the rules that have no external reference at all.
 6. **RESERVED_COST_FLOOR stays at 500.** RATIFIED (decision by Evan,
    2026-07-29). The CHIP-0049 per-condition base cost stands as the
    provisional floor, revisited when rule 5's costing design lands.
-7. **Invariant direction correction.** The Phase 0 stub stated that
+7. **CREATE_COIN renamed to CREATE_OUTPUT.** RATIFIED (decision by
+   Evan, 2026-07-31). The condition claims a transaction output
+   slot and names no coin type. With a second output-creation
+   condition arriving, the old name read as a type pair and invited
+   two false readings: that the conditions create different kinds
+   of coin, and that a taproot output requires the taproot
+   condition. Renamed together with a standing terminology policy:
+   BitLisp is aimed at Bitcoin developers and always favors
+   Bitcoin-native vocabulary, with cross-blockchain mappings in
+   `docs/glossary.md`. Chia-name continuity is explicitly
+   subordinate to that policy. Name-only change: opcode, arguments,
+   semantics, and every vector payload are unchanged. Earlier
+   entries in this record keep the name that was current when they
+   were ratified.
+8. **Invariant direction correction.** The Phase 0 stub stated that
    removing a condition never turns an invalid transaction valid.
    Under rule 1 that is false (removing one of two over-claims
    restores validity) and the true property is the reverse
