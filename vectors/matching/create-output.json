@@ -4,7 +4,7 @@
  "spec": "MATCHING.md rule 1",
  "cases": [
   {
-   "name": "duplicate_create_coin_theft",
+   "name": "duplicate_create_output_theft",
    "tx": {
     "version": 2,
     "locktime": 0,
@@ -40,7 +40,7 @@
    }
   },
   {
-   "name": "duplicate_create_coin_honest_batch",
+   "name": "duplicate_create_output_honest_batch",
    "tx": {
     "version": 2,
     "locktime": 0,

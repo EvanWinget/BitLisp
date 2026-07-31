@@ -68,7 +68,7 @@ differs, each cites its divergence row.
 ```
 
 `expect` is either `{"parsed": [...]}` with one JSON object per parsed
-condition (`{"opcode", "script_pubkey", "amount"}` for CREATE_COIN,
+condition (`{"opcode", "script_pubkey", "amount"}` for CREATE_OUTPUT,
 `{"opcode", "cost", "args": ["<hex node>"]}` for reserved conditions)
 or `{"error": "<code>"}`. Every rejection rule in CONDITIONS.md
 section 1 and MATCHING.md rule 6 has at least one case.
@@ -104,8 +104,8 @@ is `{"valid": true}` or `{"error": "<code>"}`. The transaction must
 satisfy the model's base rules (value conservation, ranges, distinct
 outpoints): a case violating them is a malformed vector, not an
 invalid spend. The adversarial regression corpus opens with the
-duplicate-CREATE_COIN theft case as vector #1 in
-`matching/create-coin.json`, per MATCHING.md rule 1.
+duplicate-CREATE_OUTPUT theft case as vector #1 in
+`matching/create-output.json`, per MATCHING.md rule 1.
 
 Run the corpus with `python3 tools/run_vectors.py`. A vector file whose
 suite has no runner yet fails loudly rather than being skipped.
