@@ -124,9 +124,9 @@ def run_vm_case(case):
 def _condition_json(cond):
     """The pinned JSON form of one parsed condition."""
     from bitlisp import serialize
-    from bitlisp.conditions import CreateCoin
+    from bitlisp.conditions import CreateOutput
 
-    if isinstance(cond, CreateCoin):
+    if isinstance(cond, CreateOutput):
         return {
             "opcode": cond.opcode,
             "script_pubkey": cond.script_pubkey.hex(),
@@ -151,7 +151,7 @@ def run_conditions_case(case):
         }
 
     Condition JSON is {"opcode", "script_pubkey", "amount"} for
-    CREATE_COIN and {"opcode", "cost", "args": [<hex node>]} for
+    CREATE_OUTPUT and {"opcode", "cost", "args": [<hex node>]} for
     reserved conditions.
     """
     from bitlisp import BitLispError, deserialize, parse_conditions

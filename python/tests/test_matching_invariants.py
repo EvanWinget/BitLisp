@@ -13,7 +13,7 @@ from collections import Counter
 import pytest
 from bitlisp import (
     BitLispError,
-    CreateCoin,
+    CreateOutput,
     Transaction,
     TxInput,
     TxOutput,
@@ -41,7 +41,7 @@ def build_tx(input_claims, outputs):
         conditions = (
             None
             if claims is None
-            else tuple(CreateCoin(script, amount) for script, amount in claims)
+            else tuple(CreateOutput(script, amount) for script, amount in claims)
         )
         inputs.append(
             TxInput(
