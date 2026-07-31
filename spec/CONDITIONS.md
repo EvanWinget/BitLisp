@@ -1,7 +1,7 @@
 # BitLisp Conditions
 
-Status: in progress. Section 1 and the CREATE_OUTPUT entry are
-normative. The remaining vocabulary v0 entries land across Phase 2,
+Status: in progress. Section 1 and the CREATE_OUTPUT and
+CREATE_OUTPUT_TAPROOT entries are normative. The remaining vocabulary v0 entries land across Phase 2,
 each with semantics, arguments, cost, matching rule reference, and a
 curation note per design obligation 4.
 
@@ -62,9 +62,10 @@ block without a vocabulary entry are invalid, not reserved:
 | opcode | condition |
 | --- | --- |
 | `0x01` | `CREATE_OUTPUT` |
+| `0x02` | `CREATE_OUTPUT_TAPROOT` |
 
 Planned entries, unassigned and invalid until their sections land:
-`CREATE_OUTPUT_TAPROOT`, the secp `AGG_SIG` family with program-composed
+the secp `AGG_SIG` family with program-composed
 messages, `ASSERT_HEIGHT_ABSOLUTE`, `ASSERT_HEIGHT_RELATIVE`,
 `ASSERT_SECONDS_ABSOLUTE`, `ASSERT_SECONDS_RELATIVE`, the `ASSERT_MY_*`
 family, `SEND_MESSAGE` and `RECV_MESSAGE` (transaction-scoped),
@@ -109,3 +110,59 @@ job does not exist under output-script scanning, and consensus-carried
 bytes with no consensus meaning are a deliberate non-affordance
 (design obligation 4). A memo-bearing variant remains reachable
 through the reserved tier if evidence of need emerges.
+
+### CREATE_OUTPUT_TAPROOT (`0x02`)
+
+`(0x02 internal_key merkle_root amount)`
+
+**Semantics.** Asserts that the containing transaction has one output
+slot whose content is exactly (`spk`, `amount`) and claims that slot,
+where `spk` is derived as follows:
+
+- Let `P` be the secp256k1 point whose x coordinate is `internal_key`
+  interpreted as a 32-byte big-endian integer and whose y coordinate
+  is even. If no such point exists, the spend is invalid
+  (`bad_condition_arg`).
+- Let `t` be `tagged_hash("TapTweak", internal_key || merkle_root)`,
+  where `tagged_hash(tag, m)` is `sha256(sha256(tag) || sha256(tag)
+  || m)` with `tag` the ASCII bytes of the tag name. When
+  `merkle_root` is the empty atom, the concatenation leaves
+  `internal_key` alone and the tweak commits to no script tree.
+- If `t`, interpreted as a 32-byte big-endian integer, is greater
+  than or equal to the secp256k1 group order, the spend is invalid
+  (`bad_condition_arg`).
+- Let `Q = P + t*G`, where `G` is the secp256k1 generator. If `Q` is
+  the point at infinity, the spend is invalid (`bad_condition_arg`).
+- `spk` is the 34 bytes `0x51 0x20` followed by the x coordinate of
+  `Q` as 32 big-endian bytes.
+
+After derivation, the claim is indistinguishable from a
+`CREATE_OUTPUT` claim of the same content. In particular, a
+`CREATE_OUTPUT_TAPROOT` claim and a `CREATE_OUTPUT` claim whose
+`scriptPubKey` bytes equal `spk` carry equal content, and k such
+claims require k distinct output slots under MATCHING.md rule 1,
+regardless of which opcode produced each claim.
+
+**Arguments.** `internal_key` is an atom of exactly 32 bytes and must
+satisfy the point derivation above (`bad_condition_arg`).
+`merkle_root` is an atom of exactly 0 or exactly 32 bytes
+(`bad_condition_arg`). The empty atom means the output commits to no
+script tree. `amount` is a minimally encoded integer with
+0 <= amount <= 2,100,000,000,000,000 (MAX_MONEY, in satoshis).
+Exactly three arguments, all atoms.
+
+**Cost.** Assigned when MATCHING.md rule 5 lands.
+
+**Matching rule.** MATCHING.md rule 1, after the derivation above.
+
+**Curation note.** Neither output-creation condition is an output
+type. Both produce the identical claim, and a taproot output with a
+statically known key is created with plain CREATE_OUTPUT. This
+condition exists so covenant recursion can construct a successor
+taproot output when the puzzle computes the internal key or tree
+root dynamically, without giving the VM elliptic-curve arithmetic.
+Two alternatives were declined, a general `secp256k1_muladd`
+operator and a narrow `taptweak` operator, recorded as decision
+D-CC2 in the condition record (`docs/condition-record.md`). The
+derivation matches BIP341 output-key construction exactly,
+including the key-only tweak when no script tree is committed.
