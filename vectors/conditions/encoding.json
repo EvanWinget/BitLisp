@@ -186,7 +186,7 @@
   },
   {
    "name": "opcode_family_gap",
-   "conditions": "ffff02ffa25120aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaff018080",
+   "conditions": "ffff03ffa25120aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaff018080",
    "expect": {
     "error": "bad_condition_opcode"
    }

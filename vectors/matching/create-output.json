@@ -533,7 +533,7 @@
       "index": 0,
       "script_pubkey": "0014bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
       "amount": 60000,
-      "conditions": "ffff02ffa25120aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaff018080"
+      "conditions": "ffff03ffa25120aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaff018080"
      }
     ],
     "outputs": [
