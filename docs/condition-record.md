@@ -161,7 +161,13 @@ Section 4 registers the rules that have no external reference at all.
    subordinate to that policy. Name-only change: opcode, arguments,
    semantics, and every vector payload are unchanged. Earlier
    entries in this record keep the name that was current when they
-   were ratified.
+   were ratified. The policy's term decisions (Evan, 2026-07-31):
+   coin stays, because Bitcoin Core's own class Coin names a UTXO
+   entry, puzzle becomes program, and solution becomes witness
+   arguments. CREATE_OUTPUT stands alongside coin deliberately: in
+   Core's own vocabulary inputs spend coins while transactions
+   create outputs, and the OUTPUT name encodes the positional
+   output identity behind divergences C1 and C3.
 8. **Invariant direction correction.** The Phase 0 stub stated that
    removing a condition never turns an invalid transaction valid.
    Under rule 1 that is false (removing one of two over-claims
