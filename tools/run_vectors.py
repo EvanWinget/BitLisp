@@ -285,7 +285,7 @@ def run_matching_case(case):
         }
 
     An input without a conditions key is a non-BitLisp input. An
-    input with one is a BitLisp input whose puzzle evaluation
+    input with one is a BitLisp input whose program evaluation
     produced that condition list.
     """
     from bitlisp import BitLispError, validate_transaction

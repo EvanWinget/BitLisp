@@ -8,11 +8,11 @@ A term enters this table in the same PR that introduces it.
 
 | BitLisp | Bitcoin | Chia | notes |
 | --- | --- | --- | --- |
-| coin | UTXO, unspent output | coin | the thing a spend consumes |
-| puzzle | locking program in a tapleaf | puzzle | the program committed in the output |
-| solution | witness data | solution | spender-supplied arguments to the puzzle |
+| coin | coin, UTXO (Bitcoin Core's class Coin is a UTXO entry) | coin | the thing a spend consumes, kept because it is Core's own term |
+| program | locking program in a tapleaf | puzzle | the program committed in the output, renamed 2026-07-31 |
+| witness arguments | witness data | solution | spender-supplied arguments to the program, delivered to the VM as its environment value (env), renamed 2026-07-31 |
 | condition | no direct equivalent | condition | a declarative demand the transaction must satisfy |
-| condition list | no direct equivalent | conditions | the value a successful puzzle evaluation yields |
+| condition list | no direct equivalent | conditions | the value a successful program evaluation yields |
 | CREATE_OUTPUT | creates a transaction output | CREATE_COIN | renamed 2026-07-31, claims one output slot by literal scriptPubKey bytes |
 | CREATE_OUTPUT_TAPROOT | creates a taproot output via the BIP341 tweak | none, compare bllsh secp256k1_muladd | same claim as CREATE_OUTPUT with the scriptPubKey validator-derived |
 | output slot | transaction output (scriptPubKey, amount) | created coin | identity is positional on Bitcoin, content-derived on Chia |

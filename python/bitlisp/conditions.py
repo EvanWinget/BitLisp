@@ -1,6 +1,6 @@
 """Condition-list parsing and validation.
 
-A successful puzzle evaluation yields a condition list: a proper list
+A successful program evaluation yields a condition list: a proper list
 of conditions, each a proper list opening with a one-byte opcode atom.
 Opcode values fall in three tiers. Assigned values carry the
 vocabulary's semantics under strict arity and minimal integer

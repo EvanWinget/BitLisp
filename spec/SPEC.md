@@ -11,19 +11,19 @@ matching in [MATCHING.md](MATCHING.md), and the cost model in
 
 ## 1. Overview
 
-TODO: one-page architecture. Puzzle (program) committed in the output,
-solution (arguments) supplied in the witness, evaluation yields a
+TODO: one-page architecture. Program committed in the output,
+witness arguments supplied in the witness, evaluation yields a
 condition list, conditions are matched against the transaction context.
 
 ## 2. Leaf version and commitment
 
-TODO: new tapleaf version number, puzzle hash commitment scheme, whether
+TODO: new tapleaf version number, program hash commitment scheme, whether
 standard-layer shorthands are part of the commitment scheme (Phase 4
 experiment feeds this).
 
 ## 3. Witness structure
 
-TODO: serialized puzzle + solution layout, size limits, currying
+TODO: serialized program + witness-arguments layout, size limits, currying
 discipline.
 
 ## 4. Validation pipeline

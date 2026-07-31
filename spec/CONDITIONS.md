@@ -5,14 +5,14 @@ CREATE_OUTPUT_TAPROOT entries are normative. The remaining vocabulary v0 entries
 each with semantics, arguments, cost, matching rule reference, and a
 curation note per design obligation 4.
 
-A successful puzzle evaluation yields a condition list. This document
+A successful program evaluation yields a condition list. This document
 specifies the encoding of that list and the meaning of each condition.
 How conditions are matched against the transaction is specified in
 [MATCHING.md](MATCHING.md).
 
 ## 1. Condition list encoding
 
-A successful puzzle evaluation yields a value that must satisfy every
+A successful program evaluation yields a value that must satisfy every
 rule in this section. Any violation invalidates the spend with the
 error code named in parentheses. Every condition-layer error code is
 named in this document or in MATCHING.md at the rule that raises it.
@@ -159,7 +159,7 @@ Exactly three arguments, all atoms.
 type. Both produce the identical claim, and a taproot output with a
 statically known key is created with plain CREATE_OUTPUT. This
 condition exists so covenant recursion can construct a successor
-taproot output when the puzzle computes the internal key or tree
+taproot output when the program computes the internal key or tree
 root dynamically, without giving the VM elliptic-curve arithmetic.
 Two alternatives were declined, a general `secp256k1_muladd`
 operator and a narrow `taptweak` operator, recorded as decision
