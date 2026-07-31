@@ -35,7 +35,7 @@ def _check_script(script, what):
 class TxInput:
     """One input: the outpoint it consumes, that output's content, and
     the sequence. conditions is None for a non-BitLisp input, else the
-    parsed condition list its puzzle evaluation produced."""
+    parsed condition list its program evaluation produced."""
 
     txid: bytes
     index: int

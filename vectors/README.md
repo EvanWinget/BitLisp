@@ -9,7 +9,7 @@ why the vector was wrong (CLAUDE.md).
 
 | Directory | Suite | Pins |
 | --- | --- | --- |
-| `vm/` | `vm` | (puzzle, solution) to (result, cost) or error |
+| `vm/` | `vm` | (program, witness arguments) to (result, cost) or error |
 | `conditions/` | `conditions` | condition-list parsing and validation |
 | `matching/` | `matching` | tx-context matching, including the adversarial regression corpus |
 | `upstream/` | `tools/run_upstream.py` (clvm), unit suite (bip340, bip341) | Upstream vectors vendored as data, original format, provenance headers required |
@@ -101,7 +101,7 @@ CONDITIONS.md section 1 and MATCHING.md rule 6 has at least one case.
 
 `sequence` is optional and defaults to 4294967295. An input without a
 `conditions` key is a non-BitLisp input, one with the key is a BitLisp
-input whose puzzle evaluation produced that condition list. `expect`
+input whose program evaluation produced that condition list. `expect`
 is `{"valid": true}` or `{"error": "<code>"}`. The transaction must
 satisfy the model's base rules (value conservation, ranges, distinct
 outpoints): a case violating them is a malformed vector, not an
