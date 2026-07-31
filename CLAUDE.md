@@ -152,3 +152,12 @@ behavior the harness pins down as a vector the same day.
 
 No em dashes anywhere. No semicolons in Markdown prose. Enforced by
 `ci/lint/lint_prose.py`.
+
+## Terminology
+
+BitLisp is aimed at Bitcoin developers and always favors
+Bitcoin-native vocabulary in every artifact: spec, code, docs,
+vectors (decision by Evan, 2026-07-31). Chia-name continuity is
+subordinate to this. Cross-blockchain term mappings live in
+`docs/glossary.md`, and a new term gets its glossary row in the
+same PR that introduces it.
