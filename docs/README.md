@@ -1,5 +1,8 @@
 # docs
 
+- [motivation.md](motivation.md): why the project exists, the
+  capability argument against Script, and how Simplicity, bllsh, and
+  BitLisp relate.
 - [execution-plan.md](execution-plan.md): the phased working plan.
 - [bitcoin-script-successor-evaluation.md](bitcoin-script-successor-evaluation.md):
   the evaluation doc this repo executes against. The section 7 design
