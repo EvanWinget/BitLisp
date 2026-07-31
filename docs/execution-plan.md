@@ -86,7 +86,7 @@
 **Goal:** the executable spec for the only consensus component that exists nowhere else.
 
 - [ ] `CONDITIONS.md` v0 vocabulary: ported set (CREATE_COIN, secp AGG_SIG family with program-composed messages, ASSERT_HEIGHT/SECONDS abs/rel, ASSERT_MY_* family, SEND/RECV_MESSAGE tx-scoped, RESERVE_FEE) + universal asserts (ASSERT_OUTPUT_COUNT, ASSERT_FEE_LE) + explicit curation notes per obligation 4.
-- [ ] Minimal Bitcoin tx model in Python (inputs w/ outpoint+amount+leaf, outputs w/ scriptPubKey+amount, locktime/sequence) — enough to validate against, no networking.
+- [x] Minimal Bitcoin tx model in Python (inputs w/ outpoint+amount+leaf, outputs w/ scriptPubKey+amount, locktime/sequence) — enough to validate against, no networking.
 - [ ] `MATCHING.md` + implementation, in this order (novelty-first):
   1. **Injective multiset output matching** — k identical CREATE_COINs consume k distinct output slots.
   2. **Mixed-transaction rule** — every condition finds a distinct satisfier; unmatched outputs permitted (plain-taproot coexistence).

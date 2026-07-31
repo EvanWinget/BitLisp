@@ -4,8 +4,12 @@ The matching rules have no external oracle, so property-based
 invariants and the adversarial vector corpus stand in for one.
 
 Transactions are generated over a small content pool (three scripts,
-four amounts) so claim and slot collisions are dense, which is where
-injective matching earns its keep.
+four amounts, plus taproot-derived scripts) so claim and slot
+collisions are dense, which is where injective matching earns its
+keep. Contents with a taproot derivation are claimed alternately by
+CreateOutputTaproot and by a plain CreateOutput carrying the derived
+script, so every property here also pins that the producing class is
+irrelevant to matching.
 """
 
 from collections import Counter
@@ -14,11 +18,13 @@ import pytest
 from bitlisp import (
     BitLispError,
     CreateOutput,
+    CreateOutputTaproot,
     Transaction,
     TxInput,
     TxOutput,
     validate_transaction,
 )
+from bitlisp.secp256k1 import G, point_mul, taproot_output_key
 from hypothesis import given
 from hypothesis import strategies as st
 
@@ -26,11 +32,43 @@ SCRIPTS = (b"\x51", b"\x52", b"\x53")
 AMOUNTS = (0, 1, 2, 3)
 UNMATCHABLE = b"\xff"  # never appears in generated outputs
 
-contents = st.tuples(st.sampled_from(SCRIPTS), st.sampled_from(AMOUNTS))
+
+def _taproot_pool():
+    """(script_pubkey, amount) -> CreateOutputTaproot, derived from
+    two on-curve internal keys, one with and one without a script
+    tree."""
+    pool = {}
+    for k, root in ((1, b""), (2, b"\xab" * 32)):
+        internal_key = point_mul(k, G)[0].to_bytes(32, "big")
+        script = b"\x51\x20" + taproot_output_key(internal_key, root)
+        for amount in (1, 2):
+            pool[(script, amount)] = CreateOutputTaproot(
+                internal_key, root, amount, script
+            )
+    return pool
+
+
+TAPROOT_BY_CONTENT = _taproot_pool()
+TAPROOT_CONTENTS = tuple(sorted(TAPROOT_BY_CONTENT))
+
+contents = st.one_of(
+    st.tuples(st.sampled_from(SCRIPTS), st.sampled_from(AMOUNTS)),
+    st.sampled_from(TAPROOT_CONTENTS),
+)
 claim_lists = st.lists(contents, max_size=3)
 output_lists = st.lists(contents, min_size=1, max_size=6)
 # None is a non-BitLisp input, a list is a BitLisp input's claims.
 input_specs = st.lists(st.one_of(st.none(), claim_lists), min_size=1, max_size=3)
+
+
+def _condition_for(script, amount, position):
+    """The claim's producing condition. Taproot-derivable contents
+    alternate producers by list position, so reorderings exercise
+    both classes over identical content."""
+    taproot = TAPROOT_BY_CONTENT.get((script, amount))
+    if taproot is not None and position % 2 == 0:
+        return taproot
+    return CreateOutput(script, amount)
 
 
 def build_tx(input_claims, outputs):
@@ -41,7 +79,10 @@ def build_tx(input_claims, outputs):
         conditions = (
             None
             if claims is None
-            else tuple(CreateOutput(script, amount) for script, amount in claims)
+            else tuple(
+                _condition_for(script, amount, i)
+                for i, (script, amount) in enumerate(claims)
+            )
         )
         inputs.append(
             TxInput(
@@ -195,11 +236,25 @@ def test_mutating_an_exactly_claimed_output_invalidates(
             if mutation == "amount":
                 mutated_content = (script, amount + 1)
             else:
-                mutated_content = (bytes([script[0] ^ 0x01]), amount)
+                mutated_content = (script[:-1] + bytes([script[-1] ^ 0x01]), amount)
             mutated = list(outputs)
             mutated[mutated.index(content)] = mutated_content
             assert not is_valid(build_tx(input_claims, mutated))
             break
+
+
+@given(st.sampled_from(TAPROOT_CONTENTS))
+def test_cross_opcode_equal_content_competes_for_slots(content):
+    """A taproot-derived claim and a plain CreateOutput claim
+    carrying the same content are one multiset: two claims need two
+    slots. build_tx's alternation guarantees the pair mixes both
+    classes."""
+    input_claims = [[content, content]]
+    tx = build_tx(input_claims, [content])
+    produced = {type(c) for c in tx.inputs[0].conditions}
+    assert produced == {CreateOutput, CreateOutputTaproot}
+    assert not is_valid(tx)
+    assert is_valid(build_tx(input_claims, [content, content]))
 
 
 @given(st.integers(min_value=2, max_value=5), contents)

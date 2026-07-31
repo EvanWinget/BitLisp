@@ -1,0 +1,204 @@
+{
+ "schema": "bitlisp-vector-v0",
+ "suite": "conditions",
+ "spec": "CONDITIONS.md section 2 CREATE_OUTPUT_TAPROOT",
+ "cases": [
+  {
+   "name": "keypath_sentinel",
+   "conditions": "ffff02ffa0d6889cb081036e0faefa3a35157ad71086b123b2b144b649798b494c300a961dff80ff8300c3508080",
+   "expect": {
+    "parsed": [
+     {
+      "opcode": 2,
+      "internal_key": "d6889cb081036e0faefa3a35157ad71086b123b2b144b649798b494c300a961d",
+      "merkle_root": "",
+      "amount": 50000,
+      "script_pubkey": "512053a1f6e454df1aa2776a2814a721372d6258050de330b3c6d10ee8f4e0dda343"
+     }
+    ]
+   }
+  },
+  {
+   "name": "with_merkle_root",
+   "conditions": "ffff02ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b21ff8300c3508080",
+   "expect": {
+    "parsed": [
+     {
+      "opcode": 2,
+      "internal_key": "187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27",
+      "merkle_root": "5b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b21",
+      "amount": 50000,
+      "script_pubkey": "5120147c9c57132f6e7ecddba9800bb0c4449251c92a1e60371ee77557b6620f3ea3"
+     }
+    ]
+   }
+  },
+  {
+   "name": "amount_zero",
+   "conditions": "ffff02ffa0d6889cb081036e0faefa3a35157ad71086b123b2b144b649798b494c300a961dff80ff808080",
+   "expect": {
+    "parsed": [
+     {
+      "opcode": 2,
+      "internal_key": "d6889cb081036e0faefa3a35157ad71086b123b2b144b649798b494c300a961d",
+      "merkle_root": "",
+      "amount": 0,
+      "script_pubkey": "512053a1f6e454df1aa2776a2814a721372d6258050de330b3c6d10ee8f4e0dda343"
+     }
+    ]
+   }
+  },
+  {
+   "name": "amount_max_money",
+   "conditions": "ffff02ffa0d6889cb081036e0faefa3a35157ad71086b123b2b144b649798b494c300a961dff80ff870775f05a0740008080",
+   "expect": {
+    "parsed": [
+     {
+      "opcode": 2,
+      "internal_key": "d6889cb081036e0faefa3a35157ad71086b123b2b144b649798b494c300a961d",
+      "merkle_root": "",
+      "amount": 2100000000000000,
+      "script_pubkey": "512053a1f6e454df1aa2776a2814a721372d6258050de330b3c6d10ee8f4e0dda343"
+     }
+    ]
+   }
+  },
+  {
+   "name": "mixed_with_create_output_and_reserved",
+   "conditions": "ffff01ffa2512053a1f6e454df1aa2776a2814a721372d6258050de330b3c6d10ee8f4e0dda343ff8300c35080ffff02ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b21ff8300c35080ffff8180ff8201f48080",
+   "expect": {
+    "parsed": [
+     {
+      "opcode": 1,
+      "script_pubkey": "512053a1f6e454df1aa2776a2814a721372d6258050de330b3c6d10ee8f4e0dda343",
+      "amount": 50000
+     },
+     {
+      "opcode": 2,
+      "internal_key": "187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27",
+      "merkle_root": "5b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b21",
+      "amount": 50000,
+      "script_pubkey": "5120147c9c57132f6e7ecddba9800bb0c4449251c92a1e60371ee77557b6620f3ea3"
+     },
+     {
+      "opcode": 128,
+      "cost": 500,
+      "args": []
+     }
+    ]
+   }
+  },
+  {
+   "name": "arity_two",
+   "conditions": "ffff02ffa0d6889cb081036e0faefa3a35157ad71086b123b2b144b649798b494c300a961dff8300c3508080",
+   "expect": {
+    "error": "bad_condition_arity"
+   }
+  },
+  {
+   "name": "arity_four",
+   "conditions": "ffff02ffa0d6889cb081036e0faefa3a35157ad71086b123b2b144b649798b494c300a961dff80ff8300c350ff808080",
+   "expect": {
+    "error": "bad_condition_arity"
+   }
+  },
+  {
+   "name": "key_31_bytes",
+   "conditions": "ffff02ff9fd6889cb081036e0faefa3a35157ad71086b123b2b144b649798b494c300a96ff80ff8300c3508080",
+   "expect": {
+    "error": "bad_condition_arg"
+   }
+  },
+  {
+   "name": "key_33_bytes",
+   "conditions": "ffff02ffa1d6889cb081036e0faefa3a35157ad71086b123b2b144b649798b494c300a961d00ff80ff8300c3508080",
+   "expect": {
+    "error": "bad_condition_arg"
+   }
+  },
+  {
+   "name": "key_off_curve",
+   "conditions": "ffff02ffa00000000000000000000000000000000000000000000000000000000000000005ff80ff8300c3508080",
+   "expect": {
+    "error": "bad_condition_arg"
+   }
+  },
+  {
+   "name": "key_not_canonical_field_element",
+   "conditions": "ffff02ffa0ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff80ff8300c3508080",
+   "expect": {
+    "error": "bad_condition_arg"
+   }
+  },
+  {
+   "name": "key_is_pair",
+   "conditions": "ffff02ffffa0d6889cb081036e0faefa3a35157ad71086b123b2b144b649798b494c300a961d80ff80ff8300c3508080",
+   "expect": {
+    "error": "bad_condition_arg"
+   }
+  },
+  {
+   "name": "root_is_pair",
+   "conditions": "ffff02ffa0d6889cb081036e0faefa3a35157ad71086b123b2b144b649798b494c300a961dffffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b2180ff8300c3508080",
+   "expect": {
+    "error": "bad_condition_arg"
+   }
+  },
+  {
+   "name": "amount_is_pair",
+   "conditions": "ffff02ffa0d6889cb081036e0faefa3a35157ad71086b123b2b144b649798b494c300a961dff80ffff8300c350808080",
+   "expect": {
+    "error": "bad_condition_arg"
+   }
+  },
+  {
+   "name": "root_1_byte",
+   "conditions": "ffff02ffa0d6889cb081036e0faefa3a35157ad71086b123b2b144b649798b494c300a961dff81aaff8300c3508080",
+   "expect": {
+    "error": "bad_condition_arg"
+   }
+  },
+  {
+   "name": "root_31_bytes",
+   "conditions": "ffff02ffa0d6889cb081036e0faefa3a35157ad71086b123b2b144b649798b494c300a961dff9f5b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88bff8300c3508080",
+   "expect": {
+    "error": "bad_condition_arg"
+   }
+  },
+  {
+   "name": "root_33_bytes",
+   "conditions": "ffff02ffa0d6889cb081036e0faefa3a35157ad71086b123b2b144b649798b494c300a961dffa15b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b2100ff8300c3508080",
+   "expect": {
+    "error": "bad_condition_arg"
+   }
+  },
+  {
+   "name": "amount_non_minimal_zero",
+   "conditions": "ffff02ffa0d6889cb081036e0faefa3a35157ad71086b123b2b144b649798b494c300a961dff80ff008080",
+   "expect": {
+    "error": "bad_condition_arg"
+   }
+  },
+  {
+   "name": "amount_non_minimal_leading",
+   "conditions": "ffff02ffa0d6889cb081036e0faefa3a35157ad71086b123b2b144b649798b494c300a961dff80ff840000c3508080",
+   "expect": {
+    "error": "bad_condition_arg"
+   }
+  },
+  {
+   "name": "amount_negative",
+   "conditions": "ffff02ffa0d6889cb081036e0faefa3a35157ad71086b123b2b144b649798b494c300a961dff80ff81ff8080",
+   "expect": {
+    "error": "bad_condition_arg"
+   }
+  },
+  {
+   "name": "amount_over_max_money",
+   "conditions": "ffff02ffa0d6889cb081036e0faefa3a35157ad71086b123b2b144b649798b494c300a961dff80ff870775f05a0740018080",
+   "expect": {
+    "error": "bad_condition_arg"
+   }
+  }
+ ]
+}

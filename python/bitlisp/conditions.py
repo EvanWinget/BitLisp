@@ -13,6 +13,7 @@ becoming an accidental no-op.
 
 from dataclasses import dataclass
 
+from . import secp256k1
 from .errors import BitLispError
 from .sexp import NIL, atom_to_int, int_to_atom, is_atom, is_pair
 
@@ -21,6 +22,7 @@ MAX_SCRIPT_PUBKEY_SIZE = 10_000
 RESERVED_COST_FLOOR = 500
 
 CREATE_OUTPUT = 0x01
+CREATE_OUTPUT_TAPROOT = 0x02
 _RESERVED_START = 0x80
 
 
@@ -32,6 +34,23 @@ class CreateOutput:
     amount: int
 
     opcode = CREATE_OUTPUT
+
+
+@dataclass(frozen=True)
+class CreateOutputTaproot:
+    """Claims one output slot with derived taproot content.
+
+    script_pubkey is computed from internal_key and merkle_root at
+    parse time. The claimed slot content is (script_pubkey, amount),
+    exactly as for CreateOutput.
+    """
+
+    internal_key: bytes
+    merkle_root: bytes
+    amount: int
+    script_pubkey: bytes
+
+    opcode = CREATE_OUTPUT_TAPROOT
 
 
 @dataclass(frozen=True)
@@ -82,6 +101,39 @@ def _parse_create_output(args):
     return CreateOutput(script_pubkey, amount)
 
 
+def _parse_create_output_taproot(args):
+    if len(args) != 3:
+        raise BitLispError(
+            "bad_condition_arity",
+            f"CREATE_OUTPUT_TAPROOT takes 3 arguments, got {len(args)}",
+        )
+    internal_key, merkle_root, amount_atom = args
+    if not is_atom(internal_key):
+        raise BitLispError("bad_condition_arg", "internal key must be an atom")
+    if len(internal_key) != 32:
+        raise BitLispError(
+            "bad_condition_arg",
+            f"internal key must be 32 bytes, got {len(internal_key)}",
+        )
+    if not is_atom(merkle_root):
+        raise BitLispError("bad_condition_arg", "merkle root must be an atom")
+    if len(merkle_root) not in (0, 32):
+        raise BitLispError(
+            "bad_condition_arg",
+            f"merkle root must be 0 or 32 bytes, got {len(merkle_root)}",
+        )
+    amount = _parse_int(amount_atom, "CREATE_OUTPUT_TAPROOT amount")
+    if not 0 <= amount <= MAX_MONEY:
+        raise BitLispError("bad_condition_arg", f"amount out of range: {amount}")
+    output_key = secp256k1.taproot_output_key(internal_key, merkle_root)
+    if output_key is None:
+        raise BitLispError(
+            "bad_condition_arg", "internal key and merkle root derive no output key"
+        )
+    script_pubkey = b"\x51\x20" + output_key
+    return CreateOutputTaproot(internal_key, merkle_root, amount, script_pubkey)
+
+
 def _parse_reserved(opcode, args):
     if not args:
         raise BitLispError(
@@ -113,6 +165,8 @@ def _parse_condition(node):
         return _parse_reserved(opcode, args)
     if opcode == CREATE_OUTPUT:
         return _parse_create_output(args)
+    if opcode == CREATE_OUTPUT_TAPROOT:
+        return _parse_create_output_taproot(args)
     raise BitLispError("bad_condition_opcode", f"invalid opcode {opcode:#04x}")
 
 

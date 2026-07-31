@@ -12,7 +12,7 @@ why the vector was wrong (CLAUDE.md).
 | `vm/` | `vm` | (puzzle, solution) to (result, cost) or error |
 | `conditions/` | `conditions` | condition-list parsing and validation |
 | `matching/` | `matching` | tx-context matching, including the adversarial regression corpus |
-| `upstream/` | `tools/run_upstream.py` (clvm), unit suite (bip340) | Upstream vectors vendored as data, original format, provenance headers required |
+| `upstream/` | `tools/run_upstream.py` (clvm), unit suite (bip340, bip341) | Upstream vectors vendored as data, original format, provenance headers required |
 
 ## File format
 
@@ -69,9 +69,11 @@ differs, each cites its divergence row.
 
 `expect` is either `{"parsed": [...]}` with one JSON object per parsed
 condition (`{"opcode", "script_pubkey", "amount"}` for CREATE_OUTPUT,
-`{"opcode", "cost", "args": ["<hex node>"]}` for reserved conditions)
-or `{"error": "<code>"}`. Every rejection rule in CONDITIONS.md
-section 1 and MATCHING.md rule 6 has at least one case.
+`{"opcode", "internal_key", "merkle_root", "amount", "script_pubkey"}`
+for CREATE_OUTPUT_TAPROOT with `script_pubkey` the derived taproot
+script, `{"opcode", "cost", "args": ["<hex node>"]}` for reserved
+conditions) or `{"error": "<code>"}`. Every rejection rule in
+CONDITIONS.md section 1 and MATCHING.md rule 6 has at least one case.
 
 ## matching case shape
 

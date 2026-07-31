@@ -48,7 +48,9 @@ script is simply an unmatched slot.
 An **output claim** is a pair (`scriptPubKey`, `amount`) demanded of
 the transaction's outputs. Each vocabulary entry states whether it
 produces a claim. CREATE_OUTPUT produces exactly one claim, its own
-argument pair.
+argument pair. CREATE_OUTPUT_TAPROOT produces exactly one claim, the
+pair (`spk`, `amount`) its entry derives. Nothing in this document
+distinguishes which entry produced a claim.
 
 Let C be the multiset of all output claims produced by all BitLisp
 inputs of the transaction, and let O be the multiset of all output
