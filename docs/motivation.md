@@ -22,8 +22,8 @@ closer to a scalable, self-custodial solution include:
 - **Symmetric channels.** Channels where the latest state wins
   (LN-Symmetry), replacing penalty-based enforcement and shrinking
   what channel partners must watch for.
-- **Non-interactive protocols.** Oracle contracts that one party can 
-publish and another can take later, with no signing ceremony that 
+- **Non-interactive protocols.** Oracle contracts that one party can
+publish and another can take later, with no signing ceremony that
 requires interactivity.
 
 ## What the contract layer must support
@@ -68,30 +68,30 @@ these limits.
 ## Simplicity
 
 [Simplicity](https://github.com/BlockstreamResearch/simplicity)
-is deployed on Liquid and handling real user funds today, which no other 
-Script alternative can claim, and it has formal verification: 
-machine-checked semantics and static cost bounds known before execution. 
-The review surface is large because the combinator language, its 
-execution machine, and the catalog of jets together form a large body of 
+is deployed on Liquid and handling real user funds today, which no other
+Script alternative can claim, and it has formal verification:
+machine-checked semantics and static cost bounds known before execution.
+The review surface is large because the combinator language, its
+execution machine, and the catalog of jets together form a large body of
 new consensus code.
 
 ## bllsh
 
 Anthony Towns' [bllsh](https://github.com/ajtowns/bllsh) explores a
-Lisp VM with transaction introspection operators. Programs read fields 
-of the spending transaction directly and fail the spend when a check 
-does not hold. It is an experimental REPL rather than a deployed system. 
+Lisp VM with transaction introspection operators. Programs read fields
+of the spending transaction directly and fail the spend when a check
+does not hold. It is an experimental REPL rather than a deployed system.
 Its operator set is kept side by side with ours in [opcode-comparison.md](opcode-comparison.md).
 
 ## BitLisp
 
-BitLisp is an alternative Lisp direction which is more similar to Chia's 
-model where a VM evaluates the program committed in an output against 
-spender-supplied witness arguments and returns a condition list. A 
-single validator then matches those conditions against the transaction. 
-Chia has operated this architecture in production since 2021, which 
-gives most of the VM a deployed oracle to diff against. The genuinely 
-novel part, matching conditions against a Bitcoin transaction, has no 
+BitLisp is an alternative Lisp direction which is more similar to Chia's
+model where a VM evaluates the program committed in an output against
+spender-supplied witness arguments and returns a condition list. A
+single validator then matches those conditions against the transaction.
+Chia has operated this architecture in production since 2021, which
+gives most of the VM a deployed oracle to diff against. The genuinely
+novel part, matching conditions against a Bitcoin transaction, has no
 deployed precedent anywhere.
 
 The questions this repo exists to answer with measurements rather
