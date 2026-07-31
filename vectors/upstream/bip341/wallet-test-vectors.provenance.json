@@ -5,5 +5,6 @@
  "license": "BSD-3-Clause",
  "sha256": "403e19fb81dd1f31e745699216308f61fb403774b2aafa87b631b8f7c042d37f",
  "import_date": "2026-07-31",
+ "importing_commit": "292783e2ef786b09b84cadcbf3706f8e13be740e",
  "notes": "Official BIP 341 wallet test vectors. The 7 scriptPubKey entries drive python/tests/test_taproot.py: given.internalPubkey and intermediary.merkleRoot (null meaning no script tree, the empty atom) pin the tweak scalar, the tweaked output key, and the final scriptPubKey of the CREATE_OUTPUT_TAPROOT derivation. The keyPathSpending section covers signing and is unused, as are the script-tree construction fields, since BitLisp consumes the merkle root as an opaque committed value."
 }
