@@ -3,13 +3,15 @@
 
 *Working outline — July 26, 2026. Internal draft ahead of a hostile-review essay. All numbers marked (est.) are envelope estimates pending measured artifacts.*
 
+*Revised August 6, 2026 after an email exchange on the architecture (roadmap item 5): aggregation qualification in section 4.4, consolidation benchmark in section 3.4, obligation 2 rewording and track-record precision in section 7, confidence update in section 8, steelmen in section 10.*
+
 ---
 
 ## 1. Executive Summary
 
 **Recommendation:** Bitcoin's script successor should be a **Lisp VM with a condition-emission interface** — the *curated conditions architecture* — deployed as a single new tapleaf version, carrying four binding design obligations (§7). This is the answer to the ten-year question ("what substrate can carry global-scale self-custody?"). The answer to the three-year question ("what is the correct next soft fork?") is published alongside it without hedging: **CTV+CSFS, or BIP 448's spelling of the same capability, is the right next step, and our proposal is its destination, not its rival.**
 
-**Confidence: 70%** that this is the best terminal architecture among currently known designs, decomposed in §8. The load-bearing judgment (conditions over introspection, ~72%) awaits hostile review — this document exists to enable that review.
+**Confidence: 70%** that this is the best terminal architecture among currently known designs, decomposed in §8. The load-bearing judgment (conditions over introspection, ~70%) held through a first email exchange in August 2026 (§9 item 5) that produced the §4.4 qualification and the §10 steelmen, and still awaits full hostile review. This document exists to enable that review.
 
 ---
 
@@ -98,7 +100,9 @@ Protocols: weights locked before scoring; every score cites a benchmark; sensiti
 
 ### 3.4 Benchmark suite
 
-Vault · LN-Symmetry · payment pool · Ark round · CTV congestion batch · asynchronous offer · oracle/DLC · channel factory · fungible asset token — each with a today-baseline column.
+Vault · LN-Symmetry · payment pool · Ark round · CTV congestion batch · asynchronous offer · oracle/DLC · channel factory · fungible asset token · vault consolidation — each with a today-baseline column.
+
+Vault consolidation was added 2026-08-06 from the email exchange in §9 item 5: an input is authorized only if some output pays the input's own scriptPubKey at least the summed value of every input sharing that scriptPubKey. It is the suite's one case where the architectures differ in complexity class rather than in style. One curated condition makes it O(N) for the validator, per-input introspection makes it O(N^2), and BIP 345 shows the special-cased-opcode middle path. Its adversarial variant (a hostile extra input emitting claims that distort the sums) is exactly the obligation 1 matching-rule surface and gets theft-bug vectors like the rest of that layer.
 
 ---
 
@@ -111,10 +115,12 @@ Restored opcodes (CAT, 64-bit arithmetic, varops budget) plus template and signa
 Combinator language + Bit Machine + jets; deployed on Liquid. Formal verification unmatched; static cost bounds best-in-class. **Eliminated for mainnet:** the largest consensus surface of any candidate against the smallest qualified reviewer set; predicate/introspection model inherits that side's structural limits. (Worth stealing: static pre-execution cost bounds.)
 
 ### 4.3 Lisp + transaction introspection ("LISP-I"; BLL/bllsh architecture)
-Real language, predicate model, tx-introspection opcodes; Elements-adjacent precedent. **Never first under any weighting tried** — concedes Script-similarity to GSR+ without capturing conditions' structural wins. Loses to LISP-C on five margins: cross-input runtime coordination (the witness wall), single-validator auditability, assertive/batchable signature semantics, flat-effect analyzability, offer-economy completeness. Gains vs LISP-C: native universal tx-properties (vocabulary-patchable on the other side) and lower validator novelty.
+Real language, predicate model, tx-introspection opcodes; Elements-adjacent precedent. **Never first under any weighting tried** — concedes Script-similarity to GSR+ without capturing conditions' structural wins. Loses to LISP-C on five margins: cross-input runtime coordination (the witness wall), single-validator auditability, assertive/batchable signature semantics, flat-effect analyzability, offer-economy completeness. Gains vs LISP-C: native universal tx-properties (vocabulary-patchable on the other side) and lower validator novelty. The strongest case for this side is written out in §10.1.
 
 ### 4.4 Lisp + condition emission ("LISP-C"; CLVM-architecture port)
-Pure (program, witness arguments) → condition list; consensus-side validator checks conditions against the transaction; tx ≈ Chia spend bundle, input ≈ coin spend. **Q1 runner-up (3.25/5, statistical tie); Q2 winner.** Passes 1B gate with headroom (336–374 vb single exit (est.)); batches at 153 vb/exit at k=10 (est.), falling with k; nesting native via covenant recursion; **non-interactive exit aggregation** via offers (exit-intents swept by permissionless aggregators). Deficits are design variables, not architecture properties: witness compression unsolved, validator novel with theft-grade sharp edges (injective output matching), externality surface (easy tokens, pinning) requiring curation.
+Pure (program, witness arguments) → condition list; consensus-side validator checks conditions against the transaction; tx ≈ Chia spend bundle, input ≈ coin spend. **Q1 runner-up (3.25/5, statistical tie); Q2 winner.** Passes 1B gate with headroom (336–374 vb single exit (est.)); batches at 153 vb/exit at k=10 (est.), falling with k; nesting native via covenant recursion; **non-interactive exit aggregation** via offers (exit-intents swept by permissionless aggregators). Deficits are design variables, not architecture properties: witness compression unsolved, validator novel with theft-grade sharp edges (injective output matching), externality surface (easy tokens, pinning) requiring curation. The strongest case for this side is written out in §10.2.
+
+**Aggregation qualification (recorded 2026-08-06, from the email exchange in §9 item 5).** Bitcoin output identity is positional. An outpoint is (txid, vout) and the txid commits to the whole transaction, so an untrusted aggregator recombining spends changes every downstream outpoint, and any presigned transaction bound to a txid breaks. Chia never faces this: its coin identity is content-derived from parent, program hash, and amount, independent of which aggregate spend bundle carries the spend. The non-interactive aggregation claim above therefore holds only for constructions whose downstream authorization travels in script (covenant recursion carries the successor in the created output's scriptPubKey) or in rebindable signature messages (the APO-class rebinding of §7, which brings its own replay sharp edges, and rebinding by scriptPubKey and amount re-enters the duplicate-output ambiguity that obligation 1 exists to resolve). Exit to a plain key, the §2.3 gate's case, is unaffected. Recombined txids also present as malleability to any txid-tracking wallet or L2 stack, an integration cost recorded here so it is priced, not discovered.
 
 ### 4.5 MATT / OP_CHECKCONTRACTVERIFY
 State-commitment interface — a genuine third point between introspection and conditions; smallest consensus surface of anything expressive; beats GSR-CAT on pools (~250–400 vb (est.), passes 1B gate). **Loses on terminal margins:** general computation arrives via fraud proofs, re-importing challenge-game interactivity exactly where the gate forbids it; direct-covenant mode collapses computation back to Script's; contract logic remains scattered per-contract Script; no purity, hence no non-interactive aggregation economy. Best answer to "expressiveness per consensus byte" — which is not the terminal figure of merit; asymptotic exit structure is.
@@ -142,7 +148,7 @@ GSR+ and LISP-C are a statistical tie at the top (±1/cell scorer noise → ±0.
 
 1. Per-user-UTXO self-custody caps near 10⁸ users; terminal scale requires recursive shared UTXOs with amortized, **non-interactive** exit. *(Arithmetic.)*
 2. That requirement implies real spend-time computation (merkle work, state succession, arithmetic) — eliminating opcode-bundle approaches as destinations.
-3. The interface asymmetries favoring conditions — purity → non-interactive composition; one hardened validator vs thousands of hand-rolled checkers; the witness wall on cross-input runtime data; assertive (batchable, aggregation-ready) signature semantics — survived error-correction and every re-weighting. Introspection's advantages (universal tx-properties) are vocabulary-patchable; purity is not retrofittable onto introspection.
+3. The interface asymmetries favoring conditions — purity → non-interactive composition; one hardened validator vs thousands of hand-rolled checkers; the witness wall on cross-input runtime data; assertive (batchable, aggregation-ready) signature semantics — survived error-correction and every re-weighting. Introspection's advantages (universal tx-properties) are vocabulary-patchable; purity is not retrofittable onto introspection. Qualified 2026-08-06: purity's composition benefit holds for script-carried authorization, not for txid-bound presigned chains (§4.4).
 4. Simplicity's review surface disqualifies it for mainnet regardless of weighting; the introspection Lisp never leads under any weighting.
 5. GSR-vs-conditions is purely a time-horizon question; two-track deployment is therefore the dominant strategy, not a hedge.
 
@@ -155,13 +161,17 @@ A Lisp VM under one new tapleaf version. Witness carries (serialized program, wi
 **Four binding design obligations** (each converts a scored deficit into a requirement):
 
 1. **Validator specification to BIP standard before advocacy** — injective (multiset) output matching so k identical CREATE_OUTPUTs consume k distinct outputs; mixed-transaction rule ("every condition finds a distinct output," never "outputs = union of conditions"); message matching scoped strictly within the transaction; explicit dedup and multiplicity rules; differential testing against Chia's five-years-hardened validator for every semantic that ports, and adversarial vectors for every rule that doesn't (the matching rules are precisely the part with no Chia prior art).
-2. **Per-condition costing tuned against UTXO-set growth** — CREATE_OUTPUT priced superlinearly against set expansion; CLVM's battle-tested cost table inherited and mapped to weight.
+2. **Per-condition costing tuned against UTXO-set growth** — CREATE_OUTPUT priced superlinearly against set expansion; CLVM's deployed cost table inherited as a starting point, re-validated per operator against measured CPU cost, and mapped to weight. The cost table is the weakest part of the inheritance: Chia's February 2026 security release repriced modpow after finding it priced far below real CPU cost and capped division operand sizes in mempool policy. Both incidents live in operators outside BitLisp's closed set, but they set the re-validation bar.
 3. **Witness-compression story measured against the gate** — canonical standard-layer shorthands, currying discipline, taproot-tree vs program-tree division of labor; validated against 526 vb (1B single exit) and amortized/nested thresholds (9B). This is the recommendation's binding technical constraint.
 4. **Curated vocabulary** — Chia's core conditions plus deliberately chosen universal asserts (output count, fee bound); token-affordance decisions made explicitly and documented (recording the counterargument: inscriptions produced token manias on bare Script — expressiveness may not be the binding constraint on spam); ZK_VERIFY reserved as an upgrade word via unknown-conditions-with-declared-cost.
+
+One further discipline, recorded 2026-08-06 after the email exchange in §9 item 5 and binding on the benchmark programs and standard-layer templates rather than on consensus: a construction claiming non-interactive aggregation must carry every downstream authorization in script or in rebindable signature messages, never in a presigned transaction bound to a txid. The §4.4 qualification is the reason. A template that violates this silently loses the aggregation property the moment an aggregator touches its parent transaction.
 
 **Deployment:** two-track. Endorse and support CTV/CSFS (or BIP 448) now; build the conditions architecture as specification + Inquisition/signet deployment, valuable in every activation scenario including slow ones.
 
 **Known honest costs carried forward:** validator novelty (no Bitcoin-family deployment precedent); witness verbosity pending obligation 3; ephemeral-coin patterns do not port (no intra-tx chaining); externality surface pending obligation 4; cultural headwind ("porting Chia to Bitcoin").
+
+Two more recorded 2026-08-06 after the email exchange in §9 item 5. First, txid instability under aggregation for presigned chains (the §4.4 qualification). Second, the upstream track record stated precisely rather than as "no major bugs," a phrasing retired from this project's correspondence. Chia's condition semantics have no known theft-grade failure in five years of adversarial deployment, but the VM around them has not been incident-free. Negative division was disabled after an admitted implementation bug (2021, soft fork). CHIP-0011 revised the softfork opcode's semantics (2023). The 2.6.0 security release repriced modpow and capped division operands in mempool policy (February 2026). The incidents cluster in the VM cost table and the generator layer, the parts BitLisp respectively re-validates (obligation 2) and declined to port.
 
 ---
 
@@ -171,7 +181,7 @@ A Lisp VM under one new tapleaf version. Witness carries (serialized program, wi
 |---|---|---|
 | Scaling arithmetic → recursive pools + amortized non-interactive exit required | 95% | Arithmetic; attackable only via pre-registered parameters |
 | Terminal substrate is a real-VM covenant language (some interface) | 85% | Residual: a DA breakthrough making ZK-custody self-contained |
-| **Conditions over introspection (the load-bearing judgment)** | **72%** | Survived every stress test — all authored by one analyst; needs hostile review |
+| **Conditions over introspection (the load-bearing judgment)** | **70%** | Survived internal stress tests (all authored by one analyst). A first email exchange (2026-08, §9 item 5) qualified the aggregation claim (§4.4), yielded concessions on accumulating checks and softfork extensibility, and left the arithmetic and the gate uncontested. Steelmen in §10. Full hostile review still owed |
 | Two-track deployment strategy | 90% | Derived independently by rubric and by politics |
 | Mainnet activation within 10 years | 25–35% | Outside the recommendation; 0% CTV signaling + proposal fragmentation as of mid-2026 |
 
@@ -187,4 +197,4 @@ A Lisp VM under one new tapleaf version. Witness carries (serialized program, wi
 2. **Measured artifacts** — write and serialize the real pool program (CLVM) and benchmark 3/6 equivalents per candidate; replace every (est.) in this document.
 3. **Validator specification** (obligation 1) — the injective-matching rules first; they are the novel consensus surface.
 4. **Witness-compression design** (obligation 3) — the binding constraint on the scaling narrative.
-5. **Direct review with AJ Towns** — framing: "here is where the introspection architecture is right, and here are the five margins where we believe conditions beat it."
+5. **Direct review with AJ Towns** — framing: "here is where the introspection architecture is right, and here are the five margins where we believe conditions beat it." A first email exchange is complete (August 2026). Outcomes: the §4.4 aggregation qualification, the §3.4 consolidation benchmark, the obligation 2 rewording, the §7 track-record correction, and two concessions from the introspection side (accumulating checks belong in condition lists, and softfork conditions are not a meaningful limitation since returned conditions can merge into the overall requirements). Open threads: composing an annex-declared claim with a program that asserts its presence, the softfork-guard challenge recorded under D3 in `docs/vm-record.md`, and the consolidation benchmark's exploit-resistance treatment under obligation 1.
