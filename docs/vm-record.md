@@ -174,6 +174,25 @@ phase that owes the answer.
      Phase 2. A guard remains addable in a later leaf version if
      in-VM verification over program-internal values ever proves
      necessary, while a shipped guard could never be removed.
+
+   Addendum (2026-08-06, external review exchange with AJ Towns,
+   recorded but not reopened). AJ challenged the decline from the
+   introspection side, arguing a guard is worth shipping compared
+   with spending tapleaf versions, and proposed a new variant: a
+   guard whose extension returns conditions that merge into the
+   spend's overall requirement list. He also independently
+   confirmed the commit-and-verify equivalence this entry relies
+   on (an abort on `f(x) != y` is as powerful as returning `f(x)`,
+   at the cost of carrying `y` in witness data). The
+   condition-emitting variant is noted as subsumed by the ratified
+   mechanism for deployed coins: a reserved condition already lets
+   a future fork assign meaning to emitted data without changing
+   what any program computes, old nodes skip the unchecked region
+   either way, and the two mechanisms deliver enforcement at the
+   same granularity. The redundancy rationale above therefore
+   stands. Whether the challenge justifies reopening the decision
+   is Evan's call, flagged as an open thread in the evaluation
+   doc's roadmap item 5.
 2. **D2 (crypto family curation).** RATIFIED (decisions by Evan,
    2026-07-28). The crypto family is `sha256` plus `secp_verify`,
    nothing else, and `secp_verify` is BIP340 only. The family
