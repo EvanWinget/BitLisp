@@ -17,4 +17,7 @@
   and the novel-layer register. Cited by CLAUDE.md ground rule 3.
 - [opcode-comparison.md](opcode-comparison.md): informative side-by-side
   of the CLVM, bllsh, and BitLisp operator sets.
+- [condition-comparison.md](condition-comparison.md): informative
+  side-by-side of Chia's deployed condition vocabulary and BitLisp's
+  v0 vocabulary, plus the matching-layer architecture comparison.
 - Essay drafts land here in Phase 5.
