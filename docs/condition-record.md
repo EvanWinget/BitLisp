@@ -176,6 +176,56 @@ Section 4 registers the rules that have no external reference at all.
    never invalidates a valid transaction. Corrected in the spec
    commit that made the invariants normative, 2026-07-29, flagged
    in that PR for review.
+9. **Assert vocabulary covers the field grid by default.** RATIFIED
+   (decision by Evan, 2026-08-06). The ASSERT_* family enumerates
+   every applicable field of the transaction context rather than
+   curating entries case by case. Coverage is the default and every
+   omission is a recorded decline in this record, so the burden of
+   proof sits on leaving a field out. Three grounds:
+   - In this architecture the assert vocabulary is a program's only
+     window onto the transaction. A missing introspection opcode in
+     other designs is an inconvenience the contract author routes
+     around. A missing assert here is an expressiveness hole that
+     only a soft fork through the reserved tier can patch.
+   - Chia curated its assert set and the gaps surfaced as a
+     retrofit: CHIP-0011 added the ASSERT_BEFORE family, the birth
+     asserts, ASSERT_EPHEMERAL, and the concurrent asserts years
+     into deployment. Field coverage is cheap up front and
+     expensive to recover.
+   - Asserts are uniform read-only comparisons against data the
+     validator already holds, so systematic coverage is more
+     reviewable than a judgment-call subset. The spec states one
+     rule for the whole grid instead of a rationale per entry, and
+     the vector corpus enumerates the grid mechanically.
+   The grid, to be enumerated exhaustively when the assert sections
+   of `spec/CONDITIONS.md` land: transaction-level fields (version,
+   locktime, input count, output count, fee), the spending input's
+   own fields (outpoint, amount, spent scriptPubKey, sequence,
+   input index, leaf commitment), sibling inputs' fields by index,
+   outputs' fields by index (amount, scriptPubKey), and chain
+   context (height and median time past, absolute and relative).
+   Three cells are flagged for their own recorded decisions rather
+   than defaulted in:
+   - The before/expiry direction. An assert that a height or time
+     has not yet passed makes validity expire, a valid-to-invalid
+     transition Bitcoin has deliberately avoided for reorg safety,
+     while Chia ships the ASSERT_BEFORE family and the
+     expiring-offer pattern wants it. Include or decline is a real
+     decision with a benchmark on one side and a mempool and reorg
+     safety norm on the other.
+   - Witness-dependent quantities (transaction weight, fee rate).
+     The witness contains the program making the claim, so these
+     are self-referential and need either a stripped-measure
+     definition or a decline.
+   - The annex. Pre-execution visibility of declared claims
+     composes naturally with the assert family, and its shape is an
+     open thread from the email exchange recorded in the evaluation
+     doc roadmap item 5.
+   Obligation 4's curation stance is unchanged for affordances
+   (output creation variants, memos, message conditions): coverage
+   by default applies to read-only asserts over transaction fields,
+   where the risk profile is uniform, not to conditions that create
+   abilities.
 
 ## 4. Novel-layer register
 
