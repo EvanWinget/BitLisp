@@ -103,11 +103,12 @@ phase that owes the answer.
    2026-07-29): strict rejection stands and the operator set is
    closed. BitLisp's upgrade path is new tapleaf versions for coins
    created after a fork and reserved conditions for coins already
-   deployed. A CLVM-style `softfork` guard is declined for v0. The
-   alternative was analyzed twice (discussions with Evan, 2026-07-26
-   and 2026-07-29, the second with oracle probes) and the record
-   below replaces the earlier provisional entry, correcting one of
-   its claims.
+   deployed. A CLVM-style `softfork` guard was declined for v0, a
+   sub-decision REOPENED on 2026-08-06 (addendum at the end of this
+   entry). The alternative was analyzed twice (discussions with
+   Evan, 2026-07-26 and 2026-07-29, the second with oracle probes)
+   and the record below replaces the earlier provisional entry,
+   correcting one of its claims.
 
    - CLVM's unknown-opcode acceptance is not an upgrade path for
      value-returning operators. An unknown operator evaluates its
@@ -174,6 +175,34 @@ phase that owes the answer.
      Phase 2. A guard remains addable in a later leaf version if
      in-VM verification over program-internal values ever proves
      necessary, while a shipped guard could never be removed.
+
+   Addendum (2026-08-06, from an email exchange on the
+   architecture). The exchange challenged the decline from the
+   introspection side, arguing a guard is worth shipping compared
+   with spending tapleaf versions, and proposed a new variant: a
+   guard whose extension returns conditions that merge into the
+   spend's overall requirement list. The exchange also
+   independently confirmed the commit-and-verify equivalence this
+   entry relies on (an abort on `f(x) != y` is as powerful as
+   returning `f(x)`, at the cost of carrying `y` in witness data).
+   On the analysis recorded here the condition-emitting variant is
+   subsumed by the ratified mechanism for deployed coins: a
+   reserved condition already lets a future fork assign meaning to
+   emitted data without changing what any program computes, old
+   nodes skip the unchecked region either way, and the two
+   mechanisms deliver enforcement at the same granularity. The
+   challenge nevertheless REOPENS the guard sub-decision (decision
+   by Evan, 2026-08-06), with Evan's lean recorded toward the
+   guard. It is decided by the end of Phase 2, when the reserved
+   tier's costing (matching rule 5) completes the condition-layer
+   upgrade path. The deciding test is pre-registered so the
+   outcome is earned in either direction: the guard ships if a
+   written analysis identifies a concrete upgrade an in-VM guard
+   delivers that the reserved tier cannot deliver at equivalent
+   granularity and cost, and the decline is re-ratified if none is
+   found. The closed operator set and strict unknown-operator
+   rejection above are not reopened: a shipped guard would be an
+   assigned table operator, not unknown-opcode acceptance.
 2. **D2 (crypto family curation).** RATIFIED (decisions by Evan,
    2026-07-28). The crypto family is `sha256` plus `secp_verify`,
    nothing else, and `secp_verify` is BIP340 only. The family
