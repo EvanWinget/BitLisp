@@ -1,7 +1,8 @@
 # BitLisp Condition Validation
 
-Status: in progress. The transaction view, rule 1, and rule 6 are
-normative. Rules 2 to 5 are designed in architecture sessions, land
+Status: in progress. The transaction view, the claims-and-asserts
+principle, the validation stages, and rules 1, 2, and 6 are
+normative. Rules 3 to 5 are designed in architecture sessions, land
 here as prose first, and only then get implemented. Ground rule 4:
 this layer gets invariants and adversarial vectors before any feature
 work.
@@ -41,6 +42,57 @@ base consensus does not: in particular, an output slot's
 scriptPubKey has no size bound, and a slot larger than any claimable
 script is simply an unmatched slot.
 
+## Claims and asserts
+
+A condition constrains the transaction through claims and asserts,
+and in no other way. Each vocabulary entry in `spec/CONDITIONS.md`
+states what it claims and what it asserts. An entry may produce
+neither: rule 6's reserved conditions constrain nothing.
+
+- A **claim** requires a resource of the transaction and consumes
+  it. The output claims of rule 1 are the only claim kind defined
+  so far. Validation assigns resources to claims injectively: each
+  claim is assigned its own resource, called its **satisfier**,
+  and no resource is assigned to two claims.
+- An **assert** requires a fact to hold. A fact is a predicate
+  over the transaction view and the validation context. Checking
+  an assert assigns and consumes nothing. Any number of asserts,
+  from one input or many, may read the same fact. The transaction
+  is checked against every assert of every BitLisp input.
+
+The implication runs one way only. No rule in this document
+constrains a part of the transaction that no condition claims or
+reads. An output slot no claim consumes, an input that is not a
+BitLisp input, and a fact no assert reads are all unconstrained.
+Rule 2 states the consequences.
+
+**Composition guarantee.** Let two transactions each be valid
+under this document, with no outpoint consumed in both. If their
+concatenation, the inputs of both followed by the outputs of both,
+satisfies the transaction view's preconditions, then no rule in
+this document rejects the concatenation. Every rule and every
+vocabulary entry must preserve this property. A vocabulary entry
+whose assert reads a fact that concatenating valid transactions
+can falsify, such as an upper bound on a quantity that
+concatenation sums or an exact count, must not be defined.
+Relaxing this paragraph changes what wallets may safely batch and
+requires a recorded design decision.
+
+## Validation stages
+
+Rules are organized into stages of strictly increasing context. A
+rule's stage states exactly what context can invalidate its work,
+and no check reads more context than its stage provides.
+
+1. Stateless per-spend work: the VM run and condition
+   well-formedness.
+2. Facts of the spent output's own data: outpoint, spent
+   scriptPubKey, amount.
+3. Chain-context facts: height and median time past.
+4. Cross-spend work: claim assignment and cross-input pairing.
+5. Batch signature verification over the collected
+   (public key, message) pairs.
+
 ## Rules (in landing order)
 
 ### 1. Injective multiset output matching
@@ -75,11 +127,32 @@ decision.
 Slots not consumed by any claim are unconstrained by this rule.
 Rule 2 states the coexistence consequences.
 
+This rule is stage 4 work: its outcome depends on every BitLisp
+input's claims and every output slot, so it is re-checked when
+spends are recombined into a different transaction.
+
 ### 2. Mixed-transaction rule
 
-TODO. Every condition finds a distinct satisfier. Unmatched outputs are
-permitted, so plain-taproot inputs and outputs coexist in the same
-transaction.
+This rule performs no computation and defines no error. It states
+what the rest of this document must leave unconstrained, and it
+binds future rules exactly as it binds the current ones.
+
+A transaction may contain inputs that are not BitLisp inputs. They
+produce no conditions, and no rule examines them beyond their
+contribution to the transaction view. A transaction may contain
+output slots that no claim consumes. Unconsumed slots are
+unconstrained. Rule 1 states this for output claims, and this rule
+extends it to every claim kind a future rule may define.
+
+A transaction with no BitLisp inputs is subject to no rule in this
+document.
+
+A transaction is valid under this document if and only if every
+condition of every BitLisp input is well-formed (the encoding
+rules of `spec/CONDITIONS.md` and rule 6, the stage 1 checks),
+every claim is assigned a satisfier, and every assert holds. No
+other property of the transaction's inputs and output slots
+affects validity under this document.
 
 ### 3. Message scoping
 
@@ -114,6 +187,9 @@ unconstrained: any count, any shapes, including pairs.
 No semantics are enforced. A reserved condition constrains nothing
 about the transaction.
 
+This rule is stage 1 work: it reads nothing beyond the condition
+itself.
+
 A future assignment of a reserved opcode must only tighten validity,
 must keep charging exactly the declared cost, and must require the
 declared cost to be at least the assigned operation's cost-table
@@ -145,3 +221,14 @@ it enforceable, and lands with that rule:
   cover that output's content turns it invalid (rule 1).
 - Metamorphic: mutating the content of any exactly-claimed output
   (amount off by one, script byte flip) causes rejection (rule 1).
+- Adding an output slot to a valid transaction never turns it
+  invalid, and adding a non-BitLisp input never turns it invalid
+  (rule 2, over the landed vocabulary: an entry whose assert reads
+  a fact that additions change, such as a fee floor, re-scopes the
+  slot half of this invariant when it lands, while the merge
+  invariant below is permanent).
+- Merge: two valid transactions consuming disjoint outpoints,
+  whose concatenation the transaction view admits, concatenate
+  into a valid transaction (composition guarantee).
+- A transaction with no BitLisp inputs validates regardless of its
+  shape (rule 2).
