@@ -11,7 +11,7 @@ why the vector was wrong (CLAUDE.md).
 | --- | --- | --- |
 | `vm/` | `vm` | (program, witness arguments) to (result, cost) or error |
 | `conditions/` | `conditions` | condition-list parsing and validation |
-| `matching/` | `matching` | tx-context matching, including the adversarial regression corpus |
+| `validation/` | `validation` | tx-context validation, including the adversarial regression corpus |
 | `upstream/` | `tools/run_upstream.py` (clvm), unit suite (bip340, bip341) | Upstream vectors vendored as data, original format, provenance headers required |
 
 ## File format
@@ -73,9 +73,9 @@ condition (`{"opcode", "script_pubkey", "amount"}` for CREATE_OUTPUT,
 for CREATE_OUTPUT_TAPROOT with `script_pubkey` the derived taproot
 script, `{"opcode", "cost", "args": ["<hex node>"]}` for reserved
 conditions) or `{"error": "<code>"}`. Every rejection rule in
-CONDITIONS.md section 1 and MATCHING.md rule 6 has at least one case.
+CONDITIONS.md section 1 and VALIDATION.md rule 6 has at least one case.
 
-## matching case shape
+## validation case shape
 
 ```json
 {
@@ -107,7 +107,7 @@ satisfy the model's base rules (value conservation, ranges, distinct
 outpoints): a case violating them is a malformed vector, not an
 invalid spend. The adversarial regression corpus opens with the
 duplicate-CREATE_OUTPUT theft case as vector #1 in
-`matching/create-output.json`, per MATCHING.md rule 1.
+`validation/create-output.json`, per VALIDATION.md rule 1.
 
 Run the corpus with `python3 tools/run_vectors.py`. A vector file whose
 suite has no runner yet fails loudly rather than being skipped.

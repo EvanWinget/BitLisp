@@ -1,8 +1,8 @@
-# Condition and matching record
+# Condition and validation record
 
 The rationale, reference provenance, and decision record for the
-condition layer (`spec/CONDITIONS.md`) and the matching layer
-(`spec/MATCHING.md`). The specs state behavior only. This record says
+condition layer (`spec/CONDITIONS.md`) and the validation layer
+(`spec/VALIDATION.md`). The specs state behavior only. This record says
 why, and what the evidence was. It is the Phase 2 counterpart of the
 VM record (`docs/vm-record.md`), with one structural difference: the
 VM record's divergence rows are each diff-tested against a consensus
@@ -15,9 +15,9 @@ Section 4 registers the rules that have no external reference at all.
 
 | id | area | Chia (deployed) | BitLisp | rationale | vectors |
 | --- | --- | --- | --- | --- | --- |
-| C1 | CREATE_COIN target | 32-byte puzzle hash | full scriptPubKey bytes, 1 to 10,000 | A Bitcoin output carries any script, and exits to non-BitLisp outputs are ordinary. A hash would also block the validator from comparing against the transaction's actual outputs without a reveal. Ratified 2026-07-29. | `matching/create-output.json` |
+| C1 | CREATE_COIN target | 32-byte puzzle hash | full scriptPubKey bytes, 1 to 10,000 | A Bitcoin output carries any script, and exits to non-BitLisp outputs are ordinary. A hash would also block the validator from comparing against the transaction's actual outputs without a reveal. Ratified 2026-07-29. | `validation/create-output.json` |
 | C2 | CREATE_COIN memos | optional third argument, wallet-discovery hints | declined, strict arity two | The discovery job does not exist under output-script scanning. Consensus-carried bytes with no consensus meaning are a deliberate non-affordance (design obligation 4, inscription counterargument recorded there). A memo-bearing variant stays reachable through the reserved tier. Ratified 2026-07-29. | `conditions/encoding.json` arity cases |
-| C3 | duplicate CREATE_COIN within one spend | rejected (child coin ids would collide) | valid, two claims requiring two distinct slots | Chia's rejection exists because its content-derived coin ids make identical children the same coin. Bitcoin output identity is positional, so identical slots are meaningful and routine (batch payouts). Counting under rule 1 handles them. Ratified 2026-07-29. | `matching/create-output.json` duplicate cases |
+| C3 | duplicate CREATE_COIN within one spend | rejected (child coin ids would collide) | valid, two claims requiring two distinct slots | Chia's rejection exists because its content-derived coin ids make identical children the same coin. Bitcoin output identity is positional, so identical slots are meaningful and routine (batch payouts). Counting under rule 1 handles them. Ratified 2026-07-29. | `validation/create-output.json` duplicate cases |
 | C4 | unknown condition opcodes | ignored and unenforced, zero cost for one-byte opcodes, a computed cost table for larger opcodes (verified in chia_rs `compute_unknown_condition_cost`, 2026-07-29) | three tiers: assigned, invalid, reserved 0x80 to 0xff with declared cost and a floor | Invalid-by-default matches the consensus mindset (reject the ambiguous case). The reserved tier is the deliberate forward-compatibility hatch, priced so old and new validators agree forever. Ratified 2026-07-29, four sub-decisions in section 3. | `conditions/encoding.json` tier cases |
 
 ## 2. Reference provenance
@@ -29,7 +29,7 @@ Section 4 registers the rules that have no external reference at all.
   binary diffing: the transaction models differ.
 - **CHIP-0025 (message conditions)** and **CHIP-0049 (Chia 3.0
   cost revisions)** are the recorded costing precedents for
-  matching rule 5. CHIP-0049's per-condition base cost of 500 is
+  validation rule 5. CHIP-0049's per-condition base cost of 500 is
   the provisional value of RESERVED_COST_FLOOR in rule 6, to be
   revisited when rule 5 lands. Two decisions are pre-registered as
   deliberate rather than inherited: whether a per-spend free tier
@@ -270,9 +270,9 @@ Section 4 registers the rules that have no external reference at all.
     announcement kinds by reserving payload prefix bytes, a
     userspace convention consensus never sees, and that convention
     is not ported. Names, arguments, binding modes, and
-    multiplicity land with the MATCHING.md rule 3 design.
+    multiplicity land with the VALIDATION.md rule 3 design.
 11. **The validator spec is organized as validation waves.**
-    RATIFIED (decision by Evan, 2026-08-06). MATCHING.md organizes
+    RATIFIED (decision by Evan, 2026-08-06). VALIDATION.md organizes
     validation into waves of strictly increasing context:
     1. Stateless per-spend work: the VM run and condition
        well-formedness, cacheable forever.
@@ -292,7 +292,7 @@ Section 4 registers the rules that have no external reference at all.
     context-free and contextual validation. And it makes decision
     12 structural: a condition's wave assignment states exactly
     what context can invalidate it, so recombination-stability
-    classification is wave assignment. MATCHING.md's rule
+    classification is wave assignment. VALIDATION.md's rule
     numbering is unchanged. The waves are the spec's organizing
     frame, and each rule states its wave.
 12. **Every binding mode gets a recombination-stability class.**
@@ -341,13 +341,13 @@ Section 4 registers the rules that have no external reference at all.
 
 ## 4. Novel-layer register
 
-The matching rules have no external reference: no deployed system
+The validation rules have no external reference: no deployed system
 checks a condition list against a Bitcoin transaction. What stands in
 for an oracle, per ground rule 4:
 
 | rule | status | oracle substitute |
 | --- | --- | --- |
-| 1. Injective multiset output matching | normative | hypothesis invariant suite (injectivity, reorder invariance, monotonicity, metamorphic mutations) plus the adversarial corpus in `vectors/matching/`, opening with the duplicate-CREATE_COIN theft vector |
+| 1. Injective multiset output matching | normative | hypothesis invariant suite (injectivity, reorder invariance, monotonicity, metamorphic mutations) plus the adversarial corpus in `vectors/validation/`, opening with the duplicate-CREATE_COIN theft vector |
 | 2. Mixed-transaction rule | pending | same treatment on landing |
 | 3. Message scoping | pending | same treatment on landing |
 | 4. Dedup and multiplicity | pending | same treatment, plus translated Chia dedup tests where semantics overlap |

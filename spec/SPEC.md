@@ -6,7 +6,7 @@ This document specifies how a BitLisp program is committed to on chain and
 how a spend supplies it: the taproot leaf version, the commitment scheme,
 and the witness structure. Evaluator semantics live in [VM.md](VM.md),
 the condition vocabulary in [CONDITIONS.md](CONDITIONS.md), transaction
-matching in [MATCHING.md](MATCHING.md), and the cost model in
+condition validation in [VALIDATION.md](VALIDATION.md), and the cost model in
 [COSTS.md](COSTS.md).
 
 ## 1. Overview

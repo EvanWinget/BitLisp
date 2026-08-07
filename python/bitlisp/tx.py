@@ -1,9 +1,9 @@
-"""Minimal Bitcoin transaction view for matching.
+"""Minimal Bitcoin transaction view for condition validation.
 
 Just enough structure to validate condition lists against: inputs
 carrying their consumed output's content, outputs as (scriptPubKey,
 amount) slots addressed by index. Construction enforces the base-rule
-subset the model represents, so matching only ever sees transactions
+subset the model represents, so validation only ever sees transactions
 that conserve value. Violations here raise ValueError: a malformed
 model is a harness bug, never a spend failure.
 """

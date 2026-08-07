@@ -1,7 +1,7 @@
 {
  "schema": "bitlisp-vector-v0",
- "suite": "matching",
- "spec": "MATCHING.md rule 1, CONDITIONS.md section 2 CREATE_OUTPUT_TAPROOT",
+ "suite": "validation",
+ "spec": "VALIDATION.md rule 1, CONDITIONS.md section 2 CREATE_OUTPUT_TAPROOT",
  "cases": [
   {
    "name": "derived_claim_matches_slot",

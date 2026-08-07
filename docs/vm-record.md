@@ -169,7 +169,7 @@ phase that owes the answer.
      condition vocabulary. It also follows this architecture's
      grain: verification already lives at the condition layer
      (the AGG_SIG family), and the rule for unknown condition
-     codes has to be written in MATCHING.md either way, so the
+     codes has to be written in VALIDATION.md either way, so the
      reserved answer adds no new mechanism. That rule is
      load-bearing for extensibility and is designed as such in
      Phase 2. A guard remains addable in a later leaf version if
@@ -194,7 +194,7 @@ phase that owes the answer.
    challenge nevertheless REOPENS the guard sub-decision (decision
    by Evan, 2026-08-06), with Evan's lean recorded toward the
    guard. It is decided by the end of Phase 2, when the reserved
-   tier's costing (matching rule 5) completes the condition-layer
+   tier's costing (validation rule 5) completes the condition-layer
    upgrade path. The deciding test is pre-registered so the
    outcome is earned in either direction: the guard ships if a
    written analysis identifies a concrete upgrade an in-VM guard

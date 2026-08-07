@@ -1,6 +1,6 @@
 # BitLisp
 
-A CLVM-derived predicate VM plus a condition/matching layer for Bitcoin,
+A CLVM-derived predicate VM plus a condition and validation layer for Bitcoin,
 committed under a new taproot leaf version. The design case and the four
 design obligations live in `docs/bitcoin-script-successor-evaluation.md`
 (section 7). The phased plan lives in `docs/execution-plan.md`.
@@ -75,8 +75,8 @@ In practice this means:
    why. Anywhere the condition layer differs from Chia's deployed
    condition semantics, the table in `docs/condition-record.md` says
    so and why.
-4. **The novel layer gets adversarial treatment first.** The matching rules
-   (`spec/MATCHING.md`) have no external reference. They get
+4. **The novel layer gets adversarial treatment first.** The validation rules
+   (`spec/VALIDATION.md`) have no external reference. They get
    property-based invariants and theft-bug regression vectors before any
    feature work builds on them.
 5. **Nothing in Phases 0 to 3 depends on the hardened-implementation

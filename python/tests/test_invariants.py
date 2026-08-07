@@ -1,6 +1,6 @@
 """Property-based invariant suite.
 
-The matching-layer invariants land here in Phase 2. Until then the
+The validation-layer invariants land here in Phase 2. Until then the
 properties below cover the vector envelope validator and pin the
 serializer and integer codec against the oracle.
 """

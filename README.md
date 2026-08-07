@@ -1,14 +1,14 @@
 # BitLisp
 
 An executable specification for a Bitcoin Script successor: a CLVM-derived
-predicate VM plus a condition vocabulary and transaction-matching layer,
+predicate VM plus a condition vocabulary and validation layer,
 committed under a new taproot leaf version.
 
 Status: Phase 1 (VM core via CLVM intersection) complete as of
 2026-07-29. The evaluator core and the complete v0 operator table
 are implemented, pinned by vectors, and diffed against both oracle
 wheels with zero unexplained divergence. Phase 2 (the condition
-layer and the matching spec) is next. Nothing here is
+layer and the validation spec) is next. Nothing here is
 consensus-ready. The phased plan is in
 [docs/execution-plan.md](docs/execution-plan.md).
 
@@ -16,9 +16,9 @@ consensus-ready. The phased plan is in
 
 | Path | Contents |
 | --- | --- |
-| `spec/` | The specification. `SPEC.md` (architecture), `VM.md` (evaluator), `CONDITIONS.md` (condition vocabulary), `MATCHING.md` (tx matching rules), `COSTS.md` (cost model) |
+| `spec/` | The specification. `SPEC.md` (architecture), `VM.md` (evaluator), `CONDITIONS.md` (condition vocabulary), `VALIDATION.md` (condition validation rules), `COSTS.md` (cost model) |
 | `python/bitlisp/` | Python reference implementation, the executable spec artifact |
-| `vectors/` | Test vector corpus: `vm/`, `conditions/`, `matching/`, plus `upstream/` for vendored Chia vectors |
+| `vectors/` | Test vector corpus: `vm/`, `conditions/`, `validation/`, plus `upstream/` for vendored Chia vectors |
 | `tools/` | Vector runner, corpus generators, measurement tooling |
 | `ci/` | Lint tooling with pinned versions |
 | `docs/` | Evaluation doc, execution plan, the VM record (divergence table, oracle provenance, design decisions), essay drafts |

@@ -9,7 +9,7 @@ Envelope format (v0), one JSON object per file:
 
     {
         "schema": "bitlisp-vector-v0",
-        "suite": "vm" | "conditions" | "matching",
+        "suite": "vm" | "conditions" | "validation",
         "spec": "<citation of the spec section the cases pin>",
         "cases": [ ... ]
     }
@@ -31,7 +31,7 @@ VECTOR_ROOT = REPO_ROOT / "vectors"
 sys.path.insert(0, str(REPO_ROOT / "python"))
 
 SCHEMA = "bitlisp-vector-v0"
-SUITES = ("vm", "conditions", "matching")
+SUITES = ("vm", "conditions", "validation")
 
 
 class VectorError(Exception):
@@ -194,14 +194,14 @@ def run_conditions_case(case):
 
 
 def _tx_from_json(obj):
-    """Builds the transaction model from a matching case's tx object.
+    """Builds the transaction model from a validation case's tx object.
 
     Parses each input's optional serialized condition list. A
     BitLispError from condition parsing is a case outcome (the spend
     is invalid), so it propagates to the caller. Everything else
     wrong with the tx object is a malformed vector: unknown or
     missing keys, a conditions field that does not deserialize (the
-    matching stage receives already-materialized evaluation results,
+    validation stage receives already-materialized evaluation results,
     so a serialization failure is not a possible outcome here), and
     ValueError from any model constructor."""
     from bitlisp import (
@@ -267,8 +267,8 @@ def _tx_from_json(obj):
         raise VectorError(f"tx violates the model's base rules: {exc}") from None
 
 
-def run_matching_case(case):
-    """One matching case: validate a transaction's condition lists.
+def run_validation_case(case):
+    """One validation case: validate a transaction's condition lists.
 
     Case shape, closed like the envelope:
         {
@@ -335,7 +335,7 @@ def _make_suite_runner(case_runner):
 RUNNERS = {
     "vm": _make_suite_runner(run_vm_case),
     "conditions": _make_suite_runner(run_conditions_case),
-    "matching": _make_suite_runner(run_matching_case),
+    "validation": _make_suite_runner(run_validation_case),
 }
 
 

@@ -1,7 +1,7 @@
 {
  "schema": "bitlisp-vector-v0",
- "suite": "matching",
- "spec": "MATCHING.md rule 1",
+ "suite": "validation",
+ "spec": "VALIDATION.md rule 1",
  "cases": [
   {
    "name": "duplicate_create_output_theft",
@@ -523,7 +523,7 @@
    }
   },
   {
-   "name": "encoding_error_surfaces_through_matching",
+   "name": "encoding_error_surfaces_through_validation",
    "tx": {
     "version": 2,
     "locktime": 0,

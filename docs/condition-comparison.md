@@ -1,11 +1,11 @@
-# Condition and matching inventory: Chia, BitLisp
+# Condition and validation inventory: Chia, BitLisp
 
 Informative, not normative. This document places Chia's deployed
 condition vocabulary side by side with BitLisp's v0 vocabulary and
-compares the two matching layers. It is the condition-layer companion
+compares the two validation layers. It is the condition-layer companion
 to [opcode-comparison.md](opcode-comparison.md). The BitLisp columns
 restate [spec/CONDITIONS.md](../spec/CONDITIONS.md) and
-[spec/MATCHING.md](../spec/MATCHING.md), which are the normative
+[spec/VALIDATION.md](../spec/VALIDATION.md), which are the normative
 sources. Divergence ids (C1 to C4) and decision ids (D-CC2) refer to
 [condition-record.md](condition-record.md).
 
@@ -25,7 +25,7 @@ Sources, as read on 2026-07-31:
   and the clone's head. CHIP-0049 (the Chia 3.0 hard fork, in
   review) revises costs but not the vocabulary, and is noted where
   it matters.
-- **BitLisp**: spec/CONDITIONS.md and spec/MATCHING.md, Phase 2 in
+- **BitLisp**: spec/CONDITIONS.md and spec/VALIDATION.md, Phase 2 in
   progress, plus the planned-entry list in CONDITIONS.md section 2
   and the Phase 2 plan in
   [execution-plan.md](execution-plan.md).
@@ -80,7 +80,7 @@ The BitLisp family's message-composition design is the open item.
 
 The four after-style asserts have double reference coverage: Chia's
 deployed semantics and Bitcoin's own locktime and sequence rules,
-which the transaction view in MATCHING.md names as the model. The
+which the transaction view in VALIDATION.md names as the model. The
 translated Chia consensus tests planned for the cross-check subset
 (condition-record.md section 2) land with this family. The before
 variants would make spend authorization expire, a capability Bitcoin
@@ -107,7 +107,7 @@ because BitLisp's spend identity is an outpoint and a scriptPubKey
 rather than a parent, puzzle hash, and amount triple. The two birth
 asserts and `ASSERT_EPHEMERAL` compare against coin records that
 exist in Chia's coin-set model and have no counterpart in the
-MATCHING.md transaction view, so porting any of them would first
+VALIDATION.md transaction view, so porting any of them would first
 require widening that view, a structural decision and not a
 vocabulary entry. The ephemeral-coin gap specifically is already
 recorded among the known honest costs in section 7 of the
@@ -119,12 +119,12 @@ is no intra-transaction chaining.
 | Capability | Chia | BitLisp |
 | --- | --- | --- |
 | announcements | `CREATE_COIN_ANNOUNCEMENT` 60, `ASSERT_COIN_ANNOUNCEMENT` 61, `CREATE_PUZZLE_ANNOUNCEMENT` 62, `ASSERT_PUZZLE_ANNOUNCEMENT` 63 | an unaddressed broadcast pair, planned, transaction-scoped, names owed by the rule 3 design, namespacing first-class in the arguments rather than payload prefix bytes (decision 10) |
-| messages | `SEND_MESSAGE` 66, `RECEIVE_MESSAGE` 67 (CHIP-0025), mode flags select which sender and receiver fields the pairing commits to, paired within the surrounding block | `SEND_MESSAGE` and `RECV_MESSAGE`, planned, strictly transaction-scoped, binding modes and multiplicity owed by MATCHING.md rule 3 |
+| messages | `SEND_MESSAGE` 66, `RECEIVE_MESSAGE` 67 (CHIP-0025), mode flags select which sender and receiver fields the pairing commits to, paired within the surrounding block | `SEND_MESSAGE` and `RECV_MESSAGE`, planned, strictly transaction-scoped, binding modes and multiplicity owed by VALIDATION.md rule 3 |
 | concurrency asserts | `ASSERT_CONCURRENT_SPEND` 64, `ASSERT_CONCURRENT_PUZZLE` 65, another spend with the named coin id or puzzle hash occurs alongside this one | not in the v0 plan |
 
 The scoping difference is the architectural one: Chia validates a
 block's spends together, so its messages and concurrency asserts
-reach any spend in the block. BitLisp matching is a pure function of
+reach any spend in the block. BitLisp validation is a pure function of
 one transaction, so message pairing shrinks to the transaction
 boundary and block-scoped concurrency has no place to attach.
 
@@ -149,7 +149,7 @@ The two universal asserts are BitLisp additions with no deployed
 reference anywhere. They are named by design obligation 4 in the
 evaluation doc (curated vocabulary, deliberately chosen universal
 asserts over the whole transaction), and their full rationale lands
-with their vocabulary entries. Like the matching rules, they get the
+with their vocabulary entries. Like the validation rules, they get the
 novel-layer treatment, invariants and adversarial vectors rather
 than translated tests.
 
@@ -158,7 +158,7 @@ than translated tests.
 | Capability | Chia | BitLisp |
 | --- | --- | --- |
 | assigned no-op | `REMARK` 1, always true, arguments ignored | no entry. Consensus-carried bytes with no consensus meaning are a recorded non-affordance (the C2 rationale). No REMARK-specific decision is recorded. |
-| priced future opcode | `SOFTFORK` 90, first argument declares the cost, scaled by 10,000, no other semantics until a softfork assigns them | reserved tier 0x80 to 0xff, first argument declares the cost, floor of 500, no other semantics until assigned (MATCHING.md rule 6) |
+| priced future opcode | `SOFTFORK` 90, first argument declares the cost, scaled by 10,000, no other semantics until a softfork assigns them | reserved tier 0x80 to 0xff, first argument declares the cost, floor of 500, no other semantics until assigned (VALIDATION.md rule 6) |
 | unknown one-byte opcode | ignored, unenforced, zero cost | invalid (C4) |
 | unknown multi-byte opcode | ignored, unenforced, cost computed from the opcode value | invalid, a condition opcode is exactly one byte (C4) |
 
@@ -166,10 +166,10 @@ The reserved tier is the C4 divergence's replacement for all three
 Chia rows below the first: one priced hatch instead of a free
 ignored tier plus a priced one, invalid by default everywhere else.
 
-## Matching layers
+## Validation layers
 
-Chia has no document corresponding to MATCHING.md because its
-matching problem is thinner: `CREATE_COIN` constructs the child coin
+Chia has no document corresponding to VALIDATION.md because its
+validation problem is thinner: `CREATE_COIN` constructs the child coin
 authoritatively rather than claiming a pre-existing transaction
 output, so nothing like rule 1's assignment problem arises. The
 comparison below is therefore between architectures, not between two
@@ -194,19 +194,19 @@ specs of the same shape.
   `SEND_MESSAGE`, `RECV_MESSAGE`, the unaddressed broadcast pair,
   `RESERVE_FEE`, `ASSERT_OUTPUT_COUNT`, and `ASSERT_FEE_LE`. Two
   families are planned with membership open, the secp AGG_SIG
-  family and `ASSERT_MY_*`. Of the six matching rules, 1 and 6 are
+  family and `ASSERT_MY_*`. Of the six validation rules, 1 and 6 are
   normative and 2 to 5 are pending.
 - **Reference coverage is uneven by design.** The ported entries
   (timelocks, messages, `RESERVE_FEE`, the AGG_SIG and `ASSERT_MY_*`
   shapes) have deployed Chia semantics to translate tests from. The
   novel surface, both universal asserts, the taproot derivation, and
-  every matching rule, has no external reference and gets the
+  every validation rule, has no external reference and gets the
   ground-rule-4 treatment instead: invariants first, adversarial
   vectors, and the novel-layer register in condition-record.md.
 - **The transaction-view boundary does the curation.** Every Chia
   condition absent from the v0 plan reads state beyond one
   transaction: birth records, ephemerality, block-scoped
-  concurrency, block-scoped message pairing. BitLisp's matching
+  concurrency, block-scoped message pairing. BitLisp's validation
   layer is a pure function of the transaction view, so these did not
   have to be individually declined, the architecture excludes them.
   Widening the view is the structural decision any future port of

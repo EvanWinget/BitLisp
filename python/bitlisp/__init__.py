@@ -15,10 +15,10 @@ from .conditions import (
 )
 from .errors import CODES, BitLispError
 from .machine import run, run_serialized
-from .matching import validate_transaction
 from .serialize import deserialize, serialize
 from .sexp import NIL, TRUE, atom_to_int, int_to_atom, is_atom, is_pair
 from .tx import Transaction, TxInput, TxOutput
+from .validation import validate_transaction
 
 __version__ = "0.0.1"
 

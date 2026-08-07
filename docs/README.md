@@ -12,12 +12,12 @@
   divergence table, the oracle provenance, and the design decision
   record. Cited by CLAUDE.md ground rule 3.
 - [condition-record.md](condition-record.md): the Phase 2 counterpart
-  behind spec/CONDITIONS.md and spec/MATCHING.md, the
+  behind spec/CONDITIONS.md and spec/VALIDATION.md, the
   divergence-from-Chia table, reference provenance, decision record,
   and the novel-layer register. Cited by CLAUDE.md ground rule 3.
 - [opcode-comparison.md](opcode-comparison.md): informative side-by-side
   of the CLVM, bllsh, and BitLisp operator sets.
 - [condition-comparison.md](condition-comparison.md): informative
   side-by-side of Chia's deployed condition vocabulary and BitLisp's
-  v0 vocabulary, plus the matching-layer architecture comparison.
+  v0 vocabulary, plus the validation-layer architecture comparison.
 - Essay drafts land here in Phase 5.

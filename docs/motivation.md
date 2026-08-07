@@ -91,14 +91,14 @@ spender-supplied witness arguments and returns a condition list. A
 single validator then matches those conditions against the transaction.
 Chia has operated this architecture in production since 2021, which
 gives most of the VM a deployed oracle to diff against. The genuinely
-novel part, matching conditions against a Bitcoin transaction, has no
+novel part, validating conditions against a Bitcoin transaction, has no
 deployed precedent anywhere.
 
 The questions this repo exists to answer with measurements rather
 than estimates:
 
 - Do witness sizes fit the unilateral exit budget the scaling argument requires?
-- Can the matching layer be specified tightly enough that adversarial
+- Can the validation layer be specified tightly enough that adversarial
   vectors stop finding theft bugs?
 - *(Placeholder: further measurement questions as Phase 4
   approaches.)*
