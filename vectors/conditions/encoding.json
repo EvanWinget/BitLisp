@@ -1,7 +1,7 @@
 {
  "schema": "bitlisp-vector-v0",
  "suite": "conditions",
- "spec": "CONDITIONS.md section 1, MATCHING.md rule 6",
+ "spec": "CONDITIONS.md section 1, VALIDATION.md rule 6",
  "cases": [
   {
    "name": "empty_list",

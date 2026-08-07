@@ -2,20 +2,20 @@
 
 Status: in progress. Section 1 and the CREATE_OUTPUT and
 CREATE_OUTPUT_TAPROOT entries are normative. The remaining vocabulary v0 entries land across Phase 2,
-each with semantics, arguments, cost, matching rule reference, and a
+each with semantics, arguments, cost, validation rule reference, and a
 curation note per design obligation 4.
 
 A successful program evaluation yields a condition list. This document
 specifies the encoding of that list and the meaning of each condition.
 How conditions are matched against the transaction is specified in
-[MATCHING.md](MATCHING.md).
+[VALIDATION.md](VALIDATION.md).
 
 ## 1. Condition list encoding
 
 A successful program evaluation yields a value that must satisfy every
 rule in this section. Any violation invalidates the spend with the
 error code named in parentheses. Every condition-layer error code is
-named in this document or in MATCHING.md at the rule that raises it.
+named in this document or in VALIDATION.md at the rule that raises it.
 
 The result must be a proper nil-terminated list (`bad_condition_list`).
 Each element is one condition and must itself be a proper list with at
@@ -42,7 +42,7 @@ otherwise. Integer arguments use the minimal integer encoding of
 VM.md section 1 and are rejected if non-minimal (`bad_condition_arg`).
 
 A reserved condition is accepted without enforcing any semantics,
-under the shape rules of MATCHING.md rule 6.
+under the shape rules of VALIDATION.md rule 6.
 
 The vocabulary is laid out in family blocks. Codes inside a family
 block without a vocabulary entry are invalid, not reserved:
@@ -70,7 +70,7 @@ messages, `ASSERT_HEIGHT_ABSOLUTE`, `ASSERT_HEIGHT_RELATIVE`,
 `ASSERT_SECONDS_ABSOLUTE`, `ASSERT_SECONDS_RELATIVE`, the `ASSERT_MY_*`
 family, `SEND_MESSAGE` and `RECV_MESSAGE` (transaction-scoped,
 addressed pairing), an unaddressed broadcast pair
-(transaction-scoped, names assigned when the MATCHING.md rule 3
+(transaction-scoped, names assigned when the VALIDATION.md rule 3
 design lands), `RESERVE_FEE`, `ASSERT_OUTPUT_COUNT`, and
 `ASSERT_FEE_LE`.
 
@@ -81,12 +81,12 @@ design lands), `RESERVE_FEE`, `ASSERT_OUTPUT_COUNT`, and
 **Semantics.** Asserts that the containing transaction has one output
 slot whose content is exactly (`scriptPubKey`, `amount`), and claims
 that slot. Claims are matched injectively across the whole transaction
-under MATCHING.md rule 1: k conditions carrying identical content
+under VALIDATION.md rule 1: k conditions carrying identical content
 require k distinct output slots. Two identical CREATE_OUTPUT conditions
 from one input are two claims.
 
 The `amount` is part of the demanded content, not a debit from the
-spending input. Matching never tracks which input's value funds which
+spending input. Validation never tracks which input's value funds which
 slot. Value conservation is enforced transaction-wide by Bitcoin's
 base rules, and an input's own value is unrelated to the amounts its
 conditions claim.
@@ -96,9 +96,9 @@ empty atom is rejected (`bad_condition_arg`). `amount` is a minimally
 encoded integer with 0 <= amount <= 2,100,000,000,000,000 (MAX_MONEY,
 in satoshis). Exactly two arguments, both atoms.
 
-**Cost.** Assigned when MATCHING.md rule 5 lands.
+**Cost.** Assigned when VALIDATION.md rule 5 lands.
 
-**Matching rule.** MATCHING.md rule 1.
+**Validation rule.** VALIDATION.md rule 1.
 
 **Curation note.** Ported from Chia's CREATE_COIN, renamed because
 the condition claims a transaction output slot and names no coin
@@ -143,7 +143,7 @@ After derivation, the claim is indistinguishable from a
 `CREATE_OUTPUT` claim of the same content. In particular, a
 `CREATE_OUTPUT_TAPROOT` claim and a `CREATE_OUTPUT` claim whose
 `scriptPubKey` bytes equal `spk` carry equal content, and k such
-claims require k distinct output slots under MATCHING.md rule 1,
+claims require k distinct output slots under VALIDATION.md rule 1,
 regardless of which opcode produced each claim.
 
 **Arguments.** `internal_key` is an atom of exactly 32 bytes and must
@@ -154,9 +154,9 @@ script tree. `amount` is a minimally encoded integer with
 0 <= amount <= 2,100,000,000,000,000 (MAX_MONEY, in satoshis).
 Exactly three arguments, all atoms.
 
-**Cost.** Assigned when MATCHING.md rule 5 lands.
+**Cost.** Assigned when VALIDATION.md rule 5 lands.
 
-**Matching rule.** MATCHING.md rule 1, after the derivation above.
+**Validation rule.** VALIDATION.md rule 1, after the derivation above.
 
 **Curation note.** Neither output-creation condition is an output
 type. Both produce the identical claim, and a taproot output with a

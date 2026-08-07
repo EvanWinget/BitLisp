@@ -1,6 +1,6 @@
-"""Property-based invariants for the matching layer.
+"""Property-based invariants for the validation layer.
 
-The matching rules have no external oracle, so property-based
+The validation rules have no external oracle, so property-based
 invariants and the adversarial vector corpus stand in for one.
 
 Transactions are generated over a small content pool (three scripts,
@@ -9,7 +9,7 @@ collisions are dense, which is where injective matching earns its
 keep. Contents with a taproot derivation are claimed alternately by
 CreateOutputTaproot and by a plain CreateOutput carrying the derived
 script, so every property here also pins that the producing class is
-irrelevant to matching.
+irrelevant to validation.
 """
 
 from collections import Counter
@@ -268,7 +268,7 @@ def test_k_claims_never_fit_k_minus_1_slots(k, content):
 
 
 # --- transaction-model preconditions ---------------------------------------
-# Value conservation is enforced at construction, so matching never
+# Value conservation is enforced at construction, so validation never
 # sees a transaction that creates value out of nothing.
 
 

@@ -1,4 +1,4 @@
-# BitLisp Transaction Matching
+# BitLisp Condition Validation
 
 Status: in progress. The transaction view, rule 1, and rule 6 are
 normative. Rules 2 to 5 are designed in architecture sessions, land
@@ -10,11 +10,11 @@ This document specifies how a validated spend's condition list is checked
 against the containing Bitcoin transaction.
 
 Target property: a reviewer who has read only this document can predict
-the outcome of every vector in `vectors/matching/`.
+the outcome of every vector in `vectors/validation/`.
 
 ## Transaction view
 
-Matching is a pure function of the transaction below. No other data
+Validation is a pure function of the transaction below. No other data
 influences any rule in this document. Contextual asserts (height,
 time) compare against fields of this view and the validation context
 in which the transaction is evaluated, in the manner of Bitcoin's
@@ -32,7 +32,7 @@ A transaction is:
 - `outputs`, an ordered list of slots. Each slot's content is the
   pair (`scriptPubKey`, `amount`). Slots are addressed by index.
 
-Matching is defined only over transactions that satisfy Bitcoin's
+Validation is defined only over transactions that satisfy Bitcoin's
 base consensus rules. The reference transaction model enforces the
 subset it represents: at least one input and one output, no outpoint
 consumed by two inputs, every amount within 0 to MAX_MONEY, and the

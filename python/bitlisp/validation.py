@@ -1,4 +1,4 @@
-"""Transaction matching, rule by rule.
+"""Condition validation, rule by rule.
 
 Rule 1, injective multiset output matching: every output claim maps
 to a distinct output slot with byte-exact content. Because a claim
@@ -43,5 +43,5 @@ def check_output_claims(tx):
 
 
 def validate_transaction(tx):
-    """Every matching rule that has landed so far."""
+    """Every validation rule that has landed so far."""
     check_output_claims(tx)

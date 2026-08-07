@@ -10,7 +10,7 @@
 1. **Spec before code.** No consensus-relevant behavior lands in the Python reference without a section in `/spec` it can cite. Every PR touching semantics references its spec section.
 2. **Vectors are the source of truth between sessions.** Claude Code sessions are stateless; the vector corpus is not. Any behavior worth keeping becomes a vector the same day.
 3. **Divergence is documented, never silent.** Anywhere BitLisp differs from CLVM, the divergence table says so and why.
-4. **The novel layer gets adversarial treatment first.** The matching rules (injective output matching, mixed-tx rule, message scoping) are the only part with no external reference — they get property-based invariants and theft-bug regression vectors before feature work.
+4. **The novel layer gets adversarial treatment first.** The validation rules (injective output matching, mixed-tx rule, message scoping) are the only part with no external reference — they get property-based invariants and theft-bug regression vectors before feature work.
 5. **Nothing in Phases 0–3 depends on the hardened-implementation language.** The language is decided ahead of the gate: C++. The independence rule stands unchanged: no Phase 0-3 artifact may assume the language.
 6. **Skeleton fixed, flesh just-in-time.** Binding from day 0: the ground rules, the phase ordering and dependencies, the done-criteria, and the decision gates with their pre-registered evidence. Everything else — task lists inside phases, session specs, far-phase detail — is indicative only, and is re-planned at the recurring checkpoint when the preceding done-criterion clears. Task specs for Claude Code are written the day they're executed, against the current state of the repo. Changing the skeleton requires an explicit, recorded decision; changing the flesh requires nothing.
 
@@ -29,13 +29,13 @@
       SPEC.md              # architecture: leaf version, commitment, witness structure
       VM.md                # evaluator semantics + divergence-from-CLVM table
       CONDITIONS.md        # condition vocabulary v0
-      MATCHING.md          # the novel layer: matching rules against a Bitcoin tx
+      VALIDATION.md        # the novel layer: validation rules against a Bitcoin tx
       COSTS.md             # cost model: inherited table + weight mapping
     python/bitlisp/           # reference implementation (executable spec)
     vectors/
       vm/                  # (puzzle, solution) -> (result, cost | error)
       conditions/          # condition-list parsing/validation vectors
-      matching/            # tx-context matching vectors incl. adversarial
+      validation/          # tx-context validation vectors incl. adversarial
     tools/                 # vector runners, corpus generators, size measurement
     docs/                  # evaluation doc, essay drafts
   ```
@@ -81,41 +81,41 @@
 
 ---
 
-## Phase 2 — Condition layer + the matching spec — *the crown*
+## Phase 2 — Condition layer + the validation spec — *the crown*
 
 **Goal:** the executable spec for the only consensus component that exists nowhere else.
 
 - [ ] `CONDITIONS.md` v0 vocabulary: ported set (CREATE_COIN, secp AGG_SIG family with program-composed messages, ASSERT_HEIGHT/SECONDS abs/rel, ASSERT_MY_* family, SEND/RECV_MESSAGE tx-scoped, RESERVE_FEE) + universal asserts (ASSERT_OUTPUT_COUNT, ASSERT_FEE_LE) + explicit curation notes per obligation 4. Amended 2026-08-06 (decision by Evan): the assert family follows the coverage principle below rather than case-by-case curation. Amended again 2026-08-06 (decision by Evan): the coordination vocabulary carries both the addressed message pair and an unaddressed broadcast pair (decision 10 in `docs/condition-record.md`), and the vocabulary as a whole follows the schema-completeness principle recorded in section 7 of the evaluation doc.
 - [x] Minimal Bitcoin tx model in Python (inputs w/ outpoint+amount+leaf, outputs w/ scriptPubKey+amount, locktime/sequence) — enough to validate against, no networking.
-- [ ] `MATCHING.md` + implementation, in this order (novelty-first):
+- [ ] `VALIDATION.md` + implementation, in this order (novelty-first):
   1. **Injective multiset output matching** — k identical CREATE_COINs consume k distinct output slots.
   2. **Mixed-transaction rule** — every condition finds a distinct satisfier; unmatched outputs permitted (plain-taproot coexistence).
   3. **Message scoping** — strictly within-tx; sender/receiver binding modes; multiplicity rules for duplicate SENDs/RECVs.
   4. **Dedup and multiplicity** — within-input and cross-input, with cost interaction documented.
   5. **Per-condition costing** — including superlinear CREATE_COIN pricing stub (obligation 2; tuning is Phase 4 data-driven).
 
-  Amended 2026-08-06 (decision by Evan): the spec organizes these rules into validation waves of strictly increasing context (stateless per-spend, prevout-bound, chain-context, cross-spend relational, batch signature verification), decision 11 in `docs/condition-record.md`. The rule numbering above is unchanged, each rule states its wave, and a condition's wave assignment doubles as its recombination-stability class (decision 12).
+  Amended 2026-08-06 (decision by Evan): the spec organizes these rules into validation waves of strictly increasing context (stateless per-spend, prevout-bound, chain-context, cross-spend relational, batch signature verification), decision 11 in `docs/condition-record.md`. The rule numbering above is unchanged, each rule states its wave, and a condition's wave assignment doubles as its recombination-stability class (decision 12). Amended again 2026-08-07 (decision by Evan): the layer is named condition validation, formerly matching, decision 13 in `docs/condition-record.md`.
 - [ ] **Invariant suite** (`hypothesis`), the correlated-blind-spot mitigation:
   - Value conservation on every accepted tx.
   - No output satisfies two conditions (matching injectivity).
   - Validation invariant under input reordering and condition-list reordering.
   - Removing any condition from a spend never turns an invalid tx valid; removing any output never leaves a matched condition matched.
   - Metamorphic: mutate any matched output (amount ±1, script byte flip) → rejection.
-- [ ] **Adversarial regression corpus** in `vectors/matching/`: the duplicate-CREATE_COIN theft case as vector #1; batching-wallet scenarios; message forgery/replay shapes; mixed-tx edge cases.
+- [ ] **Adversarial regression corpus** in `vectors/validation/`: the duplicate-CREATE_COIN theft case as vector #1; batching-wallet scenarios; message forgery/replay shapes; mixed-tx edge cases.
 - [ ] Cross-check subset: for semantics that overlap Chia (timelock comparisons, dedup behavior), translate Chia consensus tests into bitlisp vectors.
 
 **Reference material for this phase (recorded 2026-07-29, per Evan):**
 
-- **Condition costing has five years of deployed CLVM learnings: read them before designing ours.** Chia's deployed per-condition costs are the baseline, and CHIP-0049 (the Chia 3.0 hard fork, in review) revises them: a base cost of 500 per condition beyond the first 100 of each coin spend, announcement conditions always priced, and the hard 1,024-announcement cap removed in favor of pricing. That direction is consistent with obligation 2's pricing approach, applied by the team with production data. Two decisions to make deliberately rather than inherit: whether a per-spend free tier (their first-100 carve-out) is acceptable or a cliff we reject, and which precedent prices our tx-scoped SEND/RECV_MESSAGE conditions. Ours port Chia's SEND_MESSAGE and RECEIVE_MESSAGE (CHIP-0025), the announcements' successors, and CHIP-0049's always-priced exception enumerates only the four announcement codes, leaving Chia's own message conditions on the free tier, so the precedent is split and must be chosen, not assumed.
+- **Condition costing has five years of deployed CLVM learnings: read them before designing ours.** Chia's deployed per-condition costs are the baseline, and CHIP-0049 (the Chia 3.0 hard fork, in review) revises them: a base cost of 500 per condition beyond the first 100 of each coin spend, announcement conditions always priced, and the hard 1,024-announcement cap removed in favor of pricing. That direction is consistent with obligation 2's pricing approach, applied by the team with production data. Two decisions to make deliberately rather than inherit: whether a per-spend free tier (their first-100 carve-out) is acceptable or a cliff we reject, and which precedent prices our tx-scoped SEND/RECV_MESSAGE conditions. Ours port Chia's SEND_MESSAGE and RECEIVE_MESSAGE (CHIP-0025), the announcements' successors, and CHIP-0049's always-priced exception enumerates only the four announcement codes, leaving Chia's own message conditions on the free tier, so the precedent is split and must be chosen, not assumed. A third precedent recorded 2026-08-07: CLVM's reserved opcodes price themselves from their own bytes, a cost multiplier plus a two-bit charging shape, prior art to weigh against rule 6's declared-constant tier when rule 5 is designed (provenance in `docs/condition-record.md`).
 - **Assert coverage principle (recorded 2026-08-06, decision by Evan).** The ASSERT_* vocabulary covers every applicable transaction-context field by default, and any omission is a recorded per-field decline in `docs/condition-record.md`, never a silent gap. In a pure conditions VM the assert vocabulary is a program's entire window onto the transaction, so a missing assert is an expressiveness hole only a soft fork can patch. Chia curated its assert set and paid the retrofit cost: CHIP-0014 added the ASSERT_BEFORE family, the birth asserts, ASSERT_EPHEMERAL, and the concurrent asserts years into deployment. Full coverage also closes the one scored advantage the introspection architecture retained (native universal tx-properties, evaluation doc section 4.3). The field grid and the cells flagged for their own decisions (the before/expiry direction, witness-dependent quantities, the annex) live in the condition record's design decision 9.
 - **Coordination primitives (recorded 2026-08-06, decisions by Evan).** The v0 vocabulary carries both an addressed message pair and an unaddressed broadcast pair, with namespacing first-class in the condition arguments (decision 10 in `docs/condition-record.md`, reversing the earlier announcements-are-superseded framing). Design inputs for the rule 3 work: CHIP-0025's mode-bit structure re-addresses to outpoint, spent scriptPubKey, and amount. CHIP-0025's spam limits (1,024 conditions per spend, 1,024-byte messages) are costing prior art for rule 5. Upstream reports the message pair stable with no improvements queued, so the design target is fixed, not moving.
 - **Identity and signatures (recorded 2026-08-06).** The deepest Chia-to-Bitcoin delta is identity: Chia's coin id is content-derived and bundle-stable, a Bitcoin outpoint is transaction-scoped and unknown before assembly. Conditions bind to prevout data (outpoint, spent scriptPubKey, amount), and every binding mode is classified recombination-stable or not (decision 12). The signature digest shape to design against: a domain tag, the conditions hash, and an identity binding, with a menu of binding granularities offered at day one (the CHIP-0011 partial-binding AGG_SIG variants were retrofitted for state channels, evidence the menu is needed up front). Emitting explicit (pk, message) pairs is the clean interface for wave 5 batch verification and any future half-aggregation.
 - **Deliberately not ported (recorded 2026-08-06).** Amount-parity type bits, melt semantics, and the announcement payload prefix-byte namespacing convention die in transit. Namespacing is first-class in the broadcast conditions instead.
 - **Taproot output construction: out of the VM (ratified), the condition-layer form open (decide in CONDITIONS.md).** bllsh ships `secp256k1_muladd`, a general EC linear-combination operator, largely so programs can verify taproot tweaks in-language. BitLisp will meet the same need when covenant recursion constructs a successor coin whose scriptPubKey is taproot(internal key, tree). The conditions-architecture candidate is a condition form that commits to the taproot components and lets the one hardened validator compute the tweak natively, keeping EC arithmetic out of the consensus VM. Decide the form when CONDITIONS.md v0 is drafted, and record the muladd decline rationale next to it (the D2 entry in `docs/vm-record.md` already records the v0 decline).
 
-**Done when:** invariant suite green over large generated corpora; adversarial corpus ≥ 50 hand-designed vectors each citing a MATCHING.md rule; a reviewer can read MATCHING.md alone and predict every vector's outcome.
+**Done when:** invariant suite green over large generated corpora; adversarial corpus ≥ 50 hand-designed vectors each citing a VALIDATION.md rule; a reviewer can read VALIDATION.md alone and predict every vector's outcome.
 
-**Claude Code fit:** strong for implementation + invariant/corpus generation; **design decisions stay in Fable 5 sessions** (this chat) and land in spec prose before Claude Code touches them. Session pattern: Fable 5 designs a matching rule → spec commit → Claude Code implements + generates vectors → Fable 5 reviews divergence reports.
+**Claude Code fit:** strong for implementation + invariant/corpus generation; **design decisions stay in Fable 5 sessions** (this chat) and land in spec prose before Claude Code touches them. Session pattern: Fable 5 designs a validation rule → spec commit → Claude Code implements + generates vectors → Fable 5 reviews divergence reports.
 
 ---
 
@@ -160,8 +160,8 @@
 - [ ] Essay from the evaluation doc spine: arithmetic → Q1 endorsement (CTV/CSFS/BIP 448) → sufficiency gate → landscape → curated conditions recommendation → measured numbers → open problems (validator novelty, ephemeral-coin gap, externalities) stated plainly.
 - [ ] Publish `spec/` publicly with the essay — early spec publication is the second-implementation-independence play and the reviewability story in action.
 - [ ] Website: bitlisp.org (bitlisp.com and bitlisp.net redirect, all three owned by Evan) serving the essay, the rendered spec, and the docs, built from a pinned commit of this repo so the site's spec state is auditable. The site never gates sharing: the essay and the public spec circulate for feedback (Delving post, direct review) as soon as they are ready, and the site follows and iterates.
-- [ ] In-web playground, once the site exists: Pyodide running the actual Python reference VM and the v0 compiler in the browser, so reviewers can write and run adversarial puzzles against `MATCHING.md` from the essay itself. A JavaScript reimplementation of the VM is explicitly rejected: the playground runs the executable spec.
-- [ ] Delving Bitcoin post; separately, direct note to AJ framed as: where the introspection architecture is right; the five margins where conditions win; the measured artifacts; invitation to break MATCHING.md.
+- [ ] In-web playground, once the site exists: Pyodide running the actual Python reference VM and the v0 compiler in the browser, so reviewers can write and run adversarial puzzles against `VALIDATION.md` from the essay itself. A JavaScript reimplementation of the VM is explicitly rejected: the playground runs the executable spec.
+- [ ] Delving Bitcoin post; separately, direct note to AJ framed as: where the introspection architecture is right; the five margins where conditions win; the measured artifacts; invitation to break VALIDATION.md.
 - [ ] Track objections against the confidence table (§8 of evaluation doc); pre-commit to updating the doc, including downward.
 
 **Done when:** essay live; ≥ 3 substantive external technical responses engaged; confidence table revised against actual objections.
@@ -170,7 +170,7 @@
 
 ## Phase 6 — Hardened implementation + Inquisition (post-review, contingent on Phase 5 not breaking the design)
 
-- [ ] `cpp/bitlisp` per the language ADR, targeting the Bitcoin Core toolchain; differential CI: C++ ↔ Python reference on full corpus; C++ ↔ oracle wheels on intersection; libFuzzer on matching layer with invariant oracles.
+- [ ] `cpp/bitlisp` per the language ADR, targeting the Bitcoin Core toolchain; differential CI: C++ ↔ Python reference on full corpus; C++ ↔ oracle wheels on intersection; libFuzzer on validation layer with invariant oracles.
 - [ ] Minimal Inquisition patch (new tapleaf version, validation hook, weight/cost mapping), no FFI layer.
 - [ ] BIP-style draft for the tapleaf commitment + validator, extracted from `/spec`.
 - [ ] Signet demo: the measured pool + offer puzzles live, exit-aggregation flow demonstrated end-to-end.
@@ -179,13 +179,13 @@
 
 ## Working rhythm with Claude Code + Fable 5
 
-- **Division of labor:** Fable 5 (this chat) = architecture, spec prose, matching-rule design, review of divergence reports, essay drafting. Claude Code = implementation, corpus/vector generation, harness plumbing, refactors, measurement tooling. The boundary is the spec: nothing crosses from design to code except through `/spec`.
+- **Division of labor:** Fable 5 (this chat) = architecture, spec prose, validation-rule design, review of divergence reports, essay drafting. Claude Code = implementation, corpus/vector generation, harness plumbing, refactors, measurement tooling. The boundary is the spec: nothing crosses from design to code except through `/spec`.
 - **Session hygiene:** one spec section or operator family per Claude Code session; every session ends with vectors committed and CI green; start each session by pointing Claude Code at CLAUDE.md + the relevant spec section, not the chat history.
-- **Recurring checkpoint (with Fable 5):** divergence-report review, invariant-failure triage, upstream release triage (adopt/take/decline), spec drift audit (does the code do anything MATCHING.md doesn't say?), plan re-sequencing if a phase's done-criteria slipped.
-- **Risk watch-list, standing:** correlated blind spots (same author both sides of the diff harness — mitigate via invariants now, external implementers post-Phase 5); witness numbers failing the gate (Phase 4 finding, publish regardless); scope creep into vocabulary before matching rules are hardened (ground rule 4); language v0 scope creep delaying hostile review (mitigation: the hard scope boundary and the Chialisp stopgap fallback in Phase 3). Two additions 2026-08-06: the witness-byte cost of computed-over-context claims (the Phase 4 guess-and-assert measurement settles it), and the identity and recombination classification (decision 12), the one part of the condition layer with no upstream fixed point, where hostile review is the test.
+- **Recurring checkpoint (with Fable 5):** divergence-report review, invariant-failure triage, upstream release triage (adopt/take/decline), spec drift audit (does the code do anything VALIDATION.md doesn't say?), plan re-sequencing if a phase's done-criteria slipped.
+- **Risk watch-list, standing:** correlated blind spots (same author both sides of the diff harness — mitigate via invariants now, external implementers post-Phase 5); witness numbers failing the gate (Phase 4 finding, publish regardless); scope creep into vocabulary before validation rules are hardened (ground rule 4); language v0 scope creep delaying hostile review (mitigation: the hard scope boundary and the Chialisp stopgap fallback in Phase 3). Two additions 2026-08-06: the witness-byte cost of computed-over-context claims (the Phase 4 guess-and-assert measurement settles it), and the identity and recombination classification (decision 12), the one part of the condition layer with no upstream fixed point, where hostile review is the test.
 
 ## Immediate next actions
 
 1. Create the repo + CLAUDE.md + CI skeleton (Phase 0) — one Claude Code session.
 2. Evaluator core + first operator family with clvm diff harness — second session.
-3. In parallel here (Fable 5): draft `MATCHING.md` rule 1 (injective matching) so it's ready the moment Phase 1 closes.
+3. In parallel here (Fable 5): draft `VALIDATION.md` rule 1 (injective matching) so it's ready the moment Phase 1 closes.

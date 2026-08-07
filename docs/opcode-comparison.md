@@ -142,7 +142,7 @@ CLVM and BitLisp are condition-emission designs: programs return a
 condition list and a validator matches it against the transaction.
 In BitLisp that surface belongs to
 [spec/CONDITIONS.md](../spec/CONDITIONS.md) and
-[spec/MATCHING.md](../spec/MATCHING.md), owed by Phase 2.
+[spec/VALIDATION.md](../spec/VALIDATION.md), owed by Phase 2.
 
 ## Observations
 

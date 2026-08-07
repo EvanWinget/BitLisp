@@ -3,7 +3,7 @@
 Errors are consensus-relevant only as "the spend is invalid". The
 classes exist so vectors can pin the reason a spend fails: oracle
 parity for the VM codes, the named rejection rule for the condition
-and matching codes, which have no oracle.
+and validation codes, which have no oracle.
 """
 
 CODES = frozenset(

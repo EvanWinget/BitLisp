@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "bitlisp"
 version = "0.0.1"
-description = "Executable specification for a CLVM-derived Bitcoin predicate VM and matching layer"
+description = "Executable specification for a CLVM-derived Bitcoin predicate VM and condition validation layer"
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.14"
