@@ -56,6 +56,23 @@ Section 4 registers the rules that have no external reference at all.
   in section 11 of the evaluation doc. Per project policy the
   correspondence itself stays out of the repo. This evidence base
   informs the decision 9 addendum and decisions 10 to 12 below.
+- **Reserved-opcode pricing precedent (recorded 2026-08-07).** The
+  conversation that produced decision 13's cold-reader evidence
+  also flagged CLVM's reserved-opcode pricing as prior art worth a
+  deliberate comparison. Verified by reading clvm_rs's unknown-op
+  handler under the reading guardrails: an unknown CLVM opcode
+  prices itself from its own bytes, a cost multiplier of up to four
+  bytes and a two-bit cost function selecting the charging shape
+  (constant, add-like, mul-like, or concat-like, each scaled by the
+  multiplier plus one). The reserved space therefore carries many
+  opcodes with distinct, argument-sensitive costs that a future
+  fork can assign without a price change. Rule 6 prices the
+  reserved condition tier differently: a per-instance declared
+  constant cost with a floor. The owed triage folds into the rule 5
+  costing design next to the RESERVED_COST_FLOOR revisit: decide
+  whether rule 6 adopts anything from the CLVM shape, in particular
+  whether constant-only declarations underprice future conditions
+  whose validation work scales with argument size.
 - **bllsh** (AJ Towns' introspection Lisp) was cloned into
   git-ignored `references/` on 2026-07-29 and read for the
   CREATE_COIN_TAPROOT evaluation, under the reading guardrails
