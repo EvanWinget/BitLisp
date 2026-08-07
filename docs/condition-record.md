@@ -316,7 +316,10 @@ Section 4 registers the rules that have no external reference at all.
     stage, formerly wave. Stage is the word Bitcoin Core and
     chia_rs reviewers already use for staged validation, wave was
     our coinage and read as parallelism jargon. The five-part
-    structure is unchanged.
+    structure is unchanged. Under decision 14's two-sort
+    vocabulary, stage 2's entry reads as facts of the spent
+    output's own data (prevout-bound checks are asserts, not
+    claims), and the spec's stage list is the authoritative text.
 12. **Every binding mode gets a recombination-stability class.**
     RATIFIED as a requirement (decision by Evan, 2026-08-06), with
     the classification itself owed by the identity and signature
@@ -360,6 +363,61 @@ Section 4 registers the rules that have no external reference at all.
     the glossary's injective matching row, and technical uses
     (bipartite matching, opcode matching, matching the consensus
     oracle) are untouched.
+14. **The layer principle: claims and asserts, with a composition
+    guarantee.** RATIFIED (decisions by Evan, 2026-08-07, designed
+    in the rule 2 chat session). Four parts:
+    - Two sorts. A condition constrains the transaction only
+      through claims, which consume a resource assigned
+      injectively (the assigned resource is the claim's
+      satisfier), and asserts, which are predicates over the
+      transaction view and validation context, freely shared and
+      checked as a conjunction. An earlier single-sort framing
+      (satisfiers with exclusive and shared modes) was rejected
+      by Evan because nothing is assigned when an assert is
+      checked, and duplicate fact reads are the normal exhaust of
+      composing programs that cannot see each other: batched vault
+      withdrawals each asserting their own height, layered
+      programs each defensively asserting their own amount.
+    - Non-obligation. The implication runs one way, nothing
+      unclaimed and unread is constrained. Rule 2 is this
+      statement made normative. It defines no error, so five of
+      its six vectors are acceptance vectors and the sixth pins
+      the rule 1 boundary (plain inputs rescue nothing), including
+      the surplus-capture shape: a spend whose claims total less than
+      its amount leaves the difference to whoever assembles the
+      transaction, accepted deliberately, with per-spend value
+      protection expressible through own-amount asserts, claims,
+      and a fee reserve once those entries land.
+    - Composition guarantee. Two transactions valid under the
+      layer, consuming disjoint outpoints, concatenate into a
+      valid transaction whenever the concatenation satisfies the
+      view's preconditions. Ratified in this form after a stronger
+      candidate (no condition may be invalidated by any single
+      addition to the transaction) failed against RESERVE_FEE: a
+      fee floor is broken by grafting a bare output onto the
+      transaction, which is fee theft, and defending against it is
+      the condition's job. Fees are non-negative and sum under
+      concatenation, so fee floors survive merges, and the
+      deployed Chia vocabulary is merge-closed on inspection. The
+      designer's public statement of the property is the merge
+      form ("the only way two transactions can conflict with each
+      other is if they both try to spend the same coin",
+      bitcoin-dev, March 2022, evaluation doc section 11.4).
+      Pre-registered consequence: the planned ASSERT_FEE_LE and
+      exact-form ASSERT_OUTPUT_COUNT are merge-poison, an
+      aggregate upper bound vetoes strangers' decisions about
+      strangers' value, and both go to the CONDITIONS.md session
+      as recorded declines unless a use case survives that
+      analysis. Neither exists in Chia (the comparison table in
+      `docs/condition-comparison.md` marks the Chia side absent
+      for both). Whole-transaction exactness
+      stays available outside the layer on the taproot key path
+      with SIGHASH_ALL.
+    - Enforcement is twofold: the spec sentence binding future
+      vocabulary (relaxation is a recorded decision, the rule 1
+      equality-only precedent), and a hypothesis merge invariant
+      over the landed vocabulary. Every new condition family owes
+      merge vectors when it lands.
 
 ## 4. Novel-layer register
 
@@ -370,7 +428,7 @@ for an oracle, per ground rule 4:
 | rule | status | oracle substitute |
 | --- | --- | --- |
 | 1. Injective multiset output matching | normative | hypothesis invariant suite (injectivity, reorder invariance, monotonicity, metamorphic mutations) plus the adversarial corpus in `vectors/validation/`, opening with the duplicate-CREATE_COIN theft vector |
-| 2. Mixed-transaction rule | pending | same treatment on landing |
+| 2. Mixed-transaction rule | normative | `vectors/validation/mixed-transaction.json`: five acceptance vectors (mixed, plain-only, unclaimed slots, merge, surplus capture) and one rule 1 boundary rejection, plus the addition-monotonicity, merge, and plain-only invariants |
 | 3. Message scoping | pending | same treatment on landing |
 | 4. Dedup and multiplicity | pending | same treatment, plus translated Chia dedup tests where semantics overlap |
 | 5. Per-condition costing | pending | CHIP-0049 precedent comparison plus cost-conservation properties |
