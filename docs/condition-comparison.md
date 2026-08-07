@@ -76,7 +76,7 @@ The BitLisp family's message-composition design is the open item.
 | after, relative height | `ASSERT_HEIGHT_RELATIVE` 82 | `ASSERT_HEIGHT_RELATIVE`, planned |
 | after, absolute time | `ASSERT_SECONDS_ABSOLUTE` 81 | `ASSERT_SECONDS_ABSOLUTE`, planned |
 | after, relative time | `ASSERT_SECONDS_RELATIVE` 80 | `ASSERT_SECONDS_RELATIVE`, planned |
-| before variants | `ASSERT_BEFORE_*` 84 to 87, expiring spends | not in the v0 plan |
+| before variants | `ASSERT_BEFORE_*` 84 to 87, expiring spends | not in the v0 plan, decline lean recorded (condition-record.md decision 9) |
 
 The four after-style asserts have double reference coverage: Chia's
 deployed semantics and Bitcoin's own locktime and sequence rules,
@@ -85,7 +85,9 @@ translated Chia consensus tests planned for the cross-check subset
 (condition-record.md section 2) land with this family. The before
 variants would make spend authorization expire, a capability Bitcoin
 consensus has historically avoided because a reorg can retroactively
-invalidate a confirmed spend. No decision on them is recorded.
+invalidate a confirmed spend. A decline lean was recorded 2026-08-06
+in the condition record's decision 9, with the final decision and
+its decline note owed by the timelock family.
 
 ## Self asserts
 
@@ -116,7 +118,7 @@ is no intra-transaction chaining.
 
 | Capability | Chia | BitLisp |
 | --- | --- | --- |
-| announcements | `CREATE_COIN_ANNOUNCEMENT` 60, `ASSERT_COIN_ANNOUNCEMENT` 61, `CREATE_PUZZLE_ANNOUNCEMENT` 62, `ASSERT_PUZZLE_ANNOUNCEMENT` 63 | not ported, the message conditions are their successors, per the CHIP-0025 precedent recorded in the Phase 2 plan |
+| announcements | `CREATE_COIN_ANNOUNCEMENT` 60, `ASSERT_COIN_ANNOUNCEMENT` 61, `CREATE_PUZZLE_ANNOUNCEMENT` 62, `ASSERT_PUZZLE_ANNOUNCEMENT` 63 | an unaddressed broadcast pair, planned, transaction-scoped, names owed by the rule 3 design, namespacing first-class in the arguments rather than payload prefix bytes (decision 10) |
 | messages | `SEND_MESSAGE` 66, `RECEIVE_MESSAGE` 67 (CHIP-0025), mode flags select which sender and receiver fields the pairing commits to, paired within the surrounding block | `SEND_MESSAGE` and `RECV_MESSAGE`, planned, strictly transaction-scoped, binding modes and multiplicity owed by MATCHING.md rule 3 |
 | concurrency asserts | `ASSERT_CONCURRENT_SPEND` 64, `ASSERT_CONCURRENT_PUZZLE` 65, another spend with the named coin id or puzzle hash occurs alongside this one | not in the v0 plan |
 
@@ -125,6 +127,15 @@ block's spends together, so its messages and concurrency asserts
 reach any spend in the block. BitLisp matching is a pure function of
 one transaction, so message pairing shrinks to the transaction
 boundary and block-scoped concurrency has no place to attach.
+
+The announcement row changed on 2026-08-06 (decision 10 in
+condition-record.md). The message conditions are not the
+announcements' successors in practice: announcements are the
+unaddressed broadcast primitive, load-bearing for offers because
+the asserting side cannot know counterparty coin ids at signing
+time, while messages are addressed exact pairing. The v0 plan
+therefore carries an addressed pair and a broadcast pair side by
+side, both transaction-scoped.
 
 ## Fees and universal asserts
 
@@ -178,12 +189,13 @@ specs of the same shape.
 ## Observations
 
 - **Where Phase 2 stands.** Two vocabulary entries are normative,
-  `CREATE_OUTPUT` and `CREATE_OUTPUT_TAPROOT`. Nine planned entries
-  are named: the four after-style time asserts, `SEND_MESSAGE`,
-  `RECV_MESSAGE`, `RESERVE_FEE`, `ASSERT_OUTPUT_COUNT`, and
-  `ASSERT_FEE_LE`. Two families are planned with membership open,
-  the secp AGG_SIG family and `ASSERT_MY_*`. Of the six matching
-  rules, 1 and 6 are normative and 2 to 5 are pending.
+  `CREATE_OUTPUT` and `CREATE_OUTPUT_TAPROOT`. Eleven planned
+  entries are named: the four after-style time asserts,
+  `SEND_MESSAGE`, `RECV_MESSAGE`, the unaddressed broadcast pair,
+  `RESERVE_FEE`, `ASSERT_OUTPUT_COUNT`, and `ASSERT_FEE_LE`. Two
+  families are planned with membership open, the secp AGG_SIG
+  family and `ASSERT_MY_*`. Of the six matching rules, 1 and 6 are
+  normative and 2 to 5 are pending.
 - **Reference coverage is uneven by design.** The ported entries
   (timelocks, messages, `RESERVE_FEE`, the AGG_SIG and `ASSERT_MY_*`
   shapes) have deployed Chia semantics to translate tests from. The
@@ -201,7 +213,8 @@ specs of the same shape.
   them would have to make first.
 - **Chia's vocabulary is larger, 35 assigned opcodes against a v0
   plan in the teens.** The gap is mostly the six spend-binding
-  AGG_SIG variants, the four superseded announcements, the four
+  AGG_SIG variants, the four announcements (whose transaction-scoped
+  broadcast counterpart is now planned, decision 10), the four
   before-style asserts, and the chain-state family above. The
   curation direction matches the VM layer: keep the deployed
   semantics where the model fits, shrink where Bitcoin's transaction

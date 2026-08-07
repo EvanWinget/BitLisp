@@ -68,8 +68,11 @@ Planned entries, unassigned and invalid until their sections land:
 the secp `AGG_SIG` family with program-composed
 messages, `ASSERT_HEIGHT_ABSOLUTE`, `ASSERT_HEIGHT_RELATIVE`,
 `ASSERT_SECONDS_ABSOLUTE`, `ASSERT_SECONDS_RELATIVE`, the `ASSERT_MY_*`
-family, `SEND_MESSAGE` and `RECV_MESSAGE` (transaction-scoped),
-`RESERVE_FEE`, `ASSERT_OUTPUT_COUNT`, and `ASSERT_FEE_LE`.
+family, `SEND_MESSAGE` and `RECV_MESSAGE` (transaction-scoped,
+addressed pairing), an unaddressed broadcast pair
+(transaction-scoped, names assigned when the MATCHING.md rule 3
+design lands), `RESERVE_FEE`, `ASSERT_OUTPUT_COUNT`, and
+`ASSERT_FEE_LE`.
 
 ### CREATE_OUTPUT (`0x01`)
 

@@ -5,13 +5,15 @@
 
 *Revised August 6, 2026 after an email exchange on the architecture (roadmap item 5): aggregation qualification in section 4.4, consolidation benchmark in section 3.4, obligation 2 rewording and track-record precision in section 7, confidence update in section 8, steelmen in section 10.*
 
+*Revised August 7, 2026 after a conversation with the deployed architecture's designer and a production puzzle-corpus study (both 2026-08-06, recorded in section 11): design principles in section 7, aggregation reality check in section 4.4, ossification argument in section 10.2, confidence update in section 8, roadmap item 6.*
+
 ---
 
 ## 1. Executive Summary
 
 **Recommendation:** Bitcoin's script successor should be a **Lisp VM with a condition-emission interface** — the *curated conditions architecture* — deployed as a single new tapleaf version, carrying four binding design obligations (§7). This is the answer to the ten-year question ("what substrate can carry global-scale self-custody?"). The answer to the three-year question ("what is the correct next soft fork?") is published alongside it without hedging: **CTV+CSFS, or BIP 448's spelling of the same capability, is the right next step, and our proposal is its destination, not its rival.**
 
-**Confidence: 70%** that this is the best terminal architecture among currently known designs, decomposed in §8. The load-bearing judgment (conditions over introspection, ~70%) held through a first email exchange in August 2026 (§9 item 5) that produced the §4.4 qualification and the §10 steelmen, and still awaits full hostile review. This document exists to enable that review.
+**Confidence: 80%** that this is the best terminal architecture among currently known designs, decomposed in §8 (raised from 70% on 2026-08-07 by the conditions-side evidence in §11). The load-bearing judgment (conditions over introspection, ~80%) held through a first email exchange in August 2026 (§9 item 5) that produced the §4.4 qualification and the §10 steelmen, and was strengthened by the design-history evidence in §11. Every point of confidence gained since the original scoring came from friendly witnesses, so the judgment still awaits full hostile review. This document exists to enable that review.
 
 ---
 
@@ -122,6 +124,8 @@ Pure (program, witness arguments) → condition list; consensus-side validator c
 
 **Aggregation qualification (recorded 2026-08-06, from the email exchange in §9 item 5).** Bitcoin output identity is positional. An outpoint is (txid, vout) and the txid commits to the whole transaction, so an untrusted aggregator recombining spends changes every downstream outpoint, and any presigned transaction bound to a txid breaks. Chia never faces this: its coin identity is content-derived from parent, program hash, and amount, independent of which aggregate spend bundle carries the spend. The non-interactive aggregation claim above therefore holds only for constructions whose downstream authorization travels in script (covenant recursion carries the successor in the created output's scriptPubKey) or in rebindable signature messages (the APO-class rebinding of §7, which brings its own replay sharp edges, and rebinding by scriptPubKey and amount re-enters the duplicate-output ambiguity that obligation 1 exists to resolve). Exit to a plain key, the §2.3 gate's case, is unaffected. Recombined txids also present as malleability to any txid-tracking wallet or L2 stack, an integration cost recorded here so it is priced, not discovered.
 
+**Aggregation reality check (recorded 2026-08-07, from the §11 evidence).** The essay cites Chia's aggregation economy honestly. Node-level aggregation of identical spends shipped only in release 2.5.5. Singleton fast-forward is the only program-aware aggregation code in the node, and it caused a block-production incident in February 2025. Fast-forward eligibility versus ASSERT_MY_COIN_ID replay defense is a live tension between rebasability and replay protection, the same tension the recombination-stability classification (decision 12 in `docs/condition-record.md`) must resolve on our side. The offer economy's daily non-interactive composition stands as evidence. The node-level aggregation story is younger and thinner than the architecture allows, and is cited as such.
+
 ### 4.5 MATT / OP_CHECKCONTRACTVERIFY
 State-commitment interface — a genuine third point between introspection and conditions; smallest consensus surface of anything expressive; beats GSR-CAT on pools (~250–400 vb (est.), passes 1B gate). **Loses on terminal margins:** general computation arrives via fraud proofs, re-importing challenge-game interactivity exactly where the gate forbids it; direct-covenant mode collapses computation back to Script's; contract logic remains scattered per-contract Script; no purity, hence no non-interactive aggregation economy. Best answer to "expressiveness per consensus byte" — which is not the terminal figure of merit; asymptotic exit structure is.
 
@@ -167,6 +171,14 @@ A Lisp VM under one new tapleaf version. Witness carries (serialized program, wi
 
 One further discipline, recorded 2026-08-06 after the email exchange in §9 item 5 and binding on the benchmark programs and standard-layer templates rather than on consensus: a construction claiming non-interactive aggregation must carry every downstream authorization in script or in rebindable signature messages, never in a presigned transaction bound to a txid. The §4.4 qualification is the reason. A template that violates this silently loses the aggregation property the moment an aggregator touches its parent transaction.
 
+**Design principles (added 2026-08-07, from the §11 evidence).** Five principles recorded as normative for the spec work, each earned by the deployed architecture's history rather than invented here:
+
+1. **Schema-completeness over use-case curation.** The condition vocabulary is complete over Bitcoin's spend schema: every field a spend can care about gets an assert or a claim, and every omission is a recorded decline. Use-case curation is the documented failure mode (announcements were followed by messages, the self-assert family grew by the CHIP-0014 retrofit, and userspace repurposed magic amount values, -113 and -24, as signals where the vocabulary had no word). Schema enumeration is tractable, application prediction is not. This generalizes the assert-coverage decision (decision 9 in `docs/condition-record.md`) and is the vocabulary-side counterpart of obligation 4, whose curation stance continues to govern affordances.
+2. **The condition list is the complete interface.** Every effect a program has on validity flows through its emitted conditions. No side channel (cost, evaluation order, or any other validator-honored signal) may carry meaning that is not a legible condition. This is the property the obligation 1 matching spec must guarantee. Legibility, speculative pre-signing evaluation, and per-input independent semantics (PSBT-style workflows) all depend on it.
+3. **Ossification asymmetry.** Conditions ossify an append-only claim vocabulary. Introspection ossifies the transaction serialization as a script-visible API. Freezing a vocabulary that can only grow is strictly cheaper than freezing a format that was never designed to be an API. A core essay argument, stated as §10.2 item 7.
+4. **The ZK proof boundary is structural.** The pure (program, witness arguments) to condition-list function is exactly the statement a future proof system would prove, with the validator untouched by such an upgrade. Proofs are producible per input before transaction assembly, where introspection proofs are transaction-entangled and post-assembly. The ZK_VERIFY reservation in obligation 4 is structural, not bolted on.
+5. **Wave-structured validator.** The validator spec is organized as validation waves of strictly increasing context: stateless per-spend, prevout-bound, chain-context, cross-spend relational, batch signature verification. Recombination-stability classification is wave assignment. Recorded as decisions 11 and 12 in `docs/condition-record.md`.
+
 **Deployment:** two-track. Endorse and support CTV/CSFS (or BIP 448) now; build the conditions architecture as specification + Inquisition/signet deployment, valuable in every activation scenario including slow ones.
 
 **Known honest costs carried forward:** validator novelty (no Bitcoin-family deployment precedent); witness verbosity pending obligation 3; ephemeral-coin patterns do not port (no intra-tx chaining); externality surface pending obligation 4; cultural headwind ("porting Chia to Bitcoin").
@@ -175,19 +187,19 @@ Two more recorded 2026-08-06 after the email exchange in §9 item 5. First, txid
 
 ---
 
-## 8. Confidence: 70%, Decomposed
+## 8. Confidence: 80%, Decomposed
 
 | Claim | Confidence | Basis / limiter |
 |---|---|---|
 | Scaling arithmetic → recursive pools + amortized non-interactive exit required | 95% | Arithmetic; attackable only via pre-registered parameters |
 | Terminal substrate is a real-VM covenant language (some interface) | 85% | Residual: a DA breakthrough making ZK-custody self-contained |
-| **Conditions over introspection (the load-bearing judgment)** | **70%** | Survived internal stress tests (all authored by one analyst). A first email exchange (2026-08, §9 item 5) qualified the aggregation claim (§4.4), yielded concessions on accumulating checks and softfork extensibility, and left the arithmetic and the gate uncontested. Steelmen in §10. Full hostile review still owed |
+| **Conditions over introspection (the load-bearing judgment)** | **80%** | Survived internal stress tests (all authored by one analyst). A first email exchange (2026-08, §9 item 5) qualified the aggregation claim (§4.4), yielded concessions on accumulating checks and softfork extensibility, and left the arithmetic and the gate uncontested. Raised from 70% on 2026-08-07 by the §11 evidence: the effort-allocation endorsement, the converged-vocabulary inheritance, and the stable coordination primitive each remove a distinct objection. All of it from the friendliest possible witness. Steelmen in §10. Full hostile review still owed |
 | Two-track deployment strategy | 90% | Derived independently by rubric and by politics |
 | Mainnet activation within 10 years | 25–35% | Outside the recommendation; 0% CTV signaling + proposal fragmentation as of mid-2026 |
 
 **What would change the recommendation:** measured witness sizes blowing the gate thresholds after compression work; a hostile reviewer breaking the purity/witness-wall asymmetry (§6.3); a self-contained-DA construction for ZK exits; a validator-spec failure mode not repairable by rule design.
 
-**Why 70% is the ceiling here:** single-analyst process, envelope estimates, and two-party agreement with rising enthusiasm — a known warning sign. Remaining confidence lives in exactly two places: hostile review, and measured artifacts.
+**Why the low 80s is the ceiling here:** single-analyst process, envelope estimates, and the fact that every point of confidence gained since the original scoring came from friendly exchanges, with rising enthusiasm, which is a known warning sign. The §11 evidence in particular is the friendliest possible witness's testimony. Remaining confidence lives in exactly two places: hostile review of the identity seam (§4.4, decision 12 in `docs/condition-record.md`), and measured artifacts.
 
 ---
 
@@ -198,6 +210,7 @@ Two more recorded 2026-08-06 after the email exchange in §9 item 5. First, txid
 3. **Validator specification** (obligation 1) — the injective-matching rules first; they are the novel consensus surface.
 4. **Witness-compression design** (obligation 3) — the binding constraint on the scaling narrative.
 5. **Direct review with AJ Towns** — framing: "here is where the introspection architecture is right, and here are the five margins where we believe conditions beat it." A first email exchange is complete (August 2026). Outcomes: the §4.4 aggregation qualification, the §3.4 consolidation benchmark, the obligation 2 rewording, the §7 track-record correction, and two concessions from the introspection side (accumulating checks belong in condition lists, and softfork conditions are not a meaningful limitation since returned conditions can merge into the overall requirements). Open threads: composing an annex-declared claim with a program that asserts its presence, the softfork-guard challenge recorded under D3 in `docs/vm-record.md`, and the consolidation benchmark's exploit-resistance treatment under obligation 1.
+6. **Design-history review with the deployed architecture's designer** — complete (2026-08-06, a conversation plus a same-day production-corpus study, evidence recorded in §11). Outcomes: the §7 design principles, the coordination-vocabulary reversal and the wave and recombination decisions (decisions 10 to 12 in `docs/condition-record.md`), the §4.4 aggregation reality check, and the §8 confidence update. The open risks it concentrated: witness-byte cost of computed-over-context claims against the pre-registered gates (a Phase 4 measurement: compute, don't argue), and the identity and recombination classification, the one part of the condition layer that is off the upstream map and ours to prove. The vault-merging objection from the introspection side lives there, so §9 item 5's continuation is the binding test.
 
 ---
 
@@ -221,6 +234,7 @@ Written after the August 2026 email exchange, one steelman per side, each drafte
 4. **Flat effects are the analyzability prize.** A condition list is data. Wallets, watchtowers, and auditors read what a spend can do without symbolically executing an arbitrary introspection program per contract.
 5. **The track record, stated precisely, still counts.** The condition semantics have had no theft-grade failure in five years of adversarial deployment, on a chain whose offer economy demonstrates non-interactive composition daily. The recorded incidents (negative division, softfork opcode revision, modpow pricing) all live in the VM and its cost table, exactly the parts BitLisp inherits under a closed operator set and re-validates under obligation 2, not in the condition layer whose novelty is the actual objection.
 6. **Purity is not retrofittable.** A vocabulary gap on the conditions side is patched by adding a word. Introspection cannot later acquire purity, flat effects, or a single validator without becoming the conditions architecture.
+7. **Ossification asymmetry (added 2026-08-07).** Both architectures freeze something forever. Conditions freeze a claim vocabulary that is append-only by construction (the reserved tier is the growth path). Introspection freezes the transaction serialization as a script-visible API, so every future change to the format becomes a script-compatibility question for coins already committed. Freezing the extensible thing is strictly cheaper than freezing the thing that was never designed to be an API.
 
 ### 10.3 What the exercise moved
 
@@ -229,3 +243,29 @@ The introspection steelman is stronger than §4.3's one-line summary conveys, an
 Both points are risk arguments rather than capability arguments, and both are answerable by work this document already mandates: obligation 1's spec-and-adversarial-vectors discipline for the novel validator, and the §7 template discipline for aggregation stability. The capability asymmetries in §10.2 stood uncontested through the first exchange, which also yielded concessions from the introspection side on accumulating checks and softfork extensibility while leaving the arithmetic and the gate untouched.
 
 Verdict: conditions over introspection stands, at 70% rather than 72%. The residual is now better localized: it is not "maybe introspection is more capable" but "maybe the novel validator's correctness risk outweighs the capability margins." That is the question hostile review should be pointed at.
+
+---
+
+## 11. Evidence from the Deployed Architecture (added 2026-08-07)
+
+Recorded from a 2026-08-06 conversation with the deployed architecture's designer and a same-day study of the production puzzle corpus. Per project policy the correspondence itself stays out of the repo. Everything here is either the friendliest possible witness's view or our own reading of public code, and §8 weighs it accordingly.
+
+### 11.1 The designer's view
+
+1. **CLVM ports to Bitcoin largely as-is. The condition layer is the Bitcoin-specific rewrite**, with new conditions needed (taproot was the given example). This matches the same author's 2024 Delving Bitcoin position (conditions are the transaction-format layer) and independently endorses this project's effort allocation: the VM is commodity, the condition vocabulary and validator are the work.
+2. **No language regrets.** The remaining limitations are minor CLVM items scheduled for Chia 3.0, a proof-of-space-format fork. The condition vocabulary converged after roughly three revision rounds (CHIP-0011, CHIP-0014, CHIP-0025), and BitLisp inherits the endpoint instead of re-running the iteration. This weakens the iteration-cadence objection to a new vocabulary.
+3. **CHIP-0025 SEND/RECEIVE is stable and working**, with no improvements queued. This de-risks the coordination-primitive bet.
+4. **Announcements are not deprecated in practice.** They are the unaddressed broadcast primitive, load-bearing for offers because the asserting side cannot know counterparty coin ids at signing time, while messages are addressed exact pairing. A coordination vocabulary needs both. This overturned the earlier successor framing (decision 10 in `docs/condition-record.md`), with namespacing made first-class in the condition rather than repeating the payload prefix-byte convention.
+
+### 11.2 The production corpus
+
+1. **The CAT ring is the flagship contortion exhibit.** Enforcing "token inputs equal token outputs" takes roughly eighty lines of induction-proof ring accounting. It is also the honest price of purity: the guess-and-assert pattern (Chia's "truths") re-derives transaction facts in-program and asserts them. The essay presents both readings.
+2. **Condition morphing is the userspace covenant engine.** The singleton and NFT layers rewrite their inner program's output-creation conditions, and the curry-and-treehash discipline is the covenant tax. On our side that tax becomes tapleaf plus taproot-tweak re-derivation, which CREATE_OUTPUT_TAPROOT already prices into one condition.
+3. **Offers are the conditions-model win.** A trustless swap in roughly fifty lines via broadcast announcements, running daily in production. This is the offer-economy evidence behind §4.4, to be cited at file level in the essay.
+4. **The aggregation record is thin.** Identical-spend dedup shipped only in release 2.5.5, singleton fast-forward is the only program-aware node aggregation and caused the February 2025 block-production incident, and fast-forward versus ASSERT_MY_COIN_ID is a live rebasability and replay-protection tension. Folded into §4.4 as the aggregation reality check.
+
+### 11.3 What this moves and what it cannot
+
+The evidence raises the conditions-over-introspection judgment to 80% (§8). The effort-allocation endorsement, the converged-vocabulary inheritance, and the stable coordination primitive each remove a distinct objection: that the rewrite scope is unknown, that the vocabulary would iterate for years under soft-fork cadence, and that the coordination bet is speculative.
+
+What it cannot move: all of this is from the friendliest possible witness, and the two concentrated risks it leaves are exactly the ones off the upstream map. Witness-byte cost of computed-over-context claims against the pre-registered gates (526 vb single exit at 1B, amortized and nested structure at 9B) is a Phase 4 measurement: compute, don't argue. And the identity and recombination seam (decision 12 in `docs/condition-record.md`) is where Chia's converged vocabulary stops being a reference, because their fixed point assumes content-derived identity. The vault-merging objection from the introspection side lives there. The hostile review of that seam (§9 item 5) remains the binding test.

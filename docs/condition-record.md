@@ -44,6 +44,18 @@ Section 4 registers the rules that have no external reference at all.
   primitives compose into a second runnable oracle, and the test
   suite runs the derivation differentially against that composition
   alongside the official vector pins.
+- **CHIP-0011 (the Chia 2.0 hard fork)** is the recorded precedent
+  for signature binding granularity: its six partial-binding
+  AGG_SIG variants (parent, puzzle, and amount combinations) were
+  retrofitted for state-channel patterns, evidence that the
+  AGG_SIG family needs a menu of binding granularities at day one
+  rather than a single full binding.
+- **Design-history evidence (2026-08-06).** A conversation with
+  the deployed architecture's designer and a same-day study of the
+  production puzzle corpus (CATs, singletons, offers), summarized
+  in section 11 of the evaluation doc. Per project policy the
+  correspondence itself stays out of the repo. This evidence base
+  informs the decision 9 addendum and decisions 10 to 12 below.
 - **bllsh** (AJ Towns' introspection Lisp) was cloned into
   git-ignored `references/` on 2026-07-29 and read for the
   CREATE_COIN_TAPROOT evaluation, under the reading guardrails
@@ -188,7 +200,7 @@ Section 4 registers the rules that have no external reference at all.
      around. A missing assert here is an expressiveness hole that
      only a soft fork through the reserved tier can patch.
    - Chia curated its assert set and the gaps surfaced as a
-     retrofit: CHIP-0011 added the ASSERT_BEFORE family, the birth
+     retrofit: CHIP-0014 added the ASSERT_BEFORE family, the birth
      asserts, ASSERT_EPHEMERAL, and the concurrent asserts years
      into deployment. Field coverage is cheap up front and
      expensive to recover.
@@ -212,7 +224,10 @@ Section 4 registers the rules that have no external reference at all.
      while Chia ships the ASSERT_BEFORE family and the
      expiring-offer pattern wants it. Include or decline is a real
      decision with a benchmark on one side and a mempool and reorg
-     safety norm on the other.
+     safety norm on the other. The lean, recorded 2026-08-06, is
+     decline: Bitcoin has repeatedly rejected expiring spend
+     authorization on reorg-safety grounds. The final decision and
+     its full decline note land with the timelock family.
    - Witness-dependent quantities (transaction weight, fee rate).
      The witness contains the program making the claim, so these
      are self-referential and need either a stripped-measure
@@ -226,6 +241,81 @@ Section 4 registers the rules that have no external reference at all.
    by default applies to read-only asserts over transaction fields,
    where the risk profile is uniform, not to conditions that create
    abilities.
+
+   Addendum (2026-08-06). The design-history evidence generalized
+   this decision into the schema-completeness principle now
+   recorded in section 7 of the evaluation doc: the vocabulary is
+   complete over Bitcoin's spend schema, never curated by predicted
+   applications. Chia's iteration history is the evidence that
+   use-case curation fails. Announcements had to be followed by
+   the message conditions, the assert set grew by the CHIP-0014
+   retrofit above, and userspace repurposed magic amount values as
+   signals where the vocabulary had no word. Schema enumeration is
+   tractable, application prediction is not.
+
+10. **Coordination vocabulary carries addressed and unaddressed
+    primitives.** RATIFIED (decision by Evan, 2026-08-06). Earlier
+    Phase 2 notes treated the CHIP-0025 message pair as the
+    announcements' successor and left the four announcement
+    conditions unported. The design-history evidence overturned
+    that premise: announcements are not deprecated in practice.
+    They are the unaddressed broadcast primitive, and they are
+    load-bearing for offers, where the asserting side cannot know
+    the counterparty's coin ids at signing time. Messages are
+    addressed exact pairing and cannot express that. The v0
+    vocabulary therefore plans both: the addressed message pair
+    and an unaddressed broadcast pair, each strictly
+    transaction-scoped. Namespacing is first-class in the
+    condition arguments. Chia's production puzzles separate their
+    announcement kinds by reserving payload prefix bytes, a
+    userspace convention consensus never sees, and that convention
+    is not ported. Names, arguments, binding modes, and
+    multiplicity land with the MATCHING.md rule 3 design.
+11. **The validator spec is organized as validation waves.**
+    RATIFIED (decision by Evan, 2026-08-06). MATCHING.md organizes
+    validation into waves of strictly increasing context:
+    1. Stateless per-spend work: the VM run and condition
+       well-formedness, cacheable forever.
+    2. Claims bound to the spent output's own data (outpoint,
+       spent scriptPubKey, amount), cacheable per outpoint.
+    3. Chain-context asserts: height and median time past, which
+       define validity ranges the mempool re-evaluates cheaply.
+    4. Cross-spend relational checks: message and broadcast
+       pairing and injective output matching, the only wave that
+       re-runs when spends are recombined into a different
+       transaction.
+    5. Batch signature verification over the collected
+       (pk, message) pairs.
+    Three grounds. It matches the deployed implementation's
+    structure: chia_rs parses and checks conditions in stages of
+    the same shape. It matches Bitcoin Core's own split between
+    context-free and contextual validation. And it makes decision
+    12 structural: a condition's wave assignment states exactly
+    what context can invalidate it, so recombination-stability
+    classification is wave assignment. MATCHING.md's rule
+    numbering is unchanged. The waves are the spec's organizing
+    frame, and each rule states its wave.
+12. **Every binding mode gets a recombination-stability class.**
+    RATIFIED as a requirement (decision by Evan, 2026-08-06), with
+    the classification itself owed by the identity and signature
+    designs. Chia's coin id is content-derived from parent,
+    program hash, and amount, so it is stable across whichever
+    aggregate spend bundle carries the spend. A Bitcoin outpoint
+    is (txid, vout), transaction-scoped and unknown before
+    assembly. Conditions and signature messages therefore bind to
+    prevout data (the outpoint, the spent scriptPubKey, the
+    amount), and every binding mode offered is classified as
+    recombination-stable, meaning its claims survive aggregation
+    of the spend into a different transaction, or
+    recombination-fragile, meaning they do not. The classification
+    is the structural answer to the aggregation qualification in
+    section 4.4 of the evaluation doc: aggregation survives
+    exactly for spends whose bindings are stable, the analogue of
+    Chia's fast-forward eligibility rules. Chia's converged
+    vocabulary is a fixed point of their identity model, so this
+    classification has no upstream reference and gets the
+    ground-rule-4 novel-layer treatment, invariants and
+    adversarial recombination vectors first.
 
 ## 4. Novel-layer register
 
@@ -241,3 +331,11 @@ for an oracle, per ground rule 4:
 | 4. Dedup and multiplicity | pending | same treatment, plus translated Chia dedup tests where semantics overlap |
 | 5. Per-condition costing | pending | CHIP-0049 precedent comparison plus cost-conservation properties |
 | 6. Reserved conditions | normative | encoding vectors in `vectors/conditions/`, every error path pinned |
+
+Decision 12 adds a seventh entry to this register when the identity
+and signature designs land: the recombination-stability
+classification, whose adversarial surface is recombination of valid
+spends into transactions their authors never assembled. No deployed
+system exercises that surface at scale (the aggregation reality
+check in section 11.2 of the evaluation doc), so it gets invariants
+and adversarial recombination vectors rather than translated tests.
