@@ -188,7 +188,7 @@ Section 4 registers the rules that have no external reference at all.
      around. A missing assert here is an expressiveness hole that
      only a soft fork through the reserved tier can patch.
    - Chia curated its assert set and the gaps surfaced as a
-     retrofit: CHIP-0011 added the ASSERT_BEFORE family, the birth
+     retrofit: CHIP-0014 added the ASSERT_BEFORE family, the birth
      asserts, ASSERT_EPHEMERAL, and the concurrent asserts years
      into deployment. Field coverage is cheap up front and
      expensive to recover.
