@@ -316,6 +316,28 @@ Section 4 registers the rules that have no external reference at all.
     classification has no upstream reference and gets the
     ground-rule-4 novel-layer treatment, invariants and
     adversarial recombination vectors first.
+13. **The layer is named condition validation.** RATIFIED (decision
+    by Evan, 2026-08-07). The layer this record has called matching
+    is renamed condition validation. `spec/MATCHING.md` becomes
+    `spec/VALIDATION.md`, `vectors/matching/` becomes
+    `vectors/validation/`, and prose across the repo follows. Three
+    grounds. First, a conversation with an external protocol
+    designer produced the record's first cold-reader evidence on
+    naming: the old name misled the reader, because matching also
+    names wallet-side program template recognition in the Chia
+    ecosystem and order pairing on exchanges, and those senses came
+    first. Second, only rule 1 computes a matching in the technical
+    sense. Message scoping, dedup, costing, and reserved conditions
+    match nothing, so the layer name had overfit its first rule.
+    Third, decision 11 already organizes the layer into validation
+    waves, and Bitcoin Core's transaction-context consensus checks
+    live in validation.cpp, so validation is the Bitcoin-native
+    noun the terminology policy favors. The word matching survives
+    exactly where it is precise: rule 1 keeps its name, injective
+    multiset output matching, the claim-to-slot assignment keeps
+    the glossary's injective matching row, and technical uses
+    (bipartite matching, opcode matching, matching the consensus
+    oracle) are untouched.
 
 ## 4. Novel-layer register
 
