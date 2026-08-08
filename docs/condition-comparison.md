@@ -72,22 +72,25 @@ The BitLisp family's message-composition design is the open item.
 
 | Capability | Chia | BitLisp |
 | --- | --- | --- |
-| after, absolute height | `ASSERT_HEIGHT_ABSOLUTE` 83 | `ASSERT_HEIGHT_ABSOLUTE`, planned |
-| after, relative height | `ASSERT_HEIGHT_RELATIVE` 82 | `ASSERT_HEIGHT_RELATIVE`, planned |
-| after, absolute time | `ASSERT_SECONDS_ABSOLUTE` 81 | `ASSERT_SECONDS_ABSOLUTE`, planned |
-| after, relative time | `ASSERT_SECONDS_RELATIVE` 80 | `ASSERT_SECONDS_RELATIVE`, planned |
-| before variants | `ASSERT_BEFORE_*` 84 to 87, expiring spends | not in the v0 plan, decline lean recorded (condition-record.md decision 9) |
+| after, absolute height | `ASSERT_HEIGHT_ABSOLUTE` 83 | `ASSERT_LOCKTIME_HEIGHT` 0x20 |
+| after, relative height | `ASSERT_HEIGHT_RELATIVE` 82 | `ASSERT_SEQUENCE_HEIGHT` 0x22 |
+| after, absolute time | `ASSERT_SECONDS_ABSOLUTE` 81 | `ASSERT_LOCKTIME_TIME` 0x21 |
+| after, relative time | `ASSERT_SECONDS_RELATIVE` 80 | `ASSERT_SEQUENCE_TIME` 0x23 |
+| before variants | `ASSERT_BEFORE_*` 84 to 87, expiring spends | declined, structurally inexpressible in the field shape (condition-record.md decision 15) |
 
-The four after-style asserts have double reference coverage: Chia's
-deployed semantics and Bitcoin's own locktime and sequence rules,
-which the transaction view in VALIDATION.md names as the model. The
-translated Chia consensus tests planned for the cross-check subset
-(condition-record.md section 2) land with this family. The before
-variants would make spend authorization expire, a capability Bitcoin
-consensus has historically avoided because a reorg can retroactively
-invalidate a confirmed spend. A decline lean was recorded 2026-08-06
-in the condition record's decision 9, with the final decision and
-its decline note owed by the timelock family.
+The four after-style asserts landed 2026-08-07 in the field
+enforcement shape: they constrain the transaction's own locktime,
+sequence, and version fields, and base consensus enforces those
+fields against the chain (condition-record.md decision 15,
+divergences C5 and C6). Double reference coverage in the vectors:
+Bitcoin's deployed locktime and sequence rules for the field
+semantics, and Chia's deployed comparison boundaries where the
+shapes overlap. The before variants would make spend authorization
+expire, a capability Bitcoin consensus has deliberately avoided
+because a reorg can retroactively invalidate a confirmed spend.
+The 2026-08-06 decline lean became a structural decline in
+decision 15: the field shape has no valid-only-before rule to
+delegate to.
 
 ## Self asserts
 
@@ -177,7 +180,7 @@ specs of the same shape.
 
 | Property | Chia | BitLisp |
 | --- | --- | --- |
-| validation scope | a block's spends plus chain state (coin records, prior block height and timestamp) | a single transaction view, contextual asserts compare against validation context in the manner of Bitcoin's locktime rules |
+| validation scope | a block's spends plus chain state (coin records, prior block height and timestamp) | a single transaction view and nothing else, the time asserts constrain the transaction's own locktime fields and base consensus enforces the fields (decision 15) |
 | output identity | content-derived coin id (parent, puzzle hash, amount) | positional slot (scriptPubKey, amount) |
 | output creation | authoritative construction, collision rejected | injective claim on existing slots, equality-only, multiset counting (rule 1, normative) |
 | coexistence | every coin is a puzzle, no foreign outputs exist | mixed transactions with plain-taproot inputs and unmatched outputs (rule 2, normative) |
@@ -188,14 +191,14 @@ specs of the same shape.
 
 ## Observations
 
-- **Where Phase 2 stands.** Two vocabulary entries are normative,
-  `CREATE_OUTPUT` and `CREATE_OUTPUT_TAPROOT`. Eleven planned
-  entries are named: the four after-style time asserts,
-  `SEND_MESSAGE`, `RECV_MESSAGE`, the unaddressed broadcast pair,
-  `RESERVE_FEE`, `ASSERT_OUTPUT_COUNT`, and `ASSERT_FEE_LE` (the
-  last two constrained by the composition guarantee, which forbids
-  their listed shapes, condition-record decision 14). Two families
-  are planned with membership open, the secp AGG_SIG family and
+- **Where Phase 2 stands.** Six vocabulary entries are normative,
+  `CREATE_OUTPUT`, `CREATE_OUTPUT_TAPROOT`, and the four time
+  asserts. Seven planned entries are named: `SEND_MESSAGE`,
+  `RECV_MESSAGE`, the unaddressed broadcast pair, `RESERVE_FEE`,
+  `ASSERT_OUTPUT_COUNT`, and `ASSERT_FEE_LE` (the last two
+  constrained by the composition guarantee, which forbids their
+  listed shapes, condition-record decision 14). Two families are
+  planned with membership open, the secp AGG_SIG family and
   `ASSERT_MY_*`. Of the six validation rules, 1, 2, and 6 are
   normative and 3 to 5 are pending.
 - **Reference coverage is uneven by design.** The ported entries

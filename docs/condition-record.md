@@ -19,14 +19,24 @@ Section 4 registers the rules that have no external reference at all.
 | C2 | CREATE_COIN memos | optional third argument, wallet-discovery hints | declined, strict arity two | The discovery job does not exist under output-script scanning. Consensus-carried bytes with no consensus meaning are a deliberate non-affordance (design obligation 4, inscription counterargument recorded there). A memo-bearing variant stays reachable through the reserved tier. Ratified 2026-07-29. | `conditions/encoding.json` arity cases |
 | C3 | duplicate CREATE_COIN within one spend | rejected (child coin ids would collide) | valid, two claims requiring two distinct slots | Chia's rejection exists because its content-derived coin ids make identical children the same coin. Bitcoin output identity is positional, so identical slots are meaningful and routine (batch payouts). Counting under rule 1 handles them. Ratified 2026-07-29. | `validation/create-output.json` duplicate cases |
 | C4 | unknown condition opcodes | ignored and unenforced, zero cost for one-byte opcodes, a computed cost table for larger opcodes (verified in chia_rs `compute_unknown_condition_cost`, 2026-07-29) | three tiers: assigned, invalid, reserved 0x80 to 0xff with declared cost and a floor | Invalid-by-default matches the consensus mindset (reject the ambiguous case). The reserved tier is the deliberate forward-compatibility hatch, priced so old and new validators agree forever. Ratified 2026-07-29, four sub-decisions in section 3. | `conditions/encoding.json` tier cases |
+| C5 | timelock enforcement | condition operands compared directly against chain state, previous transaction block height and timestamp, relative locks anchored at coin creation | conditions constrain the transaction's own locktime, sequence, and version fields, base consensus enforces them against the chain (BIP 65, 68, 112, 113 semantics inherited, relative locks anchored at prevout confirmation) | The validator holds no clock and stage 3 stays empty in v0. Reversibility decided it: a chain read stays addable through the reserved tier, the reverse migration cannot happen. Ratified 2026-08-07, decision 15. | `validation/time-asserts.json` |
+| C6 | timelock operand range | arbitrary-size integer operands | typed domains inherited from the fields: heights below 500,000,000, times 500,000,000 to 2^32 - 1, relative values 16 bits with 512-second time units | The envelope is what base consensus enforces. Exceeding it would require chain reads, the declined shape. Out-of-domain operands are malformed at stage 1, so a mistyped operand fails loudly at parse. Ratified 2026-08-07, decision 15. | `conditions/time-asserts.json` domain cases |
+| C7 | before-style timelocks | `ASSERT_BEFORE_*` family, expiring spend authorization | declined, structurally inexpressible in the field shape | Base consensus has no valid-only-before rule to delegate to. Expiring validity is the reorg hazard Bitcoin has deliberately avoided. Final decision 2026-08-07, decision 15, closing the decision 9 flag. | none, the opcodes stay invalid per `conditions/encoding.json` tier cases |
 
 ## 2. Reference provenance
 
 - **Chia condition semantics.** Established from the deployed
   behavior of the pinned oracle wheels where portable, and from
-  translated Chia consensus tests for semantics that overlap
-  (the cross-check subset lands with the timelock family). No
-  binary diffing: the transaction models differ.
+  translated Chia consensus tests for semantics that overlap. No
+  binary diffing: the transaction models differ. For the timelock
+  family the field enforcement shape (decision 15) superseded
+  direct test translation: the overlap that survives the shape
+  change is the comparison boundary, where chia_rs
+  `check_time_locks.rs` fails only when the chain value is
+  strictly below the operand, agreeing with OP_CLTV and OP_CSV
+  that equality passes, and the family's boundary vectors pin
+  exactly that. Translation stays the plan for the dedup
+  semantics of rule 4.
 - **CHIP-0025 (message conditions)** and **CHIP-0049 (Chia 3.0
   cost revisions)** are the recorded costing precedents for
   validation rule 5. CHIP-0049's per-condition base cost of 500 is
@@ -419,6 +429,90 @@ Section 4 registers the rules that have no external reference at all.
       over the landed vocabulary. Every new condition family owes
       merge vectors when it lands.
 
+15. **The time assert family: field enforcement, full coverage,
+    plain operands.** RATIFIED (decisions by Evan, 2026-08-07,
+    designed in the timelock chat session). Five parts:
+    - Enforcement shape. Two candidates were steelmanned: direct
+      chain reads (Chia's deployed shape, argued from directness,
+      freedom from the locktime machinery's historical warts, no
+      range ceiling, and uniformity with the assert grid) and
+      constraining the transaction's own locktime, sequence, and
+      version fields with base consensus enforcing them (the
+      OP_CHECKLOCKTIMEVERIFY and OP_CHECKSEQUENCEVERIFY shape,
+      argued from zero new chain-reading surface, inherited reorg
+      and mempool semantics, and interoperability with every
+      deployed wallet's locktime discipline). Ratified: the field
+      shape. The deciding asymmetries: reversibility (a chain-read
+      assert stays addable later through the reserved tier with
+      evidence in hand, while a shipped chain read can never be
+      removed) and burden of proof before hostile review (the
+      validator holds no clock at all, so a timestamp objection
+      indicts deployed Bitcoin, not this layer). Validation stage 3
+      is deliberately empty in v0, and the VALIDATION.md
+      transaction view now states unconditional purity.
+    - ASSERT_BEFORE, final decision: declined, closing the cell
+      flagged in decision 9. Under the field shape the decline is
+      structural, not curated: base consensus has no valid-only-
+      before rule to delegate to, so the shape cannot express
+      expiring validity. The known cost is recorded honestly, the
+      async offer benchmark loses Chia-style offer expiry and uses
+      the standard alternative (the maker spends an input of the
+      offer to revoke it). If evidence from Phase 4 or hostile
+      review demands expiry, the pre-registered path is a reserved-
+      tier condition designed against the reorg-safety objection,
+      not a retrofit of this family.
+    - The time-typed pair is kept. The height-only position
+      (advocated publicly by Peter Todd: height is the chain's
+      native clock, timestamps are miner-influenced within bounds)
+      was weighed and declined for the vocabulary. Grounds: the
+      schema-completeness principle binds (time-typed locktime and
+      time-typed sequence locks are deployed spend-schema fields
+      that scripts constrain today), declining removes no attack
+      surface under the field shape since the validator reads no
+      clock either way, and a calendar-deadline covenant has no
+      workaround in a pure conditions VM while height estimates
+      drift by months over decade horizons. The height-first
+      stance is honored where it has teeth: tooling defaults and
+      the language reference, recorded in the curation notes.
+    - Plain-quantity operands. The condition code carries the
+      type (four names, not two), the operand is a bare height,
+      timestamp, block count, or 512-second unit count, and each
+      operand domain excludes the wrong-typed range so a mistyped
+      operand is malformed at stage 1 rather than unsatisfiable at
+      stage 4. OP_CSV's encoded-operand precedent (the operand
+      mirrors the field's bit layout) was declined: the bit
+      layouts stay in the spec's shared definitions and the field
+      decoder, never in arguments, vectors, or program text.
+    - Stage home and the guarantee's first relaxation. The family
+      is stage 4, corrected from a drafted stage 2 home for the
+      sequence pair when drafting surfaced that BIP 68 enforces
+      nothing below transaction version 2, so every assert in the
+      family reads a transaction-level field (locktime or
+      version). The composition guarantee was relaxed under its
+      own amendment clause: concatenation carries the greater
+      version and greater locktime, and the hypothesis requires
+      same-typed locktime fields. The excluded pairs are exactly
+      the ones Bitcoin's single nLockTime field already forbids
+      every wallet from batching, so the relaxation imports a
+      deployed constraint rather than inventing one.
+      Pre-registered consequence: the version cell of decision 9's
+      grid needs a composition-safe comparison form when it lands,
+      an exact-version assert is merge-poison under the
+      greater-version rule.
+    - Correction from the pre-PR five-agent review (2026-08-07):
+      the first spec draft gated the sequence asserts on a signed
+      version reading. Deployed consensus compares the version
+      unsigned. Core casts nVersion to uint32 in both the BIP 68
+      sequence-lock calculation and the OP_CHECKSEQUENCEVERIFY
+      gate, with a source comment warning that a signed comparison
+      would exclude half the range, and current Core declares the
+      field uint32 outright. The signed draft would have
+      gratuitously rejected the top-bit wire versions consensus
+      enforces. The transaction view, the model, and the entries
+      now carry the field unsigned, and the corpus pins the top of
+      the range. The draft's error direction was reject-valid, so
+      no theft path ever existed.
+
 ## 4. Novel-layer register
 
 The validation rules have no external reference: no deployed system
@@ -428,7 +522,7 @@ for an oracle, per ground rule 4:
 | rule | status | oracle substitute |
 | --- | --- | --- |
 | 1. Injective multiset output matching | normative | hypothesis invariant suite (injectivity, reorder invariance, monotonicity, metamorphic mutations) plus the adversarial corpus in `vectors/validation/`, opening with the duplicate-CREATE_COIN theft vector |
-| 2. Mixed-transaction rule | normative | `vectors/validation/mixed-transaction.json`: five acceptance vectors (mixed, plain-only, unclaimed slots, merge, surplus capture) and one rule 1 boundary rejection, plus the addition-monotonicity, merge, and plain-only invariants |
+| 2. Mixed-transaction rule | normative | `vectors/validation/mixed-transaction.json`: five acceptance vectors (mixed, plain-only, unclaimed slots, merge, surplus capture) and one rule 1 boundary rejection, plus the addition-monotonicity, merge, and plain-only invariants. The time assert family checks under this rule's assert clause: `vectors/validation/time-asserts.json` with BIP 65 and BIP 68 field semantics as the double reference, plus the operand-monotonicity and boundary-flip invariants |
 | 3. Message scoping | pending | same treatment on landing |
 | 4. Dedup and multiplicity | pending | same treatment, plus translated Chia dedup tests where semantics overlap |
 | 5. Per-condition costing | pending | CHIP-0049 precedent comparison plus cost-conservation properties |
