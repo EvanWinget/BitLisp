@@ -1,8 +1,8 @@
 # BitLisp Condition Validation
 
 Status: in progress. The transaction view, the claims-and-asserts
-principle, the validation stages, and rules 1, 2, and 6 are
-normative. Rules 3 to 5 are designed in architecture sessions, land
+principle, the validation stages, and rules 1, 2, 3, and 6 are
+normative. Rules 4 and 5 are designed in architecture sessions, land
 here as prose first, and only then get implemented. Ground rule 4:
 this layer gets invariants and adversarial vectors before any feature
 work.
@@ -47,10 +47,10 @@ script is simply an unmatched slot.
 
 ## Claims and asserts
 
-A condition constrains the transaction through claims and asserts,
-and in no other way. Each vocabulary entry in `spec/CONDITIONS.md`
-states what it claims and what it asserts. An entry may produce
-neither: rule 6's reserved conditions constrain nothing.
+A condition constrains the transaction through claims, asserts,
+and message records, and in no other way. Each vocabulary entry in
+`spec/CONDITIONS.md` states which of these it produces. An entry
+may produce none: rule 6's reserved conditions constrain nothing.
 
 - A **claim** requires a resource of the transaction and consumes
   it. The output claims of rule 1 are the only claim kind defined
@@ -62,10 +62,17 @@ neither: rule 6's reserved conditions constrain nothing.
   an assert assigns and consumes nothing. Any number of asserts,
   from one input or many, may read the same fact. The transaction
   is checked against every assert of every BitLisp input.
+- A **message record** is a weighted entry, +1 or -1, in a
+  per-transaction ledger that rule 3 defines and requires to
+  balance exactly. Its counterpart is another condition, not a
+  transaction resource, so it is neither a claim nor an assert.
+  Satisfaction is consumed one for one as with a claim, but both
+  directions demand: an unmatched send and an unmatched receive
+  are equally invalid.
 
 The implication runs one way only. No rule in this document
-constrains a part of the transaction that no condition claims or
-reads. An output slot no claim consumes, an input that is not a
+constrains a part of the transaction that no condition claims,
+reads, or records against. An output slot no claim consumes, an input that is not a
 BitLisp input, and a fact no assert reads are all unconstrained.
 Rule 2 states the consequences.
 
@@ -84,8 +91,10 @@ concatenation sums or an exact count, must not be defined. The
 same-type hypothesis is Bitcoin's own constraint, not a new one:
 a transaction has a single locktime field, so height-locked and
 time-locked spends cannot share any transaction on the network
-today. Relaxing this paragraph changes what wallets may safely
-batch and requires a recorded design decision.
+today. The message ledger of rule 3 preserves this guarantee
+arithmetically: concatenation adds the two ledgers, and sums of
+zeros are zero. Relaxing this paragraph changes what wallets may
+safely batch and requires a recorded design decision.
 
 ## Validation stages
 
@@ -163,14 +172,124 @@ document.
 A transaction is valid under this document if and only if every
 condition of every BitLisp input is well-formed (the encoding
 rules of `spec/CONDITIONS.md` and rule 6, the stage 1 checks),
-every claim is assigned a satisfier, and every assert holds. No
-other property of the transaction's inputs and output slots
-affects validity under this document.
+every claim is assigned a satisfier, every assert holds, and the
+message ledger of rule 3 balances. No other property of the
+transaction's inputs and output slots affects validity under this
+document.
 
 ### 3. Message scoping
 
-TODO. Messages are strictly within-transaction. Sender and receiver
-binding modes, multiplicity rules for duplicate sends and receives.
+This rule defines the message ledger, the one structure in this
+document where two conditions satisfy each other, and the
+announcement facts that ASSERT_ANNOUNCEMENT reads. Everything in
+this rule is scoped to the containing transaction. No message or
+announcement exists outside it.
+
+**Participant descriptors.** A descriptor identifies an input's
+prevout data at a chosen precision. It is a commitment value from
+0 to 7 together with the fields that value commits to:
+
+| commitment value | committed fields | operands, in order |
+| --- | --- | --- |
+| 0 | none | none |
+| 1 | `amount` | `amount` |
+| 2 | `scriptPubKey` | `scriptPubKey` |
+| 3 | `scriptPubKey` and `amount` | `scriptPubKey`, `amount` |
+| 4 | creating txid | `txid` |
+| 5 | creating txid and `amount` | `txid`, `amount` |
+| 6 | creating txid and `scriptPubKey` | `txid`, `scriptPubKey` |
+| 7 | the outpoint | `outpoint` |
+
+The creating txid of an input is the txid half of the outpoint it
+consumes: the transaction that created a coin is the transaction
+its outpoint names. Commitment value 7 commits to the whole
+outpoint as a single 36-byte value and is a distinct descriptor,
+not the union of the other bits.
+
+Two descriptors are equal if and only if their commitment values
+are equal and their committed fields are equal, byte-exact for
+scripts, txids, and outpoints, numeric for amounts.
+
+The **self descriptor** of an input at commitment value m fills
+the committed fields from that input's own prevout data in the
+transaction view. The **argument descriptor** fills them from
+condition operands, in the operand order the table states.
+
+**The message ledger.** Each SEND_MESSAGE condition of an input
+contributes weight +1 to the record (self descriptor of that input
+at the mode's sender half, argument descriptor at the receiver
+half, `message`). Each RECEIVE_MESSAGE condition of an input
+contributes weight -1 to the record (argument descriptor at the
+sender half, self descriptor of that input at the receiver half,
+`message`). The sender half of the six-bit mode is its high three
+bits and the receiver half its low three bits.
+
+The message ledger balances if and only if the
+weights of every distinct record sum to zero, and a transaction
+whose ledger does not balance is invalid, with the error
+`unbalanced_message`. The announcements below are asserts and are
+checked as asserts, not through the ledger.
+
+Consequences, each pinned by vectors:
+
+- k identical sends require exactly k identical receives, and the
+  reverse. One send cannot satisfy two receives.
+- A send and a receive may come from the same input, including one
+  input carrying both halves of its own pair.
+- The ledger is a sum, so input order and condition order never
+  affect the outcome.
+- A send whose receiver descriptor matches no input's self
+  descriptor can never balance, because only a receive from a
+  matching input produces the equal record.
+- Two independently balanced groups of inputs stay balanced when
+  spent together, even when their records collide.
+
+**Binding stability.** Every committed field carries a
+recombination-stability class:
+
+| committed field | knowable before the creating transaction exists | survives reassembly of an unconfirmed creator |
+| --- | --- | --- |
+| `amount` | yes | yes |
+| `scriptPubKey` | yes | yes |
+| creating txid | no | no |
+| `outpoint` | no | no |
+
+For an input whose creating transaction is confirmed, every field
+is fixed and any mode is safe. The classes separate content, which
+a program written before its counterpart exists can commit to,
+from location, which exists only once the creating transaction is
+final.
+
+**Guidance for program authors (not consensus).** A loose
+commitment is a loose lock. A descriptor at commitment value 0, or
+one committing only to content fields, is matched by any input
+whose prevout data fits, including an input an adversary supplies:
+the argument descriptor is chosen by the emitting program, and
+every self descriptor is honest by construction, so nothing stops
+a third party from spending an input of their own that fits a
+loose description. A program using the addressed pair or an
+announcement assert to authenticate a specific counterpart can
+rely on it only by committing to that counterpart's identity
+fields, txid or outpoint, once the counterpart is confirmed. A
+program embedded in a coin whose counterpart may still be
+reassembled can only safely address by content fields, and it
+accepts the substitution exposure that choice implies.
+
+**Announcements.** Each ANNOUNCE condition of an input creates the
+announcement (that input, `namespace`, `payload`). An
+ASSERT_ANNOUNCEMENT condition asserts that some single input
+carries an ANNOUNCE condition whose `namespace` and `payload`
+equal the assert's operands byte-exact, and that the same input's
+self descriptor at the assert's commitment value equals the
+argument descriptor. This is an ordinary assert:
+it reads a fact of the transaction view, consumes nothing, and any
+number of asserts may read the same announcement. An announcement
+no assert reads constrains nothing. Violation is the error
+`unsatisfied_announcement_assert`.
+
+This rule is stage 4 work: records and announcements combine data
+across inputs, so outcomes change when spends are recombined into
+a different transaction.
 
 ### 4. Dedup and multiplicity
 
@@ -226,10 +345,14 @@ it enforceable, and lands with that rule:
 - No output satisfies two conditions, k identical claims require k
   distinct slots (rule 1).
 - Validation is invariant under input reordering, output reordering,
-  and condition-list reordering (rule 1).
+  and condition-list reordering (rules 1 and 3).
 - Removing a condition from a valid transaction never turns it
   invalid, and adding a condition to an invalid transaction never
-  turns it valid: constraints only tighten (rule 1).
+  turns it valid: constraints only tighten (rule 1, scoped to claim
+  and assert conditions: rule 3's family is the recorded exemption,
+  a lone message half invalidates, a removed announcement can
+  invalidate, an added one can validate, with its own invariants
+  below).
 - Removing a claimed output from a transaction whose claims exactly
   cover that output's content turns it invalid (rule 1).
 - Metamorphic: mutating the content of any exactly-claimed output
@@ -254,3 +377,12 @@ it enforceable, and lands with that rule:
   the read field across the relevant boundary causes rejection,
   with locktime moved across the type threshold, the sequence
   disable flag set, or version dropped below 2 (time asserts).
+- Adding a balanced send and receive pair to a valid transaction
+  keeps it valid, and adding either half alone invalidates it
+  (rule 3).
+- Adding an ANNOUNCE to a valid transaction never invalidates it,
+  and removing the only announcement an assert reads invalidates
+  it (rule 3).
+- Metamorphic: flipping any byte of a message payload, a
+  namespace, or a committed descriptor field of the only balancing
+  pair causes rejection (rule 3).
