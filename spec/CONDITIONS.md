@@ -292,14 +292,14 @@ whose conditions' removal from a valid transaction can invalidate
 it: a lone half of a pair, or the only announcement an assert
 reads.
 
-Descriptor operands, consumed in the order VALIDATION.md rule 3's
-descriptor table states for the commitment value:
+Specifier operands, consumed in the order VALIDATION.md rule 3's
+specifier table states for the commitment value:
 
 - `txid` is an atom of exactly 32 bytes (`bad_condition_arg`).
 - `scriptPubKey` is an atom of 0 to 10,000 bytes
   (`bad_condition_arg`). A prevout may carry any script base
   consensus accepts, including the empty script, so the empty
-  atom is a valid descriptor operand here even though
+  atom is a valid specifier operand here even though
   CREATE_OUTPUT rejects it as claim content. A prevout whose
   script exceeds the bound is addressable by its other fields.
 - `amount` is a minimally encoded integer with
@@ -344,7 +344,7 @@ bytes (`bad_condition_arg`). Exactly two arguments, both atoms.
 **Semantics.** Claims nothing. Asserts that some input of the
 transaction carries an ANNOUNCE condition whose `namespace` and
 `payload` equal this condition's operands byte-exact, and whose
-self descriptor at `mode` equals the argument descriptor built
+self specifier at `mode` equals the argument specifier built
 from `announcer...`. Any number of asserts, from one input or
 many, may read the same announcement. Violation is
 `unsatisfied_announcement_assert`.
@@ -352,9 +352,9 @@ many, may read the same announcement. Violation is
 **Arguments.** `mode` is a minimally encoded integer with
 0 <= mode <= 7, a commitment value (`bad_condition_arg`).
 `namespace` and `payload` are atoms of 0 to 1024 bytes. Then the
-descriptor operands rule 3's table states for `mode`, in table
-order. Exactly 3 + n arguments, where n is the mode's operand
-count (`bad_condition_arity`).
+specifier operands the table in VALIDATION.md rule 3 states for
+`mode`, in table order. Exactly 3 + n arguments, where n is the
+mode's operand count (`bad_condition_arity`).
 
 **Cost.** Assigned when VALIDATION.md rule 5 lands.
 
@@ -365,7 +365,7 @@ count (`bad_condition_arity`).
 `(0x42 mode message receiver...)`
 
 **Semantics.** Contributes weight +1 to the message record (self
-descriptor at the sender half of `mode`, argument descriptor at
+specifier at the sender half of `mode`, argument specifier at
 the receiver half, `message`) in the ledger of VALIDATION.md rule
 3. Claims nothing and asserts nothing. The sender half always
 describes the emitting input, filled from its own prevout data,
@@ -378,9 +378,10 @@ offers.
 0 <= mode <= 63 (`bad_condition_arg`). Its high three bits are the
 sender half and its low three bits the receiver half, both
 commitment values. `message` is an atom of 0 to 1024 bytes. Then
-the descriptor operands rule 3's table states for the receiver
-half, in table order. Exactly 2 + n arguments, where n is the
-receiver half's operand count (`bad_condition_arity`).
+the specifier operands the table in VALIDATION.md rule 3 states
+for the receiver half, in table order. Exactly 2 + n arguments,
+where n is the receiver half's operand count
+(`bad_condition_arity`).
 
 **Cost.** Assigned when VALIDATION.md rule 5 lands.
 
@@ -392,7 +393,7 @@ Stage 4.
 `(0x43 mode message sender...)`
 
 **Semantics.** Contributes weight -1 to the message record
-(argument descriptor at the sender half of `mode`, self descriptor
+(argument specifier at the sender half of `mode`, self specifier
 at the receiver half, `message`) in the ledger of VALIDATION.md
 rule 3. Claims nothing and asserts nothing. The receiver half
 always describes the emitting input, filled from its own prevout
@@ -402,7 +403,7 @@ receive without its send invalidates the transaction
 
 **Arguments.** As for SEND_MESSAGE with the halves' roles
 exchanged: `mode` 0 to 63, `message` an atom of 0 to 1024 bytes,
-then the descriptor operands for the sender half, in table order.
+then the specifier operands for the sender half, in table order.
 Exactly 2 + n arguments, where n is the sender half's operand
 count (`bad_condition_arity`).
 

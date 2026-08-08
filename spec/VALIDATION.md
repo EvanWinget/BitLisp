@@ -8,7 +8,9 @@ this layer gets invariants and adversarial vectors before any feature
 work.
 
 This document specifies how a validated spend's condition list is checked
-against the containing Bitcoin transaction.
+against the containing Bitcoin transaction. The per-condition rules,
+each condition's arguments, their domains, and what it produces, are
+specified in [CONDITIONS.md](CONDITIONS.md).
 
 Target property: a reviewer who has read only this document can predict
 the outcome of every vector in `vectors/validation/`.
@@ -185,7 +187,7 @@ announcement facts that ASSERT_ANNOUNCEMENT reads. Everything in
 this rule is scoped to the containing transaction. No message or
 announcement exists outside it.
 
-**Participant descriptors.** A descriptor identifies an input's
+**Participant specifiers.** A specifier identifies an input's
 prevout data at a chosen precision. It is a commitment value from
 0 to 7 together with the fields that value commits to:
 
@@ -203,24 +205,24 @@ prevout data at a chosen precision. It is a commitment value from
 The creating txid of an input is the txid half of the outpoint it
 consumes: the transaction that created a coin is the transaction
 its outpoint names. Commitment value 7 commits to the whole
-outpoint as a single 36-byte value and is a distinct descriptor,
+outpoint as a single 36-byte value and is a distinct specifier,
 not the union of the other bits.
 
-Two descriptors are equal if and only if their commitment values
+Two specifiers are equal if and only if their commitment values
 are equal and their committed fields are equal, byte-exact for
 scripts, txids, and outpoints, numeric for amounts.
 
-The **self descriptor** of an input at commitment value m fills
+The **self specifier** of an input at commitment value m fills
 the committed fields from that input's own prevout data in the
-transaction view. The **argument descriptor** fills them from
+transaction view. The **argument specifier** fills them from
 condition operands, in the operand order the table states.
 
 **The message ledger.** Each SEND_MESSAGE condition of an input
-contributes weight +1 to the record (self descriptor of that input
-at the mode's sender half, argument descriptor at the receiver
+contributes weight +1 to the record (self specifier of that input
+at the mode's sender half, argument specifier at the receiver
 half, `message`). Each RECEIVE_MESSAGE condition of an input
-contributes weight -1 to the record (argument descriptor at the
-sender half, self descriptor of that input at the receiver half,
+contributes weight -1 to the record (argument specifier at the
+sender half, self specifier of that input at the receiver half,
 `message`). The sender half of the six-bit mode is its high three
 bits and the receiver half its low three bits.
 
@@ -238,8 +240,8 @@ Consequences, each pinned by vectors:
   input carrying both halves of its own pair.
 - The ledger is a sum, so input order and condition order never
   affect the outcome.
-- A send whose receiver descriptor matches no input's self
-  descriptor can never balance, because only a receive from a
+- A send whose receiver specifier matches no input's self
+  specifier can never balance, because only a receive from a
   matching input produces the equal record.
 - Two independently balanced groups of inputs stay balanced when
   spent together, even when their records collide.
@@ -261,11 +263,11 @@ from location, which exists only once the creating transaction is
 final.
 
 **Guidance for program authors (not consensus).** A loose
-commitment is a loose lock. A descriptor at commitment value 0, or
+commitment is a loose lock. A specifier at commitment value 0, or
 one committing only to content fields, is matched by any input
 whose prevout data fits, including an input an adversary supplies:
-the argument descriptor is chosen by the emitting program, and
-every self descriptor is honest by construction, so nothing stops
+the argument specifier is chosen by the emitting program, and
+every self specifier is honest by construction, so nothing stops
 a third party from spending an input of their own that fits a
 loose description. A program using the addressed pair or an
 announcement assert to authenticate a specific counterpart can
@@ -280,8 +282,8 @@ announcement (that input, `namespace`, `payload`). An
 ASSERT_ANNOUNCEMENT condition asserts that some single input
 carries an ANNOUNCE condition whose `namespace` and `payload`
 equal the assert's operands byte-exact, and that the same input's
-self descriptor at the assert's commitment value equals the
-argument descriptor. This is an ordinary assert:
+self specifier at the assert's commitment value equals the
+argument specifier. This is an ordinary assert:
 it reads a fact of the transaction view, consumes nothing, and any
 number of asserts may read the same announcement. An announcement
 no assert reads constrains nothing. Violation is the error
@@ -384,5 +386,5 @@ it enforceable, and lands with that rule:
   and removing the only announcement an assert reads invalidates
   it (rule 3).
 - Metamorphic: flipping any byte of a message payload, a
-  namespace, or a committed descriptor field of the only balancing
+  namespace, or a committed specifier field of the only balancing
   pair causes rejection (rule 3).
