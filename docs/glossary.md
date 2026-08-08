@@ -28,8 +28,11 @@ A term enters this table in the same PR that introduces it.
 | spend | input plus its witness | coin spend | one input's evaluation and conditions |
 | reserved condition | upgradable NOP | unknown condition | priced forward-compatibility hatch, invalid-by-default outside it |
 | internal key, merkle root, tweak | BIP341 terms, used as defined there | none | see the CREATE_OUTPUT_TAPROOT entry |
-| SEND_MESSAGE, RECV_MESSAGE | no direct equivalent | SEND_MESSAGE, RECEIVE_MESSAGE (CHIP-0025) | planned, strictly transaction-scoped, addressed exact pairing |
-| broadcast conditions | no direct equivalent | announcements (coin and puzzle, create and assert) | planned unaddressed pair, transaction-scoped, names owed by the VALIDATION.md rule 3 design (condition-record decision 10) |
+| SEND_MESSAGE, RECEIVE_MESSAGE | no direct equivalent | SEND_MESSAGE, RECEIVE_MESSAGE (CHIP-0025) | landed 2026-08-07, opcodes numerically Chia's, transaction-scoped counted balance (condition-record decision 16) |
+| ANNOUNCE, ASSERT_ANNOUNCEMENT | no direct equivalent | the four announcement conditions (coin and puzzle, create and assert) | landed 2026-08-07, the unaddressed pair, namespace first-class, announcer precision chosen by the assert (condition-record decisions 10 and 16) |
+| message record | no direct equivalent | send and receive balancing in chia_rs | the third condition sort beside claims and asserts, a weighted ledger entry (+1 or -1) whose record must net to zero (VALIDATION.md rule 3, condition-record decision 16) |
+| participant specifier | no direct equivalent | mode bits with SpendId | the commitment-value grammar naming an input's prevout data at a chosen precision (VALIDATION.md rule 3, condition-record decision 18) |
+| creating txid | the txid half of an outpoint | parent coin id | the creator handle the validator holds, substituting for Chia's coin-parent lineage (divergence C9) |
 | validator | no direct equivalent, the script interpreter checks one input at a time | condition parsing and checking | the single consensus component that checks every spend's conditions against the transaction |
 | condition validation | nearest relative is the contextual transaction checks in Core's validation.cpp | condition parsing and checking in chia_rs | the layer the validator implements, checking every spend's condition list against the containing transaction, renamed from matching 2026-08-07 (condition-record decision 13) |
 | validation stage | nearest relative is Core's split between context-free and contextual checks | condition parsing and checking stages in chia_rs | the validator spec's organizing frame, five stages of strictly increasing context (condition-record decision 11, renamed from wave 2026-08-07) |

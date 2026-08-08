@@ -121,17 +121,34 @@ def run_vm_case(case):
         raise VectorError(f"expected {expect}, got {outcome}")
 
 
+def _specifier_json(specifier):
+    """The pinned JSON form of a participant specifier: the
+    commitment value and the fields in operand order, amounts as
+    integers, everything else as hex."""
+    return {
+        "commitment": specifier.commitment,
+        "fields": [
+            field if isinstance(field, int) else field.hex()
+            for field in specifier.fields
+        ],
+    }
+
+
 def _condition_json(cond):
     """The pinned JSON form of one parsed condition."""
     from bitlisp import serialize
     from bitlisp.conditions import (
+        Announce,
+        AssertAnnouncement,
         AssertLocktimeHeight,
         AssertLocktimeTime,
         AssertSequenceHeight,
         AssertSequenceTime,
         CreateOutput,
         CreateOutputTaproot,
+        ReceiveMessage,
         Reserved,
+        SendMessage,
     )
 
     if isinstance(cond, AssertLocktimeHeight):
@@ -155,6 +172,33 @@ def _condition_json(cond):
             "merkle_root": cond.merkle_root.hex(),
             "amount": cond.amount,
             "script_pubkey": cond.script_pubkey.hex(),
+        }
+    if isinstance(cond, Announce):
+        return {
+            "opcode": cond.opcode,
+            "namespace": cond.namespace.hex(),
+            "payload": cond.payload.hex(),
+        }
+    if isinstance(cond, AssertAnnouncement):
+        return {
+            "opcode": cond.opcode,
+            "announcer": _specifier_json(cond.announcer),
+            "namespace": cond.namespace.hex(),
+            "payload": cond.payload.hex(),
+        }
+    if isinstance(cond, SendMessage):
+        return {
+            "opcode": cond.opcode,
+            "sender_commitment": cond.sender_commitment,
+            "receiver": _specifier_json(cond.receiver),
+            "message": cond.message.hex(),
+        }
+    if isinstance(cond, ReceiveMessage):
+        return {
+            "opcode": cond.opcode,
+            "sender": _specifier_json(cond.sender),
+            "receiver_commitment": cond.receiver_commitment,
+            "message": cond.message.hex(),
         }
     if isinstance(cond, Reserved):
         return {
@@ -183,6 +227,14 @@ def run_conditions_case(case):
     entry's name ("height", "time", "blocks", "units") for the time
     asserts, and {"opcode", "cost", "args": [<hex node>]} for
     reserved conditions.
+
+    The message family pins specifiers as {"commitment", "fields"}
+    with fields in operand order, amounts as integers, all other
+    fields hex. ANNOUNCE is {"opcode", "namespace", "payload"},
+    ASSERT_ANNOUNCEMENT adds "announcer" (a specifier),
+    SEND_MESSAGE is {"opcode", "sender_commitment", "receiver",
+    "message"}, and RECEIVE_MESSAGE is {"opcode", "sender",
+    "receiver_commitment", "message"}.
     """
     from bitlisp import BitLispError, deserialize, parse_conditions
     from bitlisp.errors import CODES

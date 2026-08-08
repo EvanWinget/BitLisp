@@ -121,8 +121,8 @@ is no intra-transaction chaining.
 
 | Capability | Chia | BitLisp |
 | --- | --- | --- |
-| announcements | `CREATE_COIN_ANNOUNCEMENT` 60, `ASSERT_COIN_ANNOUNCEMENT` 61, `CREATE_PUZZLE_ANNOUNCEMENT` 62, `ASSERT_PUZZLE_ANNOUNCEMENT` 63 | an unaddressed broadcast pair, planned, transaction-scoped, names owed by the rule 3 design, namespacing first-class in the arguments rather than payload prefix bytes (decision 10) |
-| messages | `SEND_MESSAGE` 66, `RECEIVE_MESSAGE` 67 (CHIP-0025), mode flags select which sender and receiver fields the pairing commits to, paired within the surrounding block | `SEND_MESSAGE` and `RECV_MESSAGE`, planned, strictly transaction-scoped, binding modes and multiplicity owed by VALIDATION.md rule 3 |
+| announcements | `CREATE_COIN_ANNOUNCEMENT` 60, `ASSERT_COIN_ANNOUNCEMENT` 61, `CREATE_PUZZLE_ANNOUNCEMENT` 62, `ASSERT_PUZZLE_ANNOUNCEMENT` 63 | `ANNOUNCE` 0x40 and `ASSERT_ANNOUNCEMENT` 0x41, normative, transaction-scoped, namespacing first-class in the arguments rather than payload prefix bytes, announcer precision chosen by the assert through the specifier grammar (decisions 10 and 16, divergence C11) |
+| messages | `SEND_MESSAGE` 66, `RECEIVE_MESSAGE` 67 (CHIP-0025), mode flags select which sender and receiver fields the pairing commits to, paired within the surrounding block | `SEND_MESSAGE` and `RECEIVE_MESSAGE` at the same numeric opcodes, normative, strictly transaction-scoped counted balance with fields re-addressed to prevout data (decision 16, divergences C8 to C10) |
 | concurrency asserts | `ASSERT_CONCURRENT_SPEND` 64, `ASSERT_CONCURRENT_PUZZLE` 65, another spend with the named coin id or puzzle hash occurs alongside this one | not in the v0 plan |
 
 The scoping difference is the architectural one: Chia validates a
@@ -191,16 +191,16 @@ specs of the same shape.
 
 ## Observations
 
-- **Where Phase 2 stands.** Six vocabulary entries are normative,
-  `CREATE_OUTPUT`, `CREATE_OUTPUT_TAPROOT`, and the four time
-  asserts. Seven planned entries are named: `SEND_MESSAGE`,
-  `RECV_MESSAGE`, the unaddressed broadcast pair, `RESERVE_FEE`,
-  `ASSERT_OUTPUT_COUNT`, and `ASSERT_FEE_LE` (the last two
-  constrained by the composition guarantee, which forbids their
-  listed shapes, condition-record decision 14). Two families are
-  planned with membership open, the secp AGG_SIG family and
-  `ASSERT_MY_*`. Of the six validation rules, 1, 2, and 6 are
-  normative and 3 to 5 are pending.
+- **Where Phase 2 stands.** Ten vocabulary entries are normative,
+  `CREATE_OUTPUT`, `CREATE_OUTPUT_TAPROOT`, the four time asserts,
+  and the message family (`SEND_MESSAGE`, `RECEIVE_MESSAGE`,
+  `ANNOUNCE`, `ASSERT_ANNOUNCEMENT`). Three planned entries are
+  named: `RESERVE_FEE`, `ASSERT_OUTPUT_COUNT`, and `ASSERT_FEE_LE`
+  (the last two constrained by the composition guarantee, which
+  forbids their listed shapes, condition-record decision 14). Two
+  families are planned with membership open, the secp AGG_SIG
+  family and `ASSERT_MY_*`. Of the six validation rules, 1, 2, 3,
+  and 6 are normative and 4 and 5 are pending.
 - **Reference coverage is uneven by design.** The ported entries
   (timelocks, messages, `RESERVE_FEE`, the AGG_SIG and `ASSERT_MY_*`
   shapes) have deployed Chia semantics to translate tests from. The

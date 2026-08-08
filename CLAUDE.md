@@ -62,11 +62,10 @@ In practice this means:
    touching semantics references its spec section. The spec states
    behavior only, and stays complete enough on its own to predict
    every vector's outcome. Rationale, oracle provenance, and decision
-   records live in `docs/` (for the VM, `docs/vm-record.md`). One
-   recorded exception (decision by Evan, 2026-07-29): vocabulary
-   entries in `spec/CONDITIONS.md` carry a brief curation note, why
-   the entry is in v0 and what was declined, with the full rationale
-   still in `docs/condition-record.md`.
+   records live in `docs/` (for the VM, `docs/vm-record.md`), with
+   no exception: a curation-note carve-out was ratified 2026-07-29
+   and reversed 2026-08-08 (decisions 5 and 17 in
+   `docs/condition-record.md`).
 2. **Vectors are the source of truth between sessions.** Sessions are
    stateless, the vector corpus is not. Any behavior worth keeping becomes
    a vector in `vectors/` the same day.

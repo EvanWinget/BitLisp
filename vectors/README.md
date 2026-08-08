@@ -74,7 +74,13 @@ for CREATE_OUTPUT_TAPROOT with `script_pubkey` the derived taproot
 script, `{"opcode"}` plus the operand under its entry's argument name
 (`"height"`, `"time"`, `"blocks"`, `"units"`) for the time asserts,
 `{"opcode", "cost", "args": ["<hex node>"]}` for reserved
-conditions) or `{"error": "<code>"}`. Every rejection rule in
+conditions) or `{"error": "<code>"}`. The message family pins
+specifiers as `{"commitment", "fields"}` with fields in operand
+order, amounts as integers, all other fields hex: ANNOUNCE is
+`{"opcode", "namespace", "payload"}`, ASSERT_ANNOUNCEMENT adds
+`"announcer"`, SEND_MESSAGE is `{"opcode", "sender_commitment",
+"receiver", "message"}`, RECEIVE_MESSAGE mirrors it with
+`"sender"` and `"receiver_commitment"`. Every rejection rule in
 CONDITIONS.md section 1 and VALIDATION.md rule 6 has at least one case.
 
 ## validation case shape
