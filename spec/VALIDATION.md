@@ -1,9 +1,9 @@
 # BitLisp Condition Validation
 
 Status: in progress. The transaction view, the claims-and-asserts
-principle, the validation stages, and rules 1, 2, 3, and 6 are
-normative. Rules 4 and 5 are designed in architecture sessions, land
-here as prose first, and only then get implemented. Ground rule 4:
+principle, the validation stages, and rules 1, 2, 3, 4, and 6 are
+normative. Rule 5 is designed in architecture sessions, lands
+here as prose first, and only then gets implemented. Ground rule 4:
 this layer gets invariants and adversarial vectors before any feature
 work.
 
@@ -293,10 +293,64 @@ This rule is stage 4 work: records and announcements combine data
 across inputs, so outcomes change when spends are recombined into
 a different transaction.
 
-### 4. Dedup and multiplicity
+### 4. Duplicates and multiplicity
 
-TODO. Within-input and cross-input deduplication, with the cost
-interaction documented.
+Two conditions are identical when their opcodes are equal and
+their operands are equal, operand by operand, equal as trees with
+corresponding atoms byte-exact. Identity is a property of the
+condition alone. What a condition contributes may still depend on
+the input that carries it: rule 3's self specifiers make
+identical SEND_MESSAGE conditions of different inputs contribute
+distinct records, and an assert's fact may read the carrying
+input's own fields.
+
+The validator never merges, deduplicates, or collapses
+conditions: every occurrence, identical or not, within one input
+or across inputs, is checked by the rules of this document
+individually.
+
+What duplication means follows from what the condition produces,
+as its entry in `spec/CONDITIONS.md` states:
+
+- **Claims are counted.** Each occurrence, in one input or many,
+  produces its own claim, and validation assigns every claim its
+  own satisfier: k identical CREATE_OUTPUT conditions demand k
+  output slots of the claimed content under rule 1.
+- **Message records are counted.** Each occurrence contributes
+  its own weight to rule 3's ledger: duplicating one half of a
+  balanced pair unbalances it.
+- **Asserts are idempotent within their input.** An assert reads
+  a fact and consumes nothing, so identical occurrences in one
+  input's condition list hold or fail together. Identical
+  occurrences in different inputs each read their own carrying
+  input's fields, and diverge where those fields do: an assert
+  reading the carrying input's sequence can hold in one input
+  and fail in another. Occurrences with differing operands are
+  checked independently, and the transaction is valid only if
+  every one holds.
+- **A condition producing no claim, assert, or record constrains
+  nothing.** Identical ANNOUNCE occurrences within one input
+  create one fact, so duplicating an ANNOUNCE within its input
+  never changes any assert's outcome. ANNOUNCE conditions of
+  different inputs create distinct facts under rule 3, whatever
+  their operands. A reserved condition's occurrences each charge
+  their declared cost under rule 6.
+
+This classification binds future rules. An entry whose
+occurrences must accumulate is defined to produce claims or
+records, never asserts. An entry defined as an assert commits to
+idempotence within its input: no meaning may attach to how many
+times it occurs in one condition list.
+
+Every occurrence enters the spend's cost accounting individually,
+under the accounting rule 5 defines, and a condition's charge may
+never depend on whether the condition is identical to another.
+This rule constrains pricing in no other way.
+
+Like rule 2, this rule performs no computation and defines no
+error. Every check a duplicate triggers, and every error it can
+produce, belongs to the rule governing what the condition
+produces.
 
 ### 5. Per-condition costing
 
@@ -388,3 +442,10 @@ it enforceable, and lands with that rule:
 - Metamorphic: flipping any byte of a message payload, a
   namespace, or a committed specifier field of the only balancing
   pair causes rejection (rule 3).
+- Duplicating any assert, ANNOUNCE, or reserved condition within
+  its input's condition list never changes the outcome: valid
+  stays valid, invalid stays invalid (rule 4, over the costless
+  v0: rule 5's budget re-scopes this to outcomes below the cost
+  ceiling when it lands). Copying a condition to a different
+  input is not duplication in this sense: the copy reads its own
+  input's fields and creates its own facts.
