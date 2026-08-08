@@ -16,10 +16,10 @@ from .conditions import (
     AssertSequenceTime,
     CreateOutput,
     CreateOutputTaproot,
-    Descriptor,
     ReceiveMessage,
     Reserved,
     SendMessage,
+    Specifier,
     parse_conditions,
 )
 from .errors import CODES, BitLispError
@@ -42,7 +42,7 @@ __all__ = [
     "CODES",
     "CreateOutput",
     "CreateOutputTaproot",
-    "Descriptor",
+    "Specifier",
     "MAX_MONEY",
     "NIL",
     "ReceiveMessage",

@@ -23,7 +23,7 @@ from bitlisp import (
     TxOutput,
     validate_transaction,
 )
-from bitlisp.validation import self_descriptor
+from bitlisp.validation import self_specifier
 from hypothesis import given
 from hypothesis import strategies as st
 
@@ -37,7 +37,7 @@ def _input_identity(salt, n):
     """The pool: input n of a group has a group-unique txid, a
     nonzero position (so the outpoint's little-endian index bytes
     discriminate), its own script, and an amount that varies by
-    position so amount-mode descriptors discriminate."""
+    position so amount-mode specifiers discriminate."""
     return TxInput(
         txid=bytes([salt + n]) * 32,
         index=n + 1,
@@ -48,11 +48,11 @@ def _input_identity(salt, n):
     )
 
 
-def _descriptor(salt, idx, commitment):
-    """The self descriptor of pool input idx, or of the phantom input
+def _specifier(salt, idx, commitment):
+    """The self specifier of pool input idx, or of the phantom input
     no transaction contains."""
     n = 0x70 if idx == _PHANTOM else idx
-    return self_descriptor(_input_identity(salt, n), commitment)
+    return self_specifier(_input_identity(salt, n), commitment)
 
 
 def _realize(salt, item):
@@ -60,16 +60,16 @@ def _realize(salt, item):
     kind = item[0]
     if kind == "send":
         _, target, s_half, r_half, payload = item
-        return SendMessage(s_half, _descriptor(salt, target, r_half), payload)
+        return SendMessage(s_half, _specifier(salt, target, r_half), payload)
     if kind == "recv":
         _, source, s_half, r_half, payload = item
-        return ReceiveMessage(_descriptor(salt, source, s_half), r_half, payload)
+        return ReceiveMessage(_specifier(salt, source, s_half), r_half, payload)
     if kind == "ann":
         _, namespace, payload = item
         return Announce(namespace, payload)
     _, announcer, commitment, namespace, payload = item
     return AssertAnnouncement(
-        _descriptor(salt, announcer, commitment), namespace, payload
+        _specifier(salt, announcer, commitment), namespace, payload
     )
 
 
@@ -126,10 +126,10 @@ def _spec_says_valid(tx):
     for tx_input in tx.inputs:
         for cond in tx_input.conditions or ():
             if isinstance(cond, SendMessage):
-                sender = self_descriptor(tx_input, cond.sender_commitment)
+                sender = self_specifier(tx_input, cond.sender_commitment)
                 ledger[(sender, cond.receiver, cond.message)] += 1
             elif isinstance(cond, ReceiveMessage):
-                receiver = self_descriptor(tx_input, cond.receiver_commitment)
+                receiver = self_specifier(tx_input, cond.receiver_commitment)
                 ledger[(cond.sender, receiver, cond.message)] -= 1
     if any(weight != 0 for weight in ledger.values()):
         return False
@@ -139,7 +139,7 @@ def _spec_says_valid(tx):
                 isinstance(announced, Announce)
                 and announced.namespace == cond.namespace
                 and announced.payload == cond.payload
-                and self_descriptor(announcer, cond.announcer.commitment)
+                and self_specifier(announcer, cond.announcer.commitment)
                 == cond.announcer
                 for announcer in tx.inputs
                 for announced in announcer.conditions or ()
@@ -241,10 +241,10 @@ def test_namespace_byte_flip_rejects(commitment, payload):
 
 
 @given(st.sampled_from(_PAYLOADS))
-def test_descriptor_field_flip_rejects(payload):
+def test_specifier_field_flip_rejects(payload):
     """Metamorphic, from the spec's invariant list: flipping a byte
-    of a committed descriptor field of the only balancing pair
-    rejects. The send's receiver script descriptor is mutated after
+    of a committed specifier field of the only balancing pair
+    rejects. The send's receiver script specifier is mutated after
     construction, so only the field byte changes."""
     spec = [[("send", 1, 2, 2, payload)], [("recv", 0, 2, 2, payload)]]
     tx = build_tx(spec)

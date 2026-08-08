@@ -36,12 +36,12 @@ _RESERVED_START = 0x80
 MAX_MESSAGE_SIZE = 1024
 OUTPOINT_SIZE = 36
 
-# A participant descriptor names an input's prevout data at one of
+# A participant specifier names an input's prevout data at one of
 # eight precisions. The commitment value's bits select the fields:
 # 0b100 the creating txid, 0b010 the spent scriptPubKey, 0b001 the
 # amount, except that 0b111 commits to the whole outpoint as a
 # single 36-byte value rather than the three fields separately.
-DESCRIPTOR_OPERANDS = {
+SPECIFIER_OPERANDS = {
     0b000: (),
     0b001: ("amount",),
     0b010: ("script_pubkey",),
@@ -129,11 +129,11 @@ class AssertSequenceTime:
 
 
 @dataclass(frozen=True)
-class Descriptor:
-    """A participant descriptor: a commitment value and the fields it
-    commits to, in DESCRIPTOR_OPERANDS order. Equality is the rule 3
+class Specifier:
+    """A participant specifier: a commitment value and the fields it
+    commits to, in SPECIFIER_OPERANDS order. Equality is the rule 3
     definition: equal commitment value and equal fields, so a
-    36-byte outpoint descriptor never equals a txid-and-script one,
+    36-byte outpoint specifier never equals a txid-and-script one,
     whatever coin each names."""
 
     commitment: int
@@ -154,9 +154,9 @@ class Announce:
 @dataclass(frozen=True)
 class AssertAnnouncement:
     """Asserts some input announced (namespace, payload) and matches
-    the announcer descriptor."""
+    the announcer specifier."""
 
-    announcer: Descriptor
+    announcer: Specifier
     namespace: bytes
     payload: bytes
 
@@ -167,10 +167,10 @@ class AssertAnnouncement:
 class SendMessage:
     """Weight +1 in the message ledger. The sender half describes the
     emitting input itself, so only its commitment value is stored
-    here. The receiver is the argument descriptor."""
+    here. The receiver is the argument specifier."""
 
     sender_commitment: int
-    receiver: Descriptor
+    receiver: Specifier
     message: bytes
 
     opcode = SEND_MESSAGE
@@ -180,9 +180,9 @@ class SendMessage:
 class ReceiveMessage:
     """Weight -1 in the message ledger. The receiver half describes
     the emitting input itself, the sender is the argument
-    descriptor."""
+    specifier."""
 
-    sender: Descriptor
+    sender: Specifier
     receiver_commitment: int
     message: bytes
 
@@ -297,16 +297,16 @@ def _parse_payload_atom(atom, what):
     return atom
 
 
-def _parse_descriptor(commitment, args, name):
-    """Parses the descriptor operands for a commitment value. The
+def _parse_specifier(commitment, args, name):
+    """Parses the specifier operands for a commitment value. The
     caller has already checked the argument count."""
     fields = []
-    for kind, atom in zip(DESCRIPTOR_OPERANDS[commitment], args, strict=True):
+    for kind, atom in zip(SPECIFIER_OPERANDS[commitment], args, strict=True):
         if kind == "amount":
-            value = _parse_int(atom, f"{name} descriptor amount")
+            value = _parse_int(atom, f"{name} specifier amount")
             if not 0 <= value <= MAX_MONEY:
                 raise BitLispError(
-                    "bad_condition_arg", f"descriptor amount out of range: {value}"
+                    "bad_condition_arg", f"specifier amount out of range: {value}"
                 )
             fields.append(value)
             continue
@@ -329,7 +329,7 @@ def _parse_descriptor(commitment, args, name):
                 f"{name} outpoint must be {OUTPOINT_SIZE} bytes, got {len(atom)}",
             )
         fields.append(atom)
-    return Descriptor(commitment, tuple(fields))
+    return Specifier(commitment, tuple(fields))
 
 
 def _parse_mode(atom, name, high):
@@ -343,7 +343,7 @@ def _parse_mode(atom, name, high):
 
 def _parse_message_pair(args, name, self_half_high):
     """Shared parse for the addressed pair: mode, message, then the
-    descriptor operands for the argument half. self_half_high says
+    specifier operands for the argument half. self_half_high says
     whether the emitting input's own half is the mode's high bits
     (SEND_MESSAGE) or its low bits (RECEIVE_MESSAGE)."""
     if len(args) < 2:
@@ -354,15 +354,15 @@ def _parse_message_pair(args, name, self_half_high):
     mode = _parse_mode(args[0], name, 63)
     self_half = (mode >> 3) & 0b111 if self_half_high else mode & 0b111
     arg_half = mode & 0b111 if self_half_high else (mode >> 3) & 0b111
-    expected = 2 + len(DESCRIPTOR_OPERANDS[arg_half])
+    expected = 2 + len(SPECIFIER_OPERANDS[arg_half])
     if len(args) != expected:
         raise BitLispError(
             "bad_condition_arity",
             f"{name} with mode {mode} takes {expected} arguments, got {len(args)}",
         )
     message = _parse_payload_atom(args[1], f"{name} message")
-    descriptor = _parse_descriptor(arg_half, args[2:], name)
-    return mode, self_half, descriptor, message
+    specifier = _parse_specifier(arg_half, args[2:], name)
+    return mode, self_half, specifier, message
 
 
 def _parse_send_message(args):
@@ -396,7 +396,7 @@ def _parse_assert_announcement(args):
             f"ASSERT_ANNOUNCEMENT takes at least 3 arguments, got {len(args)}",
         )
     mode = _parse_mode(args[0], "ASSERT_ANNOUNCEMENT", 7)
-    expected = 3 + len(DESCRIPTOR_OPERANDS[mode])
+    expected = 3 + len(SPECIFIER_OPERANDS[mode])
     if len(args) != expected:
         raise BitLispError(
             "bad_condition_arity",
@@ -405,7 +405,7 @@ def _parse_assert_announcement(args):
         )
     namespace = _parse_payload_atom(args[1], "ASSERT_ANNOUNCEMENT namespace")
     payload = _parse_payload_atom(args[2], "ASSERT_ANNOUNCEMENT payload")
-    announcer = _parse_descriptor(mode, args[3:], "ASSERT_ANNOUNCEMENT")
+    announcer = _parse_specifier(mode, args[3:], "ASSERT_ANNOUNCEMENT")
     return AssertAnnouncement(announcer, namespace, payload)
 
 

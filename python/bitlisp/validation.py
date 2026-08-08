@@ -15,8 +15,8 @@ never reads the chain and a validated transaction never needs
 re-validation as the chain grows.
 
 Rule 3, message scoping: the addressed pair contributes signed
-weights to a per-transaction ledger keyed by (sender descriptor,
-receiver descriptor, message), and every key must net to zero.
+weights to a per-transaction ledger keyed by (sender specifier,
+receiver specifier, message), and every key must net to zero.
 Balance is a sum, so the check is order-free and two balanced
 groups of inputs stay balanced when spent together. Announcements
 are ordinary asserts over facts other inputs create: existence is
@@ -29,8 +29,8 @@ once per commitment value in use before the asserts run.
 from collections import Counter
 
 from .conditions import (
-    DESCRIPTOR_OPERANDS,
     LOCKTIME_THRESHOLD,
+    SPECIFIER_OPERANDS,
     Announce,
     AssertAnnouncement,
     AssertLocktimeHeight,
@@ -39,9 +39,9 @@ from .conditions import (
     AssertSequenceTime,
     CreateOutput,
     CreateOutputTaproot,
-    Descriptor,
     ReceiveMessage,
     SendMessage,
+    Specifier,
 )
 from .errors import BitLispError
 
@@ -152,12 +152,12 @@ def check_time_asserts(tx):
                 )
 
 
-def self_descriptor(tx_input, commitment):
+def self_specifier(tx_input, commitment):
     """The input's own prevout data at a commitment value: what a
     SEND or RECEIVE says about its emitting input, and what an
     announcement assert compares its announcer operands against."""
     fields = []
-    for kind in DESCRIPTOR_OPERANDS[commitment]:
+    for kind in SPECIFIER_OPERANDS[commitment]:
         if kind == "txid":
             fields.append(tx_input.txid)
         elif kind == "script_pubkey":
@@ -166,21 +166,21 @@ def self_descriptor(tx_input, commitment):
             fields.append(tx_input.amount)
         else:
             fields.append(tx_input.txid + tx_input.index.to_bytes(4, "little"))
-    return Descriptor(commitment, tuple(fields))
+    return Specifier(commitment, tuple(fields))
 
 
 def check_messages(tx):
-    """Rule 3, the message ledger. Every distinct (sender descriptor,
-    receiver descriptor, payload) record must net to zero across the
+    """Rule 3, the message ledger. Every distinct (sender specifier,
+    receiver specifier, payload) record must net to zero across the
     whole transaction, sends counting +1 and receives -1."""
     ledger = Counter()
     for tx_input in tx.inputs:
         for cond in tx_input.conditions or ():
             if isinstance(cond, SendMessage):
-                sender = self_descriptor(tx_input, cond.sender_commitment)
+                sender = self_specifier(tx_input, cond.sender_commitment)
                 ledger[(sender, cond.receiver, cond.message)] += 1
             elif isinstance(cond, ReceiveMessage):
-                receiver = self_descriptor(tx_input, cond.receiver_commitment)
+                receiver = self_specifier(tx_input, cond.receiver_commitment)
                 ledger[(cond.sender, receiver, cond.message)] -= 1
     for (_, _, message), weight in ledger.items():
         if weight != 0:
@@ -194,7 +194,7 @@ def check_messages(tx):
 def check_announcements(tx):
     """Rule 3, announcements. Each assert must find a single input
     that announced its exact namespace and payload and whose self
-    descriptor at the assert's commitment value equals the announcer
+    specifier at the assert's commitment value equals the announcer
     operands. Nothing is consumed: one announcement satisfies any
     number of asserts. Announced facts are indexed once per
     commitment value appearing in an assert, so the check stays
@@ -214,7 +214,7 @@ def check_announcements(tx):
                 for commitment in commitments:
                     facts.add(
                         (
-                            self_descriptor(tx_input, commitment),
+                            self_specifier(tx_input, commitment),
                             cond.namespace,
                             cond.payload,
                         )

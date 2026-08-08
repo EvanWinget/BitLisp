@@ -121,15 +121,15 @@ def run_vm_case(case):
         raise VectorError(f"expected {expect}, got {outcome}")
 
 
-def _descriptor_json(descriptor):
-    """The pinned JSON form of a participant descriptor: the
+def _specifier_json(specifier):
+    """The pinned JSON form of a participant specifier: the
     commitment value and the fields in operand order, amounts as
     integers, everything else as hex."""
     return {
-        "commitment": descriptor.commitment,
+        "commitment": specifier.commitment,
         "fields": [
             field if isinstance(field, int) else field.hex()
-            for field in descriptor.fields
+            for field in specifier.fields
         ],
     }
 
@@ -182,7 +182,7 @@ def _condition_json(cond):
     if isinstance(cond, AssertAnnouncement):
         return {
             "opcode": cond.opcode,
-            "announcer": _descriptor_json(cond.announcer),
+            "announcer": _specifier_json(cond.announcer),
             "namespace": cond.namespace.hex(),
             "payload": cond.payload.hex(),
         }
@@ -190,13 +190,13 @@ def _condition_json(cond):
         return {
             "opcode": cond.opcode,
             "sender_commitment": cond.sender_commitment,
-            "receiver": _descriptor_json(cond.receiver),
+            "receiver": _specifier_json(cond.receiver),
             "message": cond.message.hex(),
         }
     if isinstance(cond, ReceiveMessage):
         return {
             "opcode": cond.opcode,
-            "sender": _descriptor_json(cond.sender),
+            "sender": _specifier_json(cond.sender),
             "receiver_commitment": cond.receiver_commitment,
             "message": cond.message.hex(),
         }
@@ -228,10 +228,10 @@ def run_conditions_case(case):
     asserts, and {"opcode", "cost", "args": [<hex node>]} for
     reserved conditions.
 
-    The message family pins descriptors as {"commitment", "fields"}
+    The message family pins specifiers as {"commitment", "fields"}
     with fields in operand order, amounts as integers, all other
     fields hex. ANNOUNCE is {"opcode", "namespace", "payload"},
-    ASSERT_ANNOUNCEMENT adds "announcer" (a descriptor),
+    ASSERT_ANNOUNCEMENT adds "announcer" (a specifier),
     SEND_MESSAGE is {"opcode", "sender_commitment", "receiver",
     "message"}, and RECEIVE_MESSAGE is {"opcode", "sender",
     "receiver_commitment", "message"}.
