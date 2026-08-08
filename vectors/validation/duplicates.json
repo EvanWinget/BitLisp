@@ -1,0 +1,450 @@
+{
+ "schema": "bitlisp-vector-v0",
+ "suite": "validation",
+ "spec": "VALIDATION.md rule 4, duplicate meaning follows what the condition produces",
+ "cases": [
+  {
+   "name": "dup_identical_locktime_asserts_one_input",
+   "tx": {
+    "version": 2,
+    "locktime": 600,
+    "inputs": [
+     {
+      "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "index": 0,
+      "script_pubkey": "5120aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "amount": 1000,
+      "sequence": 4294967294,
+      "conditions": "ffff20ff82025880ffff20ff8202588080"
+     }
+    ],
+    "outputs": [
+     {
+      "script_pubkey": "00149999999999999999999999999999999999999999",
+      "amount": 500
+     }
+    ]
+   },
+   "expect": {
+    "valid": true
+   }
+  },
+  {
+   "name": "dup_differing_locktime_asserts_max_unmet",
+   "tx": {
+    "version": 2,
+    "locktime": 650,
+    "inputs": [
+     {
+      "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "index": 0,
+      "script_pubkey": "5120aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "amount": 1000,
+      "sequence": 4294967294,
+      "conditions": "ffff20ff8201f480ffff20ff8202bc8080"
+     }
+    ],
+    "outputs": [
+     {
+      "script_pubkey": "00149999999999999999999999999999999999999999",
+      "amount": 500
+     }
+    ]
+   },
+   "expect": {
+    "error": "unsatisfied_locktime_assert"
+   }
+  },
+  {
+   "name": "dup_differing_locktime_asserts_max_met",
+   "tx": {
+    "version": 2,
+    "locktime": 700,
+    "inputs": [
+     {
+      "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "index": 0,
+      "script_pubkey": "5120aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "amount": 1000,
+      "sequence": 4294967294,
+      "conditions": "ffff20ff8201f480ffff20ff8202bc8080"
+     }
+    ],
+    "outputs": [
+     {
+      "script_pubkey": "00149999999999999999999999999999999999999999",
+      "amount": 500
+     }
+    ]
+   },
+   "expect": {
+    "valid": true
+   }
+  },
+  {
+   "name": "dup_identical_locktime_asserts_across_inputs",
+   "tx": {
+    "version": 2,
+    "locktime": 600,
+    "inputs": [
+     {
+      "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "index": 0,
+      "script_pubkey": "5120aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "amount": 1000,
+      "sequence": 4294967294,
+      "conditions": "ffff20ff8202588080"
+     },
+     {
+      "txid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "index": 0,
+      "script_pubkey": "5120bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "amount": 1000,
+      "sequence": 4294967294,
+      "conditions": "ffff20ff8202588080"
+     }
+    ],
+    "outputs": [
+     {
+      "script_pubkey": "00149999999999999999999999999999999999999999",
+      "amount": 500
+     }
+    ]
+   },
+   "expect": {
+    "valid": true
+   }
+  },
+  {
+   "name": "identical_assert_diverges_across_inputs",
+   "tx": {
+    "version": 2,
+    "locktime": 600,
+    "inputs": [
+     {
+      "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "index": 0,
+      "script_pubkey": "5120aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "amount": 1000,
+      "sequence": 4294967294,
+      "conditions": "ffff20ff8202588080"
+     },
+     {
+      "txid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "index": 0,
+      "script_pubkey": "5120bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "amount": 1000,
+      "sequence": 4294967295,
+      "conditions": "ffff20ff8202588080"
+     }
+    ],
+    "outputs": [
+     {
+      "script_pubkey": "00149999999999999999999999999999999999999999",
+      "amount": 500
+     }
+    ]
+   },
+   "expect": {
+    "error": "unsatisfied_locktime_assert"
+   }
+  },
+  {
+   "name": "dup_identical_locktime_asserts_three_inputs",
+   "tx": {
+    "version": 2,
+    "locktime": 600,
+    "inputs": [
+     {
+      "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "index": 0,
+      "script_pubkey": "5120aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "amount": 1000,
+      "sequence": 4294967294,
+      "conditions": "ffff20ff8202588080"
+     },
+     {
+      "txid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "index": 0,
+      "script_pubkey": "5120bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "amount": 1000,
+      "sequence": 4294967294,
+      "conditions": "ffff20ff8202588080"
+     },
+     {
+      "txid": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "index": 0,
+      "script_pubkey": "5120cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "amount": 1000,
+      "sequence": 4294967294,
+      "conditions": "ffff20ff8202588080"
+     }
+    ],
+    "outputs": [
+     {
+      "script_pubkey": "00149999999999999999999999999999999999999999",
+      "amount": 500
+     }
+    ]
+   },
+   "expect": {
+    "valid": true
+   }
+  },
+  {
+   "name": "dup_announce_within_input",
+   "tx": {
+    "version": 2,
+    "locktime": 0,
+    "inputs": [
+     {
+      "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "index": 0,
+      "script_pubkey": "5120aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "amount": 1000,
+      "conditions": "ffff40ff826e73ff846661637480ffff40ff826e73ff84666163748080"
+     },
+     {
+      "txid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "index": 0,
+      "script_pubkey": "5120bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "amount": 1000,
+      "conditions": "ffff41ff02ff826e73ff8466616374ffa25120aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa8080"
+     }
+    ],
+    "outputs": [
+     {
+      "script_pubkey": "00149999999999999999999999999999999999999999",
+      "amount": 500
+     }
+    ]
+   },
+   "expect": {
+    "valid": true
+   }
+  },
+  {
+   "name": "dup_announce_across_inputs_existential",
+   "tx": {
+    "version": 2,
+    "locktime": 0,
+    "inputs": [
+     {
+      "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "index": 0,
+      "script_pubkey": "5120aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "amount": 1000,
+      "conditions": "ffff40ff826e73ff84666163748080"
+     },
+     {
+      "txid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "index": 0,
+      "script_pubkey": "5120bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "amount": 1000,
+      "conditions": "ffff40ff826e73ff84666163748080"
+     },
+     {
+      "txid": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "index": 0,
+      "script_pubkey": "5120cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "amount": 1000,
+      "conditions": "ffff41ff02ff826e73ff8466616374ffa25120aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa8080"
+     }
+    ],
+    "outputs": [
+     {
+      "script_pubkey": "00149999999999999999999999999999999999999999",
+      "amount": 500
+     }
+    ]
+   },
+   "expect": {
+    "valid": true
+   }
+  },
+  {
+   "name": "announce_copy_on_named_input_satisfies",
+   "tx": {
+    "version": 2,
+    "locktime": 0,
+    "inputs": [
+     {
+      "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "index": 0,
+      "script_pubkey": "5120aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "amount": 1000,
+      "conditions": "ffff40ff826e73ff84666163748080"
+     },
+     {
+      "txid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "index": 0,
+      "script_pubkey": "5120bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "amount": 1000,
+      "conditions": "ffff40ff826e73ff84666163748080"
+     },
+     {
+      "txid": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "index": 0,
+      "script_pubkey": "5120cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "amount": 1000,
+      "conditions": "ffff41ff02ff826e73ff8466616374ffa25120bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb8080"
+     }
+    ],
+    "outputs": [
+     {
+      "script_pubkey": "00149999999999999999999999999999999999999999",
+      "amount": 500
+     }
+    ]
+   },
+   "expect": {
+    "valid": true
+   }
+  },
+  {
+   "name": "dup_assert_announcement_commitment_zero",
+   "tx": {
+    "version": 2,
+    "locktime": 0,
+    "inputs": [
+     {
+      "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "index": 0,
+      "script_pubkey": "5120aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "amount": 1000,
+      "conditions": "ffff40ff826e73ff84666163748080"
+     },
+     {
+      "txid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "index": 0,
+      "script_pubkey": "5120bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "amount": 1000,
+      "conditions": "ffff41ff80ff826e73ff846661637480ffff41ff80ff826e73ff84666163748080"
+     }
+    ],
+    "outputs": [
+     {
+      "script_pubkey": "00149999999999999999999999999999999999999999",
+      "amount": 500
+     }
+    ]
+   },
+   "expect": {
+    "valid": true
+   }
+  },
+  {
+   "name": "equal_script_inputs_share_announcer_specifier",
+   "tx": {
+    "version": 2,
+    "locktime": 0,
+    "inputs": [
+     {
+      "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "index": 0,
+      "script_pubkey": "5120aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "amount": 1000,
+      "conditions": "ffff40ff826e73ff84666163748080"
+     },
+     {
+      "txid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "index": 0,
+      "script_pubkey": "5120aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "amount": 1000
+     },
+     {
+      "txid": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "index": 0,
+      "script_pubkey": "5120cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "amount": 1000,
+      "conditions": "ffff41ff02ff826e73ff8466616374ffa25120aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa8080"
+     }
+    ],
+    "outputs": [
+     {
+      "script_pubkey": "00149999999999999999999999999999999999999999",
+      "amount": 500
+     }
+    ]
+   },
+   "expect": {
+    "valid": true
+   }
+  },
+  {
+   "name": "dup_assert_announcement_unmatched",
+   "tx": {
+    "version": 2,
+    "locktime": 0,
+    "inputs": [
+     {
+      "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "index": 0,
+      "script_pubkey": "5120aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "amount": 1000,
+      "conditions": "ffff41ff02ff826e73ff8466616374ffa25120bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb80ffff41ff02ff826e73ff8466616374ffa25120bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb8080"
+     }
+    ],
+    "outputs": [
+     {
+      "script_pubkey": "00149999999999999999999999999999999999999999",
+      "amount": 500
+     }
+    ]
+   },
+   "expect": {
+    "error": "unsatisfied_announcement_assert"
+   }
+  },
+  {
+   "name": "dup_reserved_conditions",
+   "tx": {
+    "version": 2,
+    "locktime": 0,
+    "inputs": [
+     {
+      "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "index": 0,
+      "script_pubkey": "5120aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "amount": 1000,
+      "conditions": "ffff8180ff8201f480ffff8180ff8201f48080"
+     }
+    ],
+    "outputs": [
+     {
+      "script_pubkey": "00149999999999999999999999999999999999999999",
+      "amount": 500
+     }
+    ]
+   },
+   "expect": {
+    "valid": true
+   }
+  },
+  {
+   "name": "dup_reserved_below_floor",
+   "tx": {
+    "version": 2,
+    "locktime": 0,
+    "inputs": [
+     {
+      "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "index": 0,
+      "script_pubkey": "5120aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "amount": 1000,
+      "conditions": "ffff8180ff8201f380ffff8180ff8201f38080"
+     }
+    ],
+    "outputs": [
+     {
+      "script_pubkey": "00149999999999999999999999999999999999999999",
+      "amount": 500
+     }
+    ]
+   },
+   "expect": {
+    "error": "reserved_cost_too_low"
+   }
+  }
+ ]
+}
