@@ -31,6 +31,8 @@ CODES = frozenset(
         "bad_condition_arg",
         "reserved_cost_too_low",
         "unsatisfied_output_claim",
+        "unsatisfied_locktime_assert",
+        "unsatisfied_sequence_assert",
     }
 )
 
