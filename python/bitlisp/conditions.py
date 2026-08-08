@@ -27,7 +27,30 @@ ASSERT_LOCKTIME_HEIGHT = 0x20
 ASSERT_LOCKTIME_TIME = 0x21
 ASSERT_SEQUENCE_HEIGHT = 0x22
 ASSERT_SEQUENCE_TIME = 0x23
+ANNOUNCE = 0x40
+ASSERT_ANNOUNCEMENT = 0x41
+SEND_MESSAGE = 0x42
+RECEIVE_MESSAGE = 0x43
 _RESERVED_START = 0x80
+
+MAX_MESSAGE_SIZE = 1024
+OUTPOINT_SIZE = 36
+
+# A participant descriptor names an input's prevout data at one of
+# eight precisions. The commitment value's bits select the fields:
+# 0b100 the creating txid, 0b010 the spent scriptPubKey, 0b001 the
+# amount, except that 0b111 commits to the whole outpoint as a
+# single 36-byte value rather than the three fields separately.
+DESCRIPTOR_OPERANDS = {
+    0b000: (),
+    0b001: ("amount",),
+    0b010: ("script_pubkey",),
+    0b011: ("script_pubkey", "amount"),
+    0b100: ("txid",),
+    0b101: ("txid", "amount"),
+    0b110: ("txid", "script_pubkey"),
+    0b111: ("outpoint",),
+}
 
 # A locktime below the threshold counts blocks, at or above it counts
 # Unix seconds. Operand domains exclude the wrong-typed range, so a
@@ -103,6 +126,67 @@ class AssertSequenceTime:
     units: int
 
     opcode = ASSERT_SEQUENCE_TIME
+
+
+@dataclass(frozen=True)
+class Descriptor:
+    """A participant descriptor: a commitment value and the fields it
+    commits to, in DESCRIPTOR_OPERANDS order. Equality is the rule 3
+    definition: equal commitment value and equal fields, so a
+    36-byte outpoint descriptor never equals a txid-and-script one,
+    whatever coin each names."""
+
+    commitment: int
+    fields: tuple
+
+
+@dataclass(frozen=True)
+class Announce:
+    """Creates the announcement (this input, namespace, payload).
+    Constrains nothing by itself."""
+
+    namespace: bytes
+    payload: bytes
+
+    opcode = ANNOUNCE
+
+
+@dataclass(frozen=True)
+class AssertAnnouncement:
+    """Asserts some input announced (namespace, payload) and matches
+    the announcer descriptor."""
+
+    announcer: Descriptor
+    namespace: bytes
+    payload: bytes
+
+    opcode = ASSERT_ANNOUNCEMENT
+
+
+@dataclass(frozen=True)
+class SendMessage:
+    """Weight +1 in the message ledger. The sender half describes the
+    emitting input itself, so only its commitment value is stored
+    here. The receiver is the argument descriptor."""
+
+    sender_commitment: int
+    receiver: Descriptor
+    message: bytes
+
+    opcode = SEND_MESSAGE
+
+
+@dataclass(frozen=True)
+class ReceiveMessage:
+    """Weight -1 in the message ledger. The receiver half describes
+    the emitting input itself, the sender is the argument
+    descriptor."""
+
+    sender: Descriptor
+    receiver_commitment: int
+    message: bytes
+
+    opcode = RECEIVE_MESSAGE
 
 
 @dataclass(frozen=True)
@@ -201,6 +285,130 @@ def _parse_time_assert(args, name, cls, low, high):
     return cls(value)
 
 
+def _parse_payload_atom(atom, what):
+    """A message, namespace, or payload: an atom of 0 to 1024 bytes."""
+    if not is_atom(atom):
+        raise BitLispError("bad_condition_arg", f"{what} must be an atom")
+    if len(atom) > MAX_MESSAGE_SIZE:
+        raise BitLispError(
+            "bad_condition_arg",
+            f"{what} must be at most {MAX_MESSAGE_SIZE} bytes, got {len(atom)}",
+        )
+    return atom
+
+
+def _parse_descriptor(commitment, args, name):
+    """Parses the descriptor operands for a commitment value. The
+    caller has already checked the argument count."""
+    fields = []
+    for kind, atom in zip(DESCRIPTOR_OPERANDS[commitment], args, strict=True):
+        if kind == "amount":
+            value = _parse_int(atom, f"{name} descriptor amount")
+            if not 0 <= value <= MAX_MONEY:
+                raise BitLispError(
+                    "bad_condition_arg", f"descriptor amount out of range: {value}"
+                )
+            fields.append(value)
+            continue
+        if not is_atom(atom):
+            raise BitLispError("bad_condition_arg", f"{name} {kind} must be an atom")
+        if kind == "txid" and len(atom) != 32:
+            raise BitLispError(
+                "bad_condition_arg",
+                f"{name} txid must be 32 bytes, got {len(atom)}",
+            )
+        if kind == "script_pubkey" and len(atom) > MAX_SCRIPT_PUBKEY_SIZE:
+            raise BitLispError(
+                "bad_condition_arg",
+                f"{name} scriptPubKey must be at most "
+                f"{MAX_SCRIPT_PUBKEY_SIZE} bytes, got {len(atom)}",
+            )
+        if kind == "outpoint" and len(atom) != OUTPOINT_SIZE:
+            raise BitLispError(
+                "bad_condition_arg",
+                f"{name} outpoint must be {OUTPOINT_SIZE} bytes, got {len(atom)}",
+            )
+        fields.append(atom)
+    return Descriptor(commitment, tuple(fields))
+
+
+def _parse_mode(atom, name, high):
+    value = _parse_int(atom, f"{name} mode")
+    if not 0 <= value <= high:
+        raise BitLispError(
+            "bad_condition_arg", f"{name} mode must be 0 to {high}, got {value}"
+        )
+    return value
+
+
+def _parse_message_pair(args, name, self_half_high):
+    """Shared parse for the addressed pair: mode, message, then the
+    descriptor operands for the argument half. self_half_high says
+    whether the emitting input's own half is the mode's high bits
+    (SEND_MESSAGE) or its low bits (RECEIVE_MESSAGE)."""
+    if len(args) < 2:
+        raise BitLispError(
+            "bad_condition_arity",
+            f"{name} takes at least 2 arguments, got {len(args)}",
+        )
+    mode = _parse_mode(args[0], name, 63)
+    self_half = (mode >> 3) & 0b111 if self_half_high else mode & 0b111
+    arg_half = mode & 0b111 if self_half_high else (mode >> 3) & 0b111
+    expected = 2 + len(DESCRIPTOR_OPERANDS[arg_half])
+    if len(args) != expected:
+        raise BitLispError(
+            "bad_condition_arity",
+            f"{name} with mode {mode} takes {expected} arguments, got {len(args)}",
+        )
+    message = _parse_payload_atom(args[1], f"{name} message")
+    descriptor = _parse_descriptor(arg_half, args[2:], name)
+    return mode, self_half, descriptor, message
+
+
+def _parse_send_message(args):
+    _, self_half, receiver, message = _parse_message_pair(
+        args, "SEND_MESSAGE", self_half_high=True
+    )
+    return SendMessage(self_half, receiver, message)
+
+
+def _parse_receive_message(args):
+    _, self_half, sender, message = _parse_message_pair(
+        args, "RECEIVE_MESSAGE", self_half_high=False
+    )
+    return ReceiveMessage(sender, self_half, message)
+
+
+def _parse_announce(args):
+    if len(args) != 2:
+        raise BitLispError(
+            "bad_condition_arity", f"ANNOUNCE takes 2 arguments, got {len(args)}"
+        )
+    namespace = _parse_payload_atom(args[0], "ANNOUNCE namespace")
+    payload = _parse_payload_atom(args[1], "ANNOUNCE payload")
+    return Announce(namespace, payload)
+
+
+def _parse_assert_announcement(args):
+    if len(args) < 3:
+        raise BitLispError(
+            "bad_condition_arity",
+            f"ASSERT_ANNOUNCEMENT takes at least 3 arguments, got {len(args)}",
+        )
+    mode = _parse_mode(args[0], "ASSERT_ANNOUNCEMENT", 7)
+    expected = 3 + len(DESCRIPTOR_OPERANDS[mode])
+    if len(args) != expected:
+        raise BitLispError(
+            "bad_condition_arity",
+            f"ASSERT_ANNOUNCEMENT with mode {mode} takes {expected} "
+            f"arguments, got {len(args)}",
+        )
+    namespace = _parse_payload_atom(args[1], "ASSERT_ANNOUNCEMENT namespace")
+    payload = _parse_payload_atom(args[2], "ASSERT_ANNOUNCEMENT payload")
+    announcer = _parse_descriptor(mode, args[3:], "ASSERT_ANNOUNCEMENT")
+    return AssertAnnouncement(announcer, namespace, payload)
+
+
 def _parse_reserved(opcode, args):
     if not args:
         raise BitLispError(
@@ -266,6 +474,14 @@ def _parse_condition(node):
             0,
             SEQUENCE_VALUE_MAX,
         )
+    if opcode == ANNOUNCE:
+        return _parse_announce(args)
+    if opcode == ASSERT_ANNOUNCEMENT:
+        return _parse_assert_announcement(args)
+    if opcode == SEND_MESSAGE:
+        return _parse_send_message(args)
+    if opcode == RECEIVE_MESSAGE:
+        return _parse_receive_message(args)
     raise BitLispError("bad_condition_opcode", f"invalid opcode {opcode:#04x}")
 
 

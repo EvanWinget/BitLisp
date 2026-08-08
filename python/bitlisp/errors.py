@@ -33,6 +33,8 @@ CODES = frozenset(
         "unsatisfied_output_claim",
         "unsatisfied_locktime_assert",
         "unsatisfied_sequence_assert",
+        "unbalanced_message",
+        "unsatisfied_announcement_assert",
     }
 )
 

@@ -13,18 +13,35 @@ the transaction's own locktime, sequence, and version fields, the
 fields base consensus enforces against the chain, so validation
 never reads the chain and a validated transaction never needs
 re-validation as the chain grows.
+
+Rule 3, message scoping: the addressed pair contributes signed
+weights to a per-transaction ledger keyed by (sender descriptor,
+receiver descriptor, message), and every key must net to zero.
+Balance is a sum, so the check is order-free and two balanced
+groups of inputs stay balanced when spent together. Announcements
+are ordinary asserts over facts other inputs create: existence is
+checked, nothing is consumed, and an unread announcement
+constrains nothing. Both checks stay counting problems like rule
+1: the ledger is one pass, and announcement facts are indexed
+once per commitment value in use before the asserts run.
 """
 
 from collections import Counter
 
 from .conditions import (
+    DESCRIPTOR_OPERANDS,
     LOCKTIME_THRESHOLD,
+    Announce,
+    AssertAnnouncement,
     AssertLocktimeHeight,
     AssertLocktimeTime,
     AssertSequenceHeight,
     AssertSequenceTime,
     CreateOutput,
     CreateOutputTaproot,
+    Descriptor,
+    ReceiveMessage,
+    SendMessage,
 )
 from .errors import BitLispError
 
@@ -135,7 +152,90 @@ def check_time_asserts(tx):
                 )
 
 
+def self_descriptor(tx_input, commitment):
+    """The input's own prevout data at a commitment value: what a
+    SEND or RECEIVE says about its emitting input, and what an
+    announcement assert compares its announcer operands against."""
+    fields = []
+    for kind in DESCRIPTOR_OPERANDS[commitment]:
+        if kind == "txid":
+            fields.append(tx_input.txid)
+        elif kind == "script_pubkey":
+            fields.append(tx_input.script_pubkey)
+        elif kind == "amount":
+            fields.append(tx_input.amount)
+        else:
+            fields.append(tx_input.txid + tx_input.index.to_bytes(4, "little"))
+    return Descriptor(commitment, tuple(fields))
+
+
+def check_messages(tx):
+    """Rule 3, the message ledger. Every distinct (sender descriptor,
+    receiver descriptor, payload) record must net to zero across the
+    whole transaction, sends counting +1 and receives -1."""
+    ledger = Counter()
+    for tx_input in tx.inputs:
+        for cond in tx_input.conditions or ():
+            if isinstance(cond, SendMessage):
+                sender = self_descriptor(tx_input, cond.sender_commitment)
+                ledger[(sender, cond.receiver, cond.message)] += 1
+            elif isinstance(cond, ReceiveMessage):
+                receiver = self_descriptor(tx_input, cond.receiver_commitment)
+                ledger[(cond.sender, receiver, cond.message)] -= 1
+    for (_, _, message), weight in ledger.items():
+        if weight != 0:
+            raise BitLispError(
+                "unbalanced_message",
+                f"message record nets {weight:+d}, message bytes "
+                f"{message.hex() or '(empty)'}",
+            )
+
+
+def check_announcements(tx):
+    """Rule 3, announcements. Each assert must find a single input
+    that announced its exact namespace and payload and whose self
+    descriptor at the assert's commitment value equals the announcer
+    operands. Nothing is consumed: one announcement satisfies any
+    number of asserts. Announced facts are indexed once per
+    commitment value appearing in an assert, so the check stays
+    linear in the condition count rather than quadratic."""
+    commitments = {
+        cond.announcer.commitment
+        for tx_input in tx.inputs
+        for cond in tx_input.conditions or ()
+        if isinstance(cond, AssertAnnouncement)
+    }
+    if not commitments:
+        return
+    facts = set()
+    for tx_input in tx.inputs:
+        for cond in tx_input.conditions or ():
+            if isinstance(cond, Announce):
+                for commitment in commitments:
+                    facts.add(
+                        (
+                            self_descriptor(tx_input, commitment),
+                            cond.namespace,
+                            cond.payload,
+                        )
+                    )
+    for tx_input in tx.inputs:
+        for cond in tx_input.conditions or ():
+            if (
+                isinstance(cond, AssertAnnouncement)
+                and (cond.announcer, cond.namespace, cond.payload) not in facts
+            ):
+                raise BitLispError(
+                    "unsatisfied_announcement_assert",
+                    f"no announcement matches namespace "
+                    f"{cond.namespace.hex() or '(empty)'} payload "
+                    f"{cond.payload.hex() or '(empty)'}",
+                )
+
+
 def validate_transaction(tx):
     """Every validation rule that has landed so far."""
     check_output_claims(tx)
     check_time_asserts(tx)
+    check_messages(tx)
+    check_announcements(tx)

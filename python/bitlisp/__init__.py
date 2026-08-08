@@ -8,13 +8,18 @@ and by property-based invariants where none does.
 
 from .conditions import (
     MAX_MONEY,
+    Announce,
+    AssertAnnouncement,
     AssertLocktimeHeight,
     AssertLocktimeTime,
     AssertSequenceHeight,
     AssertSequenceTime,
     CreateOutput,
     CreateOutputTaproot,
+    Descriptor,
+    ReceiveMessage,
     Reserved,
+    SendMessage,
     parse_conditions,
 )
 from .errors import CODES, BitLispError
@@ -27,6 +32,8 @@ from .validation import validate_transaction
 __version__ = "0.0.1"
 
 __all__ = [
+    "Announce",
+    "AssertAnnouncement",
     "AssertLocktimeHeight",
     "AssertLocktimeTime",
     "AssertSequenceHeight",
@@ -35,9 +42,12 @@ __all__ = [
     "CODES",
     "CreateOutput",
     "CreateOutputTaproot",
+    "Descriptor",
     "MAX_MONEY",
     "NIL",
+    "ReceiveMessage",
     "Reserved",
+    "SendMessage",
     "TRUE",
     "Transaction",
     "TxInput",
