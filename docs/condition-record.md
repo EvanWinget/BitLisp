@@ -22,6 +22,11 @@ Section 4 registers the rules that have no external reference at all.
 | C5 | timelock enforcement | condition operands compared directly against chain state, previous transaction block height and timestamp, relative locks anchored at coin creation | conditions constrain the transaction's own locktime, sequence, and version fields, base consensus enforces them against the chain (BIP 65, 68, 112, 113 semantics inherited, relative locks anchored at prevout confirmation) | The validator holds no clock and stage 3 stays empty in v0. Reversibility decided it: a chain read stays addable through the reserved tier, the reverse migration cannot happen. Ratified 2026-08-07, decision 15. | `validation/time-asserts.json` |
 | C6 | timelock operand range | arbitrary-size integer operands | typed domains inherited from the fields: heights below 500,000,000, times 500,000,000 to 2^32 - 1, relative values 16 bits with 512-second time units | The envelope is what base consensus enforces. Exceeding it would require chain reads, the declined shape. Out-of-domain operands are malformed at stage 1, so a mistyped operand fails loudly at parse. Ratified 2026-08-07, decision 15. | `conditions/time-asserts.json` domain cases |
 | C7 | before-style timelocks | `ASSERT_BEFORE_*` family, expiring spend authorization | declined, structurally inexpressible in the field shape | Base consensus has no valid-only-before rule to delegate to. Expiring validity is the reorg hazard Bitcoin has deliberately avoided. Final decision 2026-08-07, decision 15, closing the decision 9 flag. | none, the opcodes stay invalid per `conditions/encoding.json` tier cases |
+| C8 | message scope | messages balance across the validation unit, a whole block or spend bundle | messages balance within the single transaction | A Bitcoin transaction must be independently valid for relay and mempool admission, and the bundle model's recombination instability is the recorded public objection the layer avoids importing (evaluation doc section 11.4). Ratified 2026-08-07, decision 16. | `validation/messages.json` |
+| C9 | message addressing fields | parent coin id, puzzle hash, amount, coin id, all content-derived | creating txid, spent scriptPubKey as raw bytes, amount, outpoint, with script and amount content-derived, txid and outpoint location-derived. Amount domains follow the fields: u64 there, 0 to MAX_MONEY here | The validator holds prevout data only. The creating txid is the creator handle it possesses, the txid half of the outpoint. Raw script bytes follow C1's rationale. The outpoint is Bitcoin's coin identity. Chia's coin-parent reading ("output of whichever transaction spent coin P") is unverifiable from prevout data and is a recorded decline. Ratified 2026-08-07, decision 16. | `validation/messages.json` mode cases |
+| C10 | condition argument arity | consensus accepts trailing extra arguments, strict arity only under the mempool flag (STRICT_ARGS_COUNT) | strict arity everywhere | One validator, one behavior, reject the ambiguous case. Verified in chia_rs conditions.rs: check_nil runs only under the mempool flag. Already the landed behavior of every prior family, recorded as a divergence here because the message probes surfaced it. Ratified 2026-08-07, decision 16. | `conditions/messages.json` arity cases |
+| C11 | broadcast conditions | four announcement codes, announcer bound by coin id or puzzle hash, namespacing by payload prefix convention | two conditions, announcer precision chosen by the assert through the shared descriptor grammar, namespace a first-class operand | Decision 10's safety rationale upheld against the match-by-default policy: the prefix convention produced inadvertently insecure spends, CHIP-0025's own stated motivation. Chia's two flavors survive as commitment values 7 and 2. Ratified 2026-08-07, decision 16. | `validation/announcements.json` |
+| C12 | per-spend coordination cap | 1,024 message and announcement conditions per spend, enforced by today's deployed binary, removed under the hard fork 2 pricing flag | no cap in v0 | Deployed Chia's cap is the pre-pricing spam bound and CHIP-0049 replaces it with per-condition pricing. Rule 5 is the pre-registered home for the same cap-or-price decision here, so v0 records the gap rather than adopting a bound upstream is removing. Recorded 2026-08-07 with decision 16, final decision owed by rule 5. | none until rule 5 lands |
 
 ## 2. Reference provenance
 
@@ -44,8 +49,27 @@ Section 4 registers the rules that have no external reference at all.
   revisited when rule 5 lands. Two decisions are pre-registered as
   deliberate rather than inherited: whether a per-spend free tier
   is acceptable, and which precedent prices tx-scoped
-  SEND_MESSAGE and RECV_MESSAGE (the CHIP-0049 precedent is split,
-  see `docs/execution-plan.md` Phase 2 notes).
+  SEND_MESSAGE and RECEIVE_MESSAGE. The precedent was re-verified
+  2026-08-07 against chia_rs source during the rule 3 research
+  pass: under the hard fork 2 COST_CONDITIONS flag both message
+  conditions and all four announcement conditions charge a flat
+  700 (MESSAGE_CONDITION_COST), and the 1,024-per-spend
+  announcement cap is skipped in favor of that pricing. The
+  earlier reading that CHIP-0049 leaves Chia's message conditions
+  on the free tier was wrong and is corrected in the execution
+  plan.
+- **Message-condition semantics (verified 2026-08-07).** Pinned
+  against the deployed binary by direct probes of chia_rs
+  `get_conditions_from_spendbundle`: counted balance per record
+  key, the mode inside the matching key, self-send legal, spend
+  order irrelevant, payload 0 to 1024 bytes, empty payload legal,
+  arity strict only under the mempool flag. Confirmed by a source
+  read of `messages.rs` and `conditions.rs` under the reading
+  guardrails: the balance check is a hash map of record key to
+  sends minus receives with every bucket required to be zero, and
+  each 3-bit mode half re-emits as a tag byte of the key, which is
+  why the mode is part of the key. The probe corpus is translated
+  into `vectors/validation/messages.json`.
 - **BIP341 wallet test vectors** are vendored as data into
   `vectors/upstream/bip341/` with a provenance sibling, and are the
   primary tweak-derivation oracle for CREATE_OUTPUT_TAPROOT. The
@@ -513,6 +537,88 @@ Section 4 registers the rules that have no external reference at all.
       the range. The draft's error direction was reject-valid, so
       no theft path ever existed.
 
+16. **Rule 3, the message family, and the match-by-default
+    policy.** RATIFIED (decisions by Evan, 2026-08-07, designed in
+    the rule 3 chat session). Seven parts:
+    - The match-by-default policy, stated here on its first
+      application: BitLisp matches deployed Chialisp semantics
+      unless divergence is strictly necessary, every divergence
+      needs a necessity and a table row, and the default yields to
+      two things only, a Bitcoin structural difference or a prior
+      ratified decision. Names remain governed by the
+      Bitcoin-native terminology decision: the policy is about
+      semantics, not vocabulary. Precedence was exercised
+      immediately in both directions: it overturned a drafted
+      5-mode simplification of the addressing grammar (a
+      divergence of taste, not necessity), and it yielded to
+      decision 10's first-class namespacing (a ratified safety
+      decision, part seven below).
+    - The addressed pair is adopted whole: Chia's opcodes 66 and
+      67 numerically intact at `0x42` and `0x43`, the full
+      two-halves mode geometry with all 64 values valid, the
+      single 6-bit mode operand, the counted-balance matching
+      rule, self-send legality, order independence, and the
+      1024-byte payload cap. Provenance in section 2: binary
+      probes first, source read second, both agreeing.
+    - Field re-addressing, the one strictly necessary divergence
+      (C9). The parent gap is recorded honestly: Chia's parent is
+      a coin, Bitcoin's creator is a transaction that may consume
+      many coins, and the coin-parent reading is unverifiable from
+      the prevout data the validator holds, so the creating txid
+      is the substitution. The identity case maps Chia's
+      content-derived coin id to the location-derived outpoint.
+      The geometry survives because both relations are
+      one-to-many: a parent coin has many children, a transaction
+      has many outputs.
+    - The message record is the layer's third condition sort,
+      beside claims and asserts. Under counted balance both
+      directions demand, so the message pair is the first
+      vocabulary whose removal from a valid transaction can
+      invalidate it. The constraints-only-tighten invariant is
+      re-scoped to claim and assert conditions with the family as
+      the recorded exemption: a lone message half invalidates, and
+      announcements break the other direction, since removing a
+      read announcement invalidates and adding one can validate.
+      The composition guarantee is preserved arithmetically rather
+      than by monotonicity: balanced ledgers sum to balanced
+      ledgers, and announcement facts only accumulate under
+      concatenation. This deliberate break of monotonicity matches
+      deployed Chia, where an unreceived send likewise
+      invalidates.
+    - The binding-stability classification (decision 12's first
+      landing) is normative in rule 3. Content fields, amount and
+      scriptPubKey, are knowable before a coin confirms and
+      survive reassembly of an unconfirmed creator. Location
+      fields, txid and outpoint, are neither. The recorded public
+      recombination objection (bitcoin-dev, March 2022, evaluation
+      doc section 11.4) is thereby answered in the spec: the mode
+      menu exists so a program written in advance can bind to
+      content, and the classification tells authors which modes
+      are safe to bake into long-lived programs.
+    - The motivating frame in all artifacts is program-authorized
+      coordination, the controller-and-vault split: value coins
+      delegating spend policy to a shared stateful policy coin,
+      approved per spend by an addressed message within one
+      transaction. The bundle-aggregation frame (atomic swaps
+      between strangers' spends) was rejected as a motivation
+      because Bitcoin signatures cover whole transactions and
+      permissionless aggregation does not exist here.
+    - The broadcast pair keeps decision 10's first-class
+      namespacing against the match-by-default policy (C11), and
+      both pairs stay in the vocabulary on verified deployed
+      evidence: Chia's offer settlement emits puzzle
+      announcements, the singleton launcher emits a coin
+      announcement, the post-CHIP-25 custody puzzles ship
+      announcement and message wrappers side by side, and
+      CHIP-0049 prices announcements rather than retiring them.
+      The design argument is the audience-count asymmetry: a
+      message is a handshake whose sender must know its reader
+      count exactly, an announcement is posted once and read by
+      any number of asserts, including zero. The two are disjoint
+      jobs, and CHIP-0025's "no longer recommended" applies to
+      using the loose tool for the tight job, not to the loose
+      job itself.
+
 ## 4. Novel-layer register
 
 The validation rules have no external reference: no deployed system
@@ -523,7 +629,7 @@ for an oracle, per ground rule 4:
 | --- | --- | --- |
 | 1. Injective multiset output matching | normative | hypothesis invariant suite (injectivity, reorder invariance, monotonicity, metamorphic mutations) plus the adversarial corpus in `vectors/validation/`, opening with the duplicate-CREATE_COIN theft vector |
 | 2. Mixed-transaction rule | normative | `vectors/validation/mixed-transaction.json`: five acceptance vectors (mixed, plain-only, unclaimed slots, merge, surplus capture) and one rule 1 boundary rejection, plus the addition-monotonicity, merge, and plain-only invariants. The time assert family checks under this rule's assert clause: `vectors/validation/time-asserts.json` with BIP 65 and BIP 68 field semantics as the double reference, plus the operand-monotonicity and boundary-flip invariants |
-| 3. Message scoping | pending | same treatment on landing |
+| 3. Message scoping | normative | `vectors/validation/messages.json` and `vectors/validation/announcements.json`: the probe corpus translated from the chia_rs oracle (balance, multiplicity, mode-key, self-send, order cases) plus adversarial wrong-address and forgery cases, and the balanced-pair, announcement-monotonicity, and byte-flip invariants |
 | 4. Dedup and multiplicity | pending | same treatment, plus translated Chia dedup tests where semantics overlap |
 | 5. Per-condition costing | pending | CHIP-0049 precedent comparison plus cost-conservation properties |
 | 6. Reserved conditions | normative | encoding vectors in `vectors/conditions/`, every error path pinned |
