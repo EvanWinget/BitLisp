@@ -16,7 +16,10 @@ A term enters this table in the same PR that introduces it.
 | CREATE_OUTPUT | creates a transaction output | CREATE_COIN | renamed 2026-07-31, claims one output slot by literal scriptPubKey bytes |
 | CREATE_OUTPUT_TAPROOT | creates a taproot output via the BIP341 tweak | none, compare bllsh secp256k1_muladd | same claim as CREATE_OUTPUT with the scriptPubKey validator-derived |
 | output slot | transaction output (scriptPubKey, amount) | created coin | identity is positional on Bitcoin, content-derived on Chia |
-| claim | no direct equivalent | none | a demanded (scriptPubKey, amount) pair, VALIDATION.md rule 1 |
+| claim | no direct equivalent | none | a condition's demand that consumes a transaction resource, assigned injectively. Output claims (VALIDATION.md rule 1) are the first kind (condition-record decision 14) |
+| assert | nearest relatives are CLTV and CSV, opcodes reading transaction context | the ASSERT_* condition family | a condition's predicate over the transaction view and validation context, freely shared, checked as a conjunction (condition-record decision 14) |
+| satisfier | compare miniscript satisfactions, which are spender-side | none | the transaction resource assigned to a claim, one per claim. A miniscript satisfaction is what the spender gives a script, a satisfier is what the transaction gives a claim |
+| composition guarantee | batching and coinjoin practice, no consensus equivalent | spend bundle aggregation, offers | two valid transactions with disjoint outpoints concatenate into a valid transaction (VALIDATION.md preamble, condition-record decision 14) |
 | spend | input plus its witness | coin spend | one input's evaluation and conditions |
 | reserved condition | upgradable NOP | unknown condition | priced forward-compatibility hatch, invalid-by-default outside it |
 | internal key, merkle root, tweak | BIP341 terms, used as defined there | none | see the CREATE_OUTPUT_TAPROOT entry |

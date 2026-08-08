@@ -89,7 +89,7 @@
 - [x] Minimal Bitcoin tx model in Python (inputs w/ outpoint+amount+leaf, outputs w/ scriptPubKey+amount, locktime/sequence) — enough to validate against, no networking.
 - [ ] `VALIDATION.md` + implementation, in this order (novelty-first):
   1. **Injective multiset output matching** — k identical CREATE_COINs consume k distinct output slots.
-  2. **Mixed-transaction rule** — every condition finds a distinct satisfier; unmatched outputs permitted (plain-taproot coexistence).
+  2. **Mixed-transaction rule** — every claim finds a distinct satisfier, asserts read shared facts; unmatched outputs permitted (plain-taproot coexistence). Landed 2026-08-07 with the claims-and-asserts principle and the composition guarantee, decision 14 in `docs/condition-record.md`.
   3. **Message scoping** — strictly within-tx; sender/receiver binding modes; multiplicity rules for duplicate SENDs/RECVs.
   4. **Dedup and multiplicity** — within-input and cross-input, with cost interaction documented.
   5. **Per-condition costing** — including superlinear CREATE_COIN pricing stub (obligation 2; tuning is Phase 4 data-driven).

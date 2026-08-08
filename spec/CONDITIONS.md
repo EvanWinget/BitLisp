@@ -74,13 +74,20 @@ addressed pairing), an unaddressed broadcast pair
 design lands), `RESERVE_FEE`, `ASSERT_OUTPUT_COUNT`, and
 `ASSERT_FEE_LE`.
 
+Every planned entry lands only in a shape the composition
+guarantee in `spec/VALIDATION.md` permits. In their listed shapes,
+`ASSERT_OUTPUT_COUNT` (an exact count) and `ASSERT_FEE_LE` (an
+upper bound on a quantity that concatenation sums) are forbidden
+by that guarantee, so each lands re-shaped or not at all, decided
+at its design session.
+
 ### CREATE_OUTPUT (`0x01`)
 
 `(0x01 scriptPubKey amount)`
 
-**Semantics.** Asserts that the containing transaction has one output
-slot whose content is exactly (`scriptPubKey`, `amount`), and claims
-that slot. Claims are matched injectively across the whole transaction
+**Semantics.** Claims one output slot of the containing transaction
+whose content is exactly (`scriptPubKey`, `amount`). Asserts nothing.
+Claims are matched injectively across the whole transaction
 under VALIDATION.md rule 1: k conditions carrying identical content
 require k distinct output slots. Two identical CREATE_OUTPUT conditions
 from one input are two claims.
@@ -118,9 +125,9 @@ through the reserved tier if evidence of need emerges.
 
 `(0x02 internal_key merkle_root amount)`
 
-**Semantics.** Asserts that the containing transaction has one output
-slot whose content is exactly (`spk`, `amount`) and claims that slot,
-where `spk` is derived as follows:
+**Semantics.** Claims one output slot of the containing transaction
+whose content is exactly (`spk`, `amount`). Asserts nothing. `spk` is
+derived as follows:
 
 - Let `P` be the secp256k1 point whose x coordinate is `internal_key`
   interpreted as a 32-byte big-endian integer and whose y coordinate

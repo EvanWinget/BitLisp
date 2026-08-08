@@ -267,6 +267,70 @@ def test_k_claims_never_fit_k_minus_1_slots(k, content):
     assert is_valid(build_tx(input_claims, outputs + [content]))
 
 
+# --- rule 2 and the composition guarantee -----------------------------------
+
+
+@given(input_specs, output_lists, contents)
+def test_adding_an_output_slot_never_invalidates(input_claims, outputs, extra):
+    """Rule 2 over the landed vocabulary: no landed condition reads
+    a fact that adding a slot changes, so growing the output side
+    of a valid transaction never rejects. An entry that reads an
+    addition-sensitive fact (a fee floor) re-scopes this property
+    when it lands. The merge property below is the permanent one."""
+    if not is_valid(build_tx(input_claims, outputs)):
+        return
+    assert is_valid(build_tx(input_claims, outputs + [extra]))
+
+
+@given(input_specs, output_lists)
+def test_adding_a_plain_input_never_invalidates(input_claims, outputs):
+    """Rule 2: a non-BitLisp input contributes no conditions, so it
+    can never turn a valid transaction invalid."""
+    if not is_valid(build_tx(input_claims, outputs)):
+        return
+    assert is_valid(build_tx(input_claims + [None], outputs))
+
+
+@given(st.integers(min_value=1, max_value=3), output_lists)
+def test_plain_only_transaction_always_valid(input_count, outputs):
+    """Rule 2: a transaction with no BitLisp inputs is subject to no
+    validation rule, whatever its shape."""
+    assert is_valid(build_tx([None] * input_count, outputs))
+
+
+def _with_fresh_outpoints(tx_inputs, offset):
+    """The same inputs on outpoints from a disjoint txid range."""
+    return tuple(
+        TxInput(
+            txid=bytes([offset + n]) * 32,
+            index=tx_input.index,
+            script_pubkey=tx_input.script_pubkey,
+            amount=tx_input.amount,
+            sequence=tx_input.sequence,
+            conditions=tx_input.conditions,
+        )
+        for n, tx_input in enumerate(tx_inputs, start=1)
+    )
+
+
+@given(input_specs, output_lists, input_specs, output_lists)
+def test_merge_of_valid_transactions_is_valid(claims_a, outputs_a, claims_b, outputs_b):
+    """The composition guarantee: two valid transactions consuming
+    disjoint outpoints concatenate into a valid transaction."""
+    tx_a = build_tx(claims_a, outputs_a)
+    tx_b = build_tx(claims_b, outputs_b)
+    if not (is_valid(tx_a) and is_valid(tx_b)):
+        return
+    merged = Transaction(
+        version=2,
+        locktime=0,
+        inputs=_with_fresh_outpoints(tx_a.inputs, 0x10)
+        + _with_fresh_outpoints(tx_b.inputs, 0x40),
+        outputs=tx_a.outputs + tx_b.outputs,
+    )
+    assert is_valid(merged)
+
+
 # --- transaction-model preconditions ---------------------------------------
 # Value conservation is enforced at construction, so validation never
 # sees a transaction that creates value out of nothing.

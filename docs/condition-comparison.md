@@ -180,7 +180,7 @@ specs of the same shape.
 | validation scope | a block's spends plus chain state (coin records, prior block height and timestamp) | a single transaction view, contextual asserts compare against validation context in the manner of Bitcoin's locktime rules |
 | output identity | content-derived coin id (parent, puzzle hash, amount) | positional slot (scriptPubKey, amount) |
 | output creation | authoritative construction, collision rejected | injective claim on existing slots, equality-only, multiset counting (rule 1, normative) |
-| coexistence | every coin is a puzzle, no foreign outputs exist | mixed transactions with plain-taproot inputs and unmatched outputs (rule 2, pending) |
+| coexistence | every coin is a puzzle, no foreign outputs exist | mixed transactions with plain-taproot inputs and unmatched outputs (rule 2, normative) |
 | cross-spend interaction | block-scoped messages and concurrency asserts | transaction-scoped messages (rule 3, pending) |
 | dedup and multiplicity | deployed semantics, the planned cross-check source for translated tests | rule 4, pending |
 | costing | deployed per-condition costs (`CREATE_COIN` 1,800,000, `AGG_SIG` 1,200,000, message 700, generic 200), CHIP-0049 revisions in review | rule 5, pending, CHIP-0049 is the recorded precedent with two pre-registered deliberate decisions |
@@ -192,10 +192,12 @@ specs of the same shape.
   `CREATE_OUTPUT` and `CREATE_OUTPUT_TAPROOT`. Eleven planned
   entries are named: the four after-style time asserts,
   `SEND_MESSAGE`, `RECV_MESSAGE`, the unaddressed broadcast pair,
-  `RESERVE_FEE`, `ASSERT_OUTPUT_COUNT`, and `ASSERT_FEE_LE`. Two
-  families are planned with membership open, the secp AGG_SIG
-  family and `ASSERT_MY_*`. Of the six validation rules, 1 and 6 are
-  normative and 2 to 5 are pending.
+  `RESERVE_FEE`, `ASSERT_OUTPUT_COUNT`, and `ASSERT_FEE_LE` (the
+  last two constrained by the composition guarantee, which forbids
+  their listed shapes, condition-record decision 14). Two families
+  are planned with membership open, the secp AGG_SIG family and
+  `ASSERT_MY_*`. Of the six validation rules, 1, 2, and 6 are
+  normative and 3 to 5 are pending.
 - **Reference coverage is uneven by design.** The ported entries
   (timelocks, messages, `RESERVE_FEE`, the AGG_SIG and `ASSERT_MY_*`
   shapes) have deployed Chia semantics to translate tests from. The
