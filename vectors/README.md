@@ -75,7 +75,7 @@ script, `{"opcode"}` plus the operand under its entry's argument name
 (`"height"`, `"time"`, `"blocks"`, `"units"`) for the time asserts,
 `{"opcode", "cost", "args": ["<hex node>"]}` for reserved
 conditions) or `{"error": "<code>"}`. The message family pins
-descriptors as `{"commitment", "fields"}` with fields in operand
+specifiers as `{"commitment", "fields"}` with fields in operand
 order, amounts as integers, all other fields hex: ANNOUNCE is
 `{"opcode", "namespace", "payload"}`, ASSERT_ANNOUNCEMENT adds
 `"announcer"`, SEND_MESSAGE is `{"opcode", "sender_commitment",

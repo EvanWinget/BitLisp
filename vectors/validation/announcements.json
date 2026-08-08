@@ -194,7 +194,7 @@
    }
   },
   {
-   "name": "wrong_announcer_descriptor",
+   "name": "wrong_announcer_specifier",
    "tx": {
     "version": 2,
     "locktime": 0,
@@ -424,7 +424,7 @@
    }
   },
   {
-   "name": "announcement_and_descriptor_split_across_inputs",
+   "name": "announcement_and_specifier_split_across_inputs",
    "tx": {
     "version": 2,
     "locktime": 0,

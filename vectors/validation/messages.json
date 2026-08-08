@@ -1,7 +1,7 @@
 {
  "schema": "bitlisp-vector-v0",
  "suite": "validation",
- "spec": "VALIDATION.md rule 3, the message ledger: counted balance, self descriptors, order independence, composition",
+ "spec": "VALIDATION.md rule 3, the message ledger: counted balance, self specifiers, order independence, composition",
  "cases": [
   {
    "name": "matched_pair_full_commitment",
@@ -475,7 +475,7 @@
    }
   },
   {
-   "name": "wrong_amount_descriptor_never_balances",
+   "name": "wrong_amount_specifier_never_balances",
    "tx": {
     "version": 2,
     "locktime": 0,
@@ -507,7 +507,7 @@
    }
   },
   {
-   "name": "wrong_script_descriptor_never_balances",
+   "name": "wrong_script_specifier_never_balances",
    "tx": {
     "version": 2,
     "locktime": 0,
