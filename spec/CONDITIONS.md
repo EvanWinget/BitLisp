@@ -3,14 +3,15 @@
 Status: in progress. Section 1, the CREATE_OUTPUT and
 CREATE_OUTPUT_TAPROOT entries, the time assert family, and the
 message family are normative. The remaining vocabulary v0 entries
-land across Phase 2, each with semantics, arguments, cost,
-validation rule reference, and a curation note per design
-obligation 4.
+land across Phase 2, each with semantics, arguments, cost, and
+validation rule reference.
 
 A successful program evaluation yields a condition list. This document
-specifies the encoding of that list and the meaning of each condition.
-How conditions are matched against the transaction is specified in
-[VALIDATION.md](VALIDATION.md).
+specifies the encoding of that list and the per-condition rules: each
+condition's arguments, their domains, and the claims, asserts, or
+message records it produces. Everything that combines conditions
+across inputs, checking them against the containing transaction, is
+specified in [VALIDATION.md](VALIDATION.md).
 
 ## 1. Condition list encoding
 
@@ -112,20 +113,6 @@ in satoshis). Exactly two arguments, both atoms.
 
 **Validation rule.** VALIDATION.md rule 1.
 
-**Curation note.** Ported from Chia's CREATE_COIN, renamed because
-the condition claims a transaction output slot and names no coin
-type (decision recorded in the condition record), with two
-deliberate changes,
-recorded as divergences C1 and C2 in the condition record
-(`docs/condition-record.md`). First, the argument is full script bytes
-rather than a puzzle hash, because a Bitcoin output may carry any
-scriptPubKey and exits to non-BitLisp outputs are ordinary. Second,
-Chia's optional memo argument is declined in v0: its wallet-discovery
-job does not exist under output-script scanning, and consensus-carried
-bytes with no consensus meaning are a deliberate non-affordance
-(design obligation 4). A memo-bearing variant remains reachable
-through the reserved tier if evidence of need emerges.
-
 ### CREATE_OUTPUT_TAPROOT (`0x02`)
 
 `(0x02 internal_key merkle_root amount)`
@@ -170,18 +157,6 @@ Exactly three arguments, all atoms.
 
 **Validation rule.** VALIDATION.md rule 1, after the derivation above.
 
-**Curation note.** Neither output-creation condition is an output
-type. Both produce the identical claim, and a taproot output with a
-statically known key is created with plain CREATE_OUTPUT. This
-condition exists so covenant recursion can construct a successor
-taproot output when the program computes the internal key or tree
-root dynamically, without giving the VM elliptic-curve arithmetic.
-Two alternatives were declined, a general `secp256k1_muladd`
-operator and a narrow `taptweak` operator, recorded as decision
-D-CC2 in the condition record (`docs/condition-record.md`). The
-derivation matches BIP341 output-key construction exactly,
-including the key-only tweak when no script tree is committed.
-
 ### Time asserts (`0x20` to `0x23`)
 
 The four conditions of this family assert facts about the
@@ -218,20 +193,6 @@ can change when spends are recombined into a different
 transaction. The composition guarantee states the discipline under
 which recombination preserves it.
 
-**Family curation note.** The family ports Chia's four timelock
-asserts in the enforcement shape of Bitcoin's own locktime
-machinery rather than Chia's direct chain reads: conditions
-constrain the transaction's fields and deployed consensus enforces
-the fields, so this layer adds no chain-reading surface (decision
-15 in the condition record, with the declined direct-read shape
-and its reversibility argument). The type lives in the condition
-code and the operand is a plain quantity, so the field bit layouts
-appear only in the definitions above, never in arguments. Chia's
-ASSERT_BEFORE family is declined: this shape cannot express
-expiring validity, and that is deliberate (decision 15). The
-before-threshold operand domains make a mistyped operand
-malformed at stage 1 rather than unsatisfiable at stage 4.
-
 ### ASSERT_LOCKTIME_HEIGHT (`0x20`)
 
 `(0x20 height)`
@@ -252,12 +213,6 @@ argument, an atom.
 **Validation rule.** The assert clause of VALIDATION.md
 (claims and asserts, rule 2). Stage 4.
 
-**Curation note.** Ported from Chia's ASSERT_HEIGHT_ABSOLUTE,
-re-based from a chain read to the `locktime` field that
-OP_CHECKLOCKTIMEVERIFY constrains, including its non-final
-sequence requirement and its same-type rule. Divergence rows in
-the condition record.
-
 ### ASSERT_LOCKTIME_TIME (`0x21`)
 
 `(0x21 time)`
@@ -277,14 +232,6 @@ Exactly one argument, an atom.
 
 **Validation rule.** The assert clause of VALIDATION.md
 (claims and asserts, rule 2). Stage 4.
-
-**Curation note.** Ported from Chia's ASSERT_SECONDS_ABSOLUTE.
-The wall-clock semantics are whatever base consensus gives
-`locktime`, median time past under current rules, so this layer
-neither defines nor reads a clock. Kept despite the height-first
-design stance: the field is part of Bitcoin's spend schema and
-scripts constrain it today, so declining it removes no surface
-and opens a calendar-deadline expressiveness hole (decision 15).
 
 ### ASSERT_SEQUENCE_HEIGHT (`0x22`)
 
@@ -308,13 +255,6 @@ argument, an atom.
 **Validation rule.** The assert clause of VALIDATION.md
 (claims and asserts, rule 2). Stage 4.
 
-**Curation note.** Ported from Chia's ASSERT_HEIGHT_RELATIVE,
-re-based to the sequence field that OP_CHECKSEQUENCEVERIFY
-constrains, anchored at prevout confirmation by those deployed
-rules. The 16-bit range is inherited and recorded as a
-divergence. The operand cannot express OP_CSV's disabled no-op
-form: a program wanting no relative lock omits the condition.
-
 ### ASSERT_SEQUENCE_TIME (`0x23`)
 
 `(0x23 units)`
@@ -337,11 +277,6 @@ form: a program wanting no relative lock omits the condition.
 
 **Validation rule.** The assert clause of VALIDATION.md
 (claims and asserts, rule 2). Stage 4.
-
-**Curation note.** Ported from Chia's ASSERT_SECONDS_RELATIVE.
-The operand counts the field's own 512-second units, compared
-unit for unit with no arithmetic in the validator. Conversion
-from seconds is tooling's job.
 
 ### Message family (`0x40` to `0x43`)
 
@@ -384,27 +319,6 @@ pair, three for the assert) rejects first, then the mode, then the
 mode-dependent exact count, then each operand in the order the
 entry states.
 
-**Family curation note.** The addressed pair ports Chia's
-SEND_MESSAGE and RECEIVE_MESSAGE with their opcodes numerically
-intact (66 and 67 are `0x42` and `0x43`), their full mode
-geometry, and their counted balance, re-addressed to Bitcoin
-prevout data: parent coin id becomes the creating txid, puzzle
-hash becomes the spent scriptPubKey carried as raw bytes, coin id
-becomes the outpoint. Scope narrows from Chia's block to the
-transaction, because a Bitcoin transaction must be valid on its
-own. Arity is strict everywhere, where deployed Chia enforces
-arity only in its mempool. The broadcast pair replaces Chia's four
-announcement conditions with two: the announcer carries its full
-prevout data and the assert side picks its precision through the
-descriptor grammar, so the coin and puzzle flavors are commitment
-values 7 and 2 of one condition, and the namespace is a
-first-class operand rather than a payload prefix convention. Both
-pairs are kept because they solve different jobs: a message is a
-handshake whose sender must know its audience exactly, an
-announcement is posted once and read by any number of asserts,
-including zero. All divergence rows and the full rationale are in
-the condition record (decision 16).
-
 ### ANNOUNCE (`0x40`)
 
 `(0x40 namespace payload)`
@@ -422,16 +336,6 @@ bytes (`bad_condition_arg`). Exactly two arguments, both atoms.
 **Cost.** Assigned when VALIDATION.md rule 5 lands.
 
 **Validation rule.** VALIDATION.md rule 3 (announcements). Stage 4.
-
-**Curation note.** Replaces Chia's CREATE_COIN_ANNOUNCEMENT and
-CREATE_PUZZLE_ANNOUNCEMENT with one condition: the announcer
-carries its full prevout data and the assert side picks the
-precision, so the create side needs no flavors. The namespace is a
-first-class operand, replacing the payload prefix convention, a
-ratified safety decision upheld against the match-by-default
-policy (decision 16). Kept beside the addressed pair on deployed
-evidence: Chia's offer settlement, singleton launcher, and
-post-message custody puzzles all still build on announcements.
 
 ### ASSERT_ANNOUNCEMENT (`0x41`)
 
@@ -455,12 +359,6 @@ count (`bad_condition_arity`).
 **Cost.** Assigned when VALIDATION.md rule 5 lands.
 
 **Validation rule.** VALIDATION.md rule 3 (announcements). Stage 4.
-
-**Curation note.** Replaces Chia's ASSERT_COIN_ANNOUNCEMENT and
-ASSERT_PUZZLE_ANNOUNCEMENT, whose flavors survive as commitment
-values 7 and 2 of one condition, generalized to the remaining
-precisions by the shared descriptor grammar. Commitment value 0 is
-the fully unaddressed read.
 
 ### SEND_MESSAGE (`0x42`)
 
@@ -489,11 +387,6 @@ receiver half's operand count (`bad_condition_arity`).
 **Validation rule.** VALIDATION.md rule 3 (the message ledger).
 Stage 4.
 
-**Curation note.** Ported from Chia's SEND_MESSAGE with the opcode
-numerically intact (66 is `0x42`), the full mode geometry, and the
-counted balance. The re-addressing, the transaction scope, and the
-strict arity are the family's recorded divergences (decision 16).
-
 ### RECEIVE_MESSAGE (`0x43`)
 
 `(0x43 mode message sender...)`
@@ -517,8 +410,3 @@ count (`bad_condition_arity`).
 
 **Validation rule.** VALIDATION.md rule 3 (the message ledger).
 Stage 4.
-
-**Curation note.** Ported from Chia's RECEIVE_MESSAGE with the
-opcode numerically intact (67 is `0x43`). The pair shares the
-family's divergence rows: every divergence of SEND_MESSAGE is a
-divergence of this condition too.
