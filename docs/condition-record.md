@@ -288,9 +288,9 @@ Section 4 registers the rules that have no external reference at all.
     userspace convention consensus never sees, and that convention
     is not ported. Names, arguments, binding modes, and
     multiplicity land with the VALIDATION.md rule 3 design.
-11. **The validator spec is organized as validation waves.**
+11. **The validator spec is organized as validation stages.**
     RATIFIED (decision by Evan, 2026-08-06). VALIDATION.md organizes
-    validation into waves of strictly increasing context:
+    validation into stages of strictly increasing context:
     1. Stateless per-spend work: the VM run and condition
        well-formedness, cacheable forever.
     2. Claims bound to the spent output's own data (outpoint,
@@ -298,7 +298,7 @@ Section 4 registers the rules that have no external reference at all.
     3. Chain-context asserts: height and median time past, which
        define validity ranges the mempool re-evaluates cheaply.
     4. Cross-spend relational checks: message and broadcast
-       pairing and injective output matching, the only wave that
+       pairing and injective output matching, the only stage that
        re-runs when spends are recombined into a different
        transaction.
     5. Batch signature verification over the collected
@@ -307,11 +307,16 @@ Section 4 registers the rules that have no external reference at all.
     structure: chia_rs parses and checks conditions in stages of
     the same shape. It matches Bitcoin Core's own split between
     context-free and contextual validation. And it makes decision
-    12 structural: a condition's wave assignment states exactly
+    12 structural: a condition's stage assignment states exactly
     what context can invalidate it, so recombination-stability
-    classification is wave assignment. VALIDATION.md's rule
-    numbering is unchanged. The waves are the spec's organizing
-    frame, and each rule states its wave.
+    classification is stage assignment. VALIDATION.md's rule
+    numbering is unchanged. The stages are the spec's organizing
+    frame, and each rule states its stage.
+    Amended 2026-08-07 (decision by Evan): the frame's noun is
+    stage, formerly wave. Stage is the word Bitcoin Core and
+    chia_rs reviewers already use for staged validation, wave was
+    our coinage and read as parallelism jargon. The five-part
+    structure is unchanged.
 12. **Every binding mode gets a recombination-stability class.**
     RATIFIED as a requirement (decision by Evan, 2026-08-06), with
     the classification itself owed by the identity and signature
@@ -347,7 +352,7 @@ Section 4 registers the rules that have no external reference at all.
     sense. Message scoping, dedup, costing, and reserved conditions
     match nothing, so the layer name had overfit its first rule.
     Third, decision 11 already organizes the layer into validation
-    waves, and Bitcoin Core's transaction-context consensus checks
+    stages, and Bitcoin Core's transaction-context consensus checks
     live in validation.cpp, so validation is the Bitcoin-native
     noun the terminology policy favors. The word matching survives
     exactly where it is precise: rule 1 keeps its name, injective
