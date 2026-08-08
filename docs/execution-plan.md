@@ -90,7 +90,7 @@
 - [ ] `VALIDATION.md` + implementation, in this order (novelty-first):
   1. **Injective multiset output matching** — k identical CREATE_COINs consume k distinct output slots.
   2. **Mixed-transaction rule** — every claim finds a distinct satisfier, asserts read shared facts; unmatched outputs permitted (plain-taproot coexistence). Landed 2026-08-07 with the claims-and-asserts principle and the composition guarantee, decision 14 in `docs/condition-record.md`.
-  3. **Message scoping** — strictly within-tx; sender/receiver binding modes; multiplicity rules for duplicate SENDs/RECVs. Landed 2026-08-07 with the message ledger, the participant descriptors re-addressed to prevout data, the broadcast pair, and the message record as the layer's third condition sort, decision 16 in `docs/condition-record.md`. The session also stated the match-by-default policy: BitLisp matches deployed Chialisp semantics unless divergence is strictly necessary, recorded in decision 16.
+  3. **Message scoping** — strictly within-tx; sender/receiver binding modes; multiplicity rules for duplicate SENDs/RECVs. Landed 2026-08-07 with the message ledger, the participant specifiers re-addressed to prevout data, the broadcast pair, and the message record as the layer's third condition sort, decision 16 in `docs/condition-record.md`. The session also stated the match-by-default policy: BitLisp matches deployed Chialisp semantics unless divergence is strictly necessary, recorded in decision 16.
   4. **Dedup and multiplicity** — within-input and cross-input, with cost interaction documented.
   5. **Per-condition costing** — including superlinear CREATE_COIN pricing stub (obligation 2; tuning is Phase 4 data-driven).
 

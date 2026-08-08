@@ -25,7 +25,7 @@ Section 4 registers the rules that have no external reference at all.
 | C8 | message scope | messages balance across the validation unit, a whole block or spend bundle | messages balance within the single transaction | A Bitcoin transaction must be independently valid for relay and mempool admission, and the bundle model's recombination instability is the recorded public objection the layer avoids importing (evaluation doc section 11.4). Ratified 2026-08-07, decision 16. | `validation/messages.json` |
 | C9 | message addressing fields | parent coin id, puzzle hash, amount, coin id, all content-derived | creating txid, spent scriptPubKey as raw bytes, amount, outpoint, with script and amount content-derived, txid and outpoint location-derived. Amount domains follow the fields: u64 there, 0 to MAX_MONEY here | The validator holds prevout data only. The creating txid is the creator handle it possesses, the txid half of the outpoint. Raw script bytes follow C1's rationale. The outpoint is Bitcoin's coin identity. Chia's coin-parent reading ("output of whichever transaction spent coin P") is unverifiable from prevout data and is a recorded decline. Ratified 2026-08-07, decision 16. | `validation/messages.json` mode cases |
 | C10 | condition argument arity | consensus accepts trailing extra arguments, strict arity only under the mempool flag (STRICT_ARGS_COUNT) | strict arity everywhere | One validator, one behavior, reject the ambiguous case. Verified in chia_rs conditions.rs: check_nil runs only under the mempool flag. Already the landed behavior of every prior family, recorded as a divergence here because the message probes surfaced it. Ratified 2026-08-07, decision 16. | `conditions/messages.json` arity cases |
-| C11 | broadcast conditions | four announcement codes, announcer bound by coin id or puzzle hash, namespacing by payload prefix convention | two conditions, announcer precision chosen by the assert through the shared descriptor grammar, namespace a first-class operand | Decision 10's safety rationale upheld against the match-by-default policy: the prefix convention produced inadvertently insecure spends, CHIP-0025's own stated motivation. Chia's two flavors survive as commitment values 7 and 2. Ratified 2026-08-07, decision 16. | `validation/announcements.json` |
+| C11 | broadcast conditions | four announcement codes, announcer bound by coin id or puzzle hash, namespacing by payload prefix convention | two conditions, announcer precision chosen by the assert through the shared specifier grammar, namespace a first-class operand | Decision 10's safety rationale upheld against the match-by-default policy: the prefix convention produced inadvertently insecure spends, CHIP-0025's own stated motivation. Chia's two flavors survive as commitment values 7 and 2. Ratified 2026-08-07, decision 16. | `validation/announcements.json` |
 | C12 | per-spend coordination cap | 1,024 message and announcement conditions per spend, enforced by today's deployed binary, removed under the hard fork 2 pricing flag | no cap in v0 | Deployed Chia's cap is the pre-pricing spam bound and CHIP-0049 replaces it with per-condition pricing. Rule 5 is the pre-registered home for the same cap-or-price decision here, so v0 records the gap rather than adopting a bound upstream is removing. Recorded 2026-08-07 with decision 16, final decision owed by rule 5. | none until rule 5 lands |
 
 ## 2. Reference provenance
@@ -207,7 +207,7 @@ Section 4 registers the rules that have no external reference at all.
    in favor of the notes: obligation 4 wants the curation visible
    where the vocabulary is, so entries keep a brief note and this
    record keeps the full rationale. CLAUDE.md ground rule 1 records
-   the exception.
+   the exception. Reversed 2026-08-08, decision 17.
 6. **RESERVED_COST_FLOOR stays at 500.** RATIFIED (decision by Evan,
    2026-07-29). The CHIP-0049 per-condition base cost stands as the
    provisional floor, revisited when rule 5's costing design lands.
@@ -618,6 +618,46 @@ Section 4 registers the rules that have no external reference at all.
       jobs, and CHIP-0025's "no longer recommended" applies to
       using the loose tool for the tight job, not to the loose
       job itself.
+
+17. **Spec purity: the curation notes leave the spec.** RATIFIED
+    (decision by Evan, 2026-08-08, reversing decision 5). Raised
+    while reviewing the message family PR: the spec is aimed at
+    implementers and states behavior only, with no exception, so
+    rationale and Chia references live in docs alone. Every
+    curation note is removed from `spec/CONDITIONS.md` and
+    CLAUDE.md ground rule 1 drops the recorded exception.
+    Obligation 4's visibility want, the curation inspectable where
+    the vocabulary is, is carried by `docs/condition-comparison.md`,
+    whose tables map every Chia condition to its BitLisp
+    disposition, and by this record. The notes' content was
+    verified present in those two documents before removal, with
+    two clarifications moved here rather than lost:
+    - A program wanting no relative lock omits the sequence
+      asserts. The operand domain deliberately cannot express
+      OP_CSV's disabled no-op form, part of decision 15's
+      plain-operand ratification.
+    - Seconds-to-units conversion for ASSERT_SEQUENCE_TIME is
+      tooling's job, the validator compares the field's own
+      512-second units directly. This joins decision 15's
+      tooling-defaults stance, and decision 15's phrase "recorded
+      in the curation notes" now resolves to this record.
+
+18. **Participant descriptor renamed participant specifier.**
+    RATIFIED (decision by Evan, 2026-08-08). To a Bitcoin
+    developer, descriptor unqualified means an output script
+    descriptor, the BIP 380 family, and rule 3's concept is
+    unrelated to it. The terminology policy exists for exactly
+    that reader, so the collision fails it in the worst direction,
+    a loaded Bitcoin term reused for a non-Bitcoin meaning.
+    Binding was considered and declined as overloaded in the other
+    direction: the project already uses it for binding modes and
+    stability classes. Name-only change: commitment values,
+    operands, the pinned JSON forms, and every vector payload are
+    unchanged. Vector names and prose across the repo follow, and
+    the glossary row moves with the name. Earlier entries in this
+    record keep the term that was current when they were ratified,
+    except the living divergence table (C11), which reads in
+    current vocabulary.
 
 ## 4. Novel-layer register
 

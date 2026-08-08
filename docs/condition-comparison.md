@@ -121,7 +121,7 @@ is no intra-transaction chaining.
 
 | Capability | Chia | BitLisp |
 | --- | --- | --- |
-| announcements | `CREATE_COIN_ANNOUNCEMENT` 60, `ASSERT_COIN_ANNOUNCEMENT` 61, `CREATE_PUZZLE_ANNOUNCEMENT` 62, `ASSERT_PUZZLE_ANNOUNCEMENT` 63 | `ANNOUNCE` 0x40 and `ASSERT_ANNOUNCEMENT` 0x41, normative, transaction-scoped, namespacing first-class in the arguments rather than payload prefix bytes, announcer precision chosen by the assert through the descriptor grammar (decisions 10 and 16, divergence C11) |
+| announcements | `CREATE_COIN_ANNOUNCEMENT` 60, `ASSERT_COIN_ANNOUNCEMENT` 61, `CREATE_PUZZLE_ANNOUNCEMENT` 62, `ASSERT_PUZZLE_ANNOUNCEMENT` 63 | `ANNOUNCE` 0x40 and `ASSERT_ANNOUNCEMENT` 0x41, normative, transaction-scoped, namespacing first-class in the arguments rather than payload prefix bytes, announcer precision chosen by the assert through the specifier grammar (decisions 10 and 16, divergence C11) |
 | messages | `SEND_MESSAGE` 66, `RECEIVE_MESSAGE` 67 (CHIP-0025), mode flags select which sender and receiver fields the pairing commits to, paired within the surrounding block | `SEND_MESSAGE` and `RECEIVE_MESSAGE` at the same numeric opcodes, normative, strictly transaction-scoped counted balance with fields re-addressed to prevout data (decision 16, divergences C8 to C10) |
 | concurrency asserts | `ASSERT_CONCURRENT_SPEND` 64, `ASSERT_CONCURRENT_PUZZLE` 65, another spend with the named coin id or puzzle hash occurs alongside this one | not in the v0 plan |
 
