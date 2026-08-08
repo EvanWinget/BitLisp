@@ -23,7 +23,19 @@ RESERVED_COST_FLOOR = 500
 
 CREATE_OUTPUT = 0x01
 CREATE_OUTPUT_TAPROOT = 0x02
+ASSERT_LOCKTIME_HEIGHT = 0x20
+ASSERT_LOCKTIME_TIME = 0x21
+ASSERT_SEQUENCE_HEIGHT = 0x22
+ASSERT_SEQUENCE_TIME = 0x23
 _RESERVED_START = 0x80
+
+# A locktime below the threshold counts blocks, at or above it counts
+# Unix seconds. Operand domains exclude the wrong-typed range, so a
+# mistyped operand is malformed here at parse rather than
+# unsatisfiable later against the field.
+LOCKTIME_THRESHOLD = 500_000_000
+LOCKTIME_MAX = 0xFFFFFFFF
+SEQUENCE_VALUE_MAX = 0xFFFF
 
 
 @dataclass(frozen=True)
@@ -51,6 +63,46 @@ class CreateOutputTaproot:
     script_pubkey: bytes
 
     opcode = CREATE_OUTPUT_TAPROOT
+
+
+@dataclass(frozen=True)
+class AssertLocktimeHeight:
+    """Asserts a non-final own sequence and a height-typed locktime
+    at or above height."""
+
+    height: int
+
+    opcode = ASSERT_LOCKTIME_HEIGHT
+
+
+@dataclass(frozen=True)
+class AssertLocktimeTime:
+    """Asserts a non-final own sequence and a time-typed locktime at
+    or above time."""
+
+    time: int
+
+    opcode = ASSERT_LOCKTIME_TIME
+
+
+@dataclass(frozen=True)
+class AssertSequenceHeight:
+    """Asserts version 2, an enabled height-typed own sequence whose
+    value is at least blocks."""
+
+    blocks: int
+
+    opcode = ASSERT_SEQUENCE_HEIGHT
+
+
+@dataclass(frozen=True)
+class AssertSequenceTime:
+    """Asserts version 2, an enabled time-typed own sequence whose
+    value, in 512-second units, is at least units."""
+
+    units: int
+
+    opcode = ASSERT_SEQUENCE_TIME
 
 
 @dataclass(frozen=True)
@@ -134,6 +186,21 @@ def _parse_create_output_taproot(args):
     return CreateOutputTaproot(internal_key, merkle_root, amount, script_pubkey)
 
 
+def _parse_time_assert(args, name, cls, low, high):
+    """One plain-quantity operand whose domain is [low, high]."""
+    if len(args) != 1:
+        raise BitLispError(
+            "bad_condition_arity", f"{name} takes 1 argument, got {len(args)}"
+        )
+    value = _parse_int(args[0], f"{name} operand")
+    if not low <= value <= high:
+        raise BitLispError(
+            "bad_condition_arg",
+            f"{name} operand must be {low} to {high}, got {value}",
+        )
+    return cls(value)
+
+
 def _parse_reserved(opcode, args):
     if not args:
         raise BitLispError(
@@ -167,6 +234,38 @@ def _parse_condition(node):
         return _parse_create_output(args)
     if opcode == CREATE_OUTPUT_TAPROOT:
         return _parse_create_output_taproot(args)
+    if opcode == ASSERT_LOCKTIME_HEIGHT:
+        return _parse_time_assert(
+            args,
+            "ASSERT_LOCKTIME_HEIGHT",
+            AssertLocktimeHeight,
+            0,
+            LOCKTIME_THRESHOLD - 1,
+        )
+    if opcode == ASSERT_LOCKTIME_TIME:
+        return _parse_time_assert(
+            args,
+            "ASSERT_LOCKTIME_TIME",
+            AssertLocktimeTime,
+            LOCKTIME_THRESHOLD,
+            LOCKTIME_MAX,
+        )
+    if opcode == ASSERT_SEQUENCE_HEIGHT:
+        return _parse_time_assert(
+            args,
+            "ASSERT_SEQUENCE_HEIGHT",
+            AssertSequenceHeight,
+            0,
+            SEQUENCE_VALUE_MAX,
+        )
+    if opcode == ASSERT_SEQUENCE_TIME:
+        return _parse_time_assert(
+            args,
+            "ASSERT_SEQUENCE_TIME",
+            AssertSequenceTime,
+            0,
+            SEQUENCE_VALUE_MAX,
+        )
     raise BitLispError("bad_condition_opcode", f"invalid opcode {opcode:#04x}")
 
 

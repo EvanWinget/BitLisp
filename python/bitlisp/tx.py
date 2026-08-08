@@ -13,7 +13,6 @@ from dataclasses import dataclass
 from .conditions import MAX_MONEY
 
 _UINT32_MAX = 0xFFFFFFFF
-_INT32_MIN, _INT32_MAX = -(2**31), 2**31 - 1
 
 
 def _check_amount(amount, what):
@@ -85,9 +84,11 @@ class Transaction:
     outputs: tuple
 
     def __post_init__(self):
-        if not isinstance(self.version, int) or not (
-            _INT32_MIN <= self.version <= _INT32_MAX
-        ):
+        # Unsigned like the locktime field: base consensus compares
+        # the version unsigned in its locktime rules (Core casts
+        # nVersion to uint32), so a top-bit wire version is a large
+        # value here, never a negative one.
+        if not isinstance(self.version, int) or not (0 <= self.version <= _UINT32_MAX):
             raise ValueError(f"version out of range: {self.version!r}")
         if not isinstance(self.locktime, int) or not (
             0 <= self.locktime <= _UINT32_MAX

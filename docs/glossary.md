@@ -17,7 +17,12 @@ A term enters this table in the same PR that introduces it.
 | CREATE_OUTPUT_TAPROOT | creates a taproot output via the BIP341 tweak | none, compare bllsh secp256k1_muladd | same claim as CREATE_OUTPUT with the scriptPubKey validator-derived |
 | output slot | transaction output (scriptPubKey, amount) | created coin | identity is positional on Bitcoin, content-derived on Chia |
 | claim | no direct equivalent | none | a condition's demand that consumes a transaction resource, assigned injectively. Output claims (VALIDATION.md rule 1) are the first kind (condition-record decision 14) |
-| assert | nearest relatives are CLTV and CSV, opcodes reading transaction context | the ASSERT_* condition family | a condition's predicate over the transaction view and validation context, freely shared, checked as a conjunction (condition-record decision 14) |
+| assert | nearest relatives are CLTV and CSV, opcodes reading transaction context | the ASSERT_* condition family | a condition's predicate over the transaction view, freely shared, checked as a conjunction (condition-record decision 14) |
+| time asserts | CLTV and CSV, the locktime opcodes | the four timelock ASSERT conditions | the family constraining the transaction's locktime machinery, fields base consensus enforces, landed 2026-08-07 (condition-record decision 15) |
+| ASSERT_LOCKTIME_HEIGHT | OP_CHECKLOCKTIMEVERIFY, height type | ASSERT_HEIGHT_ABSOLUTE | requires a non-final own sequence and a height-typed nLockTime at or above the operand |
+| ASSERT_LOCKTIME_TIME | OP_CHECKLOCKTIMEVERIFY, time type | ASSERT_SECONDS_ABSOLUTE | the same shape against a time-typed nLockTime, wall-clock meaning is whatever base consensus gives the field |
+| ASSERT_SEQUENCE_HEIGHT | OP_CHECKSEQUENCEVERIFY, block count | ASSERT_HEIGHT_RELATIVE | requires an unsigned version of at least 2 and an enabled height-typed sequence value at or above the operand |
+| ASSERT_SEQUENCE_TIME | OP_CHECKSEQUENCEVERIFY, 512-second units | ASSERT_SECONDS_RELATIVE | the same shape with the time type flag, the operand counts the field's own 512-second units |
 | satisfier | compare miniscript satisfactions, which are spender-side | none | the transaction resource assigned to a claim, one per claim. A miniscript satisfaction is what the spender gives a script, a satisfier is what the transaction gives a claim |
 | composition guarantee | batching and coinjoin practice, no consensus equivalent | spend bundle aggregation, offers | two valid transactions with disjoint outpoints concatenate into a valid transaction (VALIDATION.md preamble, condition-record decision 14) |
 | spend | input plus its witness | coin spend | one input's evaluation and conditions |

@@ -124,8 +124,24 @@ def run_vm_case(case):
 def _condition_json(cond):
     """The pinned JSON form of one parsed condition."""
     from bitlisp import serialize
-    from bitlisp.conditions import CreateOutput, CreateOutputTaproot, Reserved
+    from bitlisp.conditions import (
+        AssertLocktimeHeight,
+        AssertLocktimeTime,
+        AssertSequenceHeight,
+        AssertSequenceTime,
+        CreateOutput,
+        CreateOutputTaproot,
+        Reserved,
+    )
 
+    if isinstance(cond, AssertLocktimeHeight):
+        return {"opcode": cond.opcode, "height": cond.height}
+    if isinstance(cond, AssertLocktimeTime):
+        return {"opcode": cond.opcode, "time": cond.time}
+    if isinstance(cond, AssertSequenceHeight):
+        return {"opcode": cond.opcode, "blocks": cond.blocks}
+    if isinstance(cond, AssertSequenceTime):
+        return {"opcode": cond.opcode, "units": cond.units}
     if isinstance(cond, CreateOutput):
         return {
             "opcode": cond.opcode,
@@ -163,8 +179,10 @@ def run_conditions_case(case):
     Condition JSON is {"opcode", "script_pubkey", "amount"} for
     CREATE_OUTPUT, {"opcode", "internal_key", "merkle_root", "amount",
     "script_pubkey"} for CREATE_OUTPUT_TAPROOT with script_pubkey the
-    derived taproot script, and {"opcode", "cost", "args":
-    [<hex node>]} for reserved conditions.
+    derived taproot script, {"opcode"} plus the operand under its
+    entry's name ("height", "time", "blocks", "units") for the time
+    asserts, and {"opcode", "cost", "args": [<hex node>]} for
+    reserved conditions.
     """
     from bitlisp import BitLispError, deserialize, parse_conditions
     from bitlisp.errors import CODES

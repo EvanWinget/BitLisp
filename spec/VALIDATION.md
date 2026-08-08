@@ -15,15 +15,18 @@ the outcome of every vector in `vectors/validation/`.
 
 ## Transaction view
 
-Validation is a pure function of the transaction below. No other data
-influences any rule in this document. Contextual asserts (height,
-time) compare against fields of this view and the validation context
-in which the transaction is evaluated, in the manner of Bitcoin's
-locktime rules, and are specified with their conditions.
+Validation is a pure function of the transaction below. No other
+data influences any rule in this document. The time asserts of
+`spec/CONDITIONS.md` compare against the transaction's own
+locktime, sequence, and version fields, which base consensus
+enforces against the chain. No rule reads the chain.
 
 A transaction is:
 
-- `version`, a 32-bit integer
+- `version`, a 32-bit unsigned integer. Base consensus compares
+  the field unsigned in its locktime rules, and this document
+  follows it, so wire versions with the top bit set are large
+  values, never negative ones.
 - `locktime`, a 32-bit unsigned integer
 - `inputs`, an ordered list. Each input carries the outpoint it
   consumes (a 32-byte txid and a 32-bit index), the consumed output's
@@ -55,7 +58,7 @@ neither: rule 6's reserved conditions constrain nothing.
   claim is assigned its own resource, called its **satisfier**,
   and no resource is assigned to two claims.
 - An **assert** requires a fact to hold. A fact is a predicate
-  over the transaction view and the validation context. Checking
+  over the transaction view and nothing else. Checking
   an assert assigns and consumes nothing. Any number of asserts,
   from one input or many, may read the same fact. The transaction
   is checked against every assert of every BitLisp input.
@@ -67,16 +70,22 @@ BitLisp input, and a fact no assert reads are all unconstrained.
 Rule 2 states the consequences.
 
 **Composition guarantee.** Let two transactions each be valid
-under this document, with no outpoint consumed in both. If their
-concatenation, the inputs of both followed by the outputs of both,
-satisfies the transaction view's preconditions, then no rule in
-this document rejects the concatenation. Every rule and every
+under this document, with no outpoint consumed in both, and with
+locktime fields of the same type: both height-typed or both
+time-typed. Their concatenation is the inputs of both followed by
+the outputs of both, carrying the greater of the two version
+fields and the greater of the two locktime fields. If the
+concatenation satisfies the transaction view's preconditions,
+then no rule in this document rejects it. Every rule and every
 vocabulary entry must preserve this property. A vocabulary entry
-whose assert reads a fact that concatenating valid transactions
-can falsify, such as an upper bound on a quantity that
-concatenation sums or an exact count, must not be defined.
-Relaxing this paragraph changes what wallets may safely batch and
-requires a recorded design decision.
+whose assert reads a fact that a concatenation satisfying these
+hypotheses can falsify, such as an upper bound on a quantity that
+concatenation sums or an exact count, must not be defined. The
+same-type hypothesis is Bitcoin's own constraint, not a new one:
+a transaction has a single locktime field, so height-locked and
+time-locked spends cannot share any transaction on the network
+today. Relaxing this paragraph changes what wallets may safely
+batch and requires a recorded design decision.
 
 ## Validation stages
 
@@ -88,8 +97,12 @@ and no check reads more context than its stage provides.
    well-formedness.
 2. Facts of the spent output's own data: outpoint, spent
    scriptPubKey, amount.
-3. Chain-context facts: height and median time past.
-4. Cross-spend work: claim assignment and cross-input pairing.
+3. Chain-context facts: height and median time past. Deliberately
+   empty in v0: no rule in this document reads them, and the time
+   asserts read the transaction's own fields instead.
+4. Whole-transaction work: claim assignment, cross-input pairing,
+   and facts of the assembled transaction's fields (version,
+   locktime, and the spending inputs' sequences).
 5. Batch signature verification over the collected
    (public key, message) pairs.
 
@@ -227,8 +240,17 @@ it enforceable, and lands with that rule:
   a fact that additions change, such as a fee floor, re-scopes the
   slot half of this invariant when it lands, while the merge
   invariant below is permanent).
-- Merge: two valid transactions consuming disjoint outpoints,
-  whose concatenation the transaction view admits, concatenate
-  into a valid transaction (composition guarantee).
+- Merge: two valid transactions consuming disjoint outpoints, with
+  same-typed locktime fields, whose concatenation under the greater
+  version and greater locktime the transaction view admits,
+  concatenate into a valid transaction (composition guarantee).
 - A transaction with no BitLisp inputs validates regardless of its
   shape (rule 2).
+- Increasing any time assert's operand never turns an invalid
+  transaction valid, and decreasing it never turns a valid
+  transaction invalid: asserts are monotone in their operand
+  (time asserts).
+- Metamorphic: on a valid transaction with a time assert, flipping
+  the read field across the relevant boundary causes rejection,
+  with locktime moved across the type threshold, the sequence
+  disable flag set, or version dropped below 2 (time asserts).

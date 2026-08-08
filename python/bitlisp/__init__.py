@@ -8,6 +8,10 @@ and by property-based invariants where none does.
 
 from .conditions import (
     MAX_MONEY,
+    AssertLocktimeHeight,
+    AssertLocktimeTime,
+    AssertSequenceHeight,
+    AssertSequenceTime,
     CreateOutput,
     CreateOutputTaproot,
     Reserved,
@@ -23,6 +27,10 @@ from .validation import validate_transaction
 __version__ = "0.0.1"
 
 __all__ = [
+    "AssertLocktimeHeight",
+    "AssertLocktimeTime",
+    "AssertSequenceHeight",
+    "AssertSequenceTime",
     "BitLispError",
     "CODES",
     "CreateOutput",
