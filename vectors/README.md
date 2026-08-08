@@ -71,7 +71,9 @@ differs, each cites its divergence row.
 condition (`{"opcode", "script_pubkey", "amount"}` for CREATE_OUTPUT,
 `{"opcode", "internal_key", "merkle_root", "amount", "script_pubkey"}`
 for CREATE_OUTPUT_TAPROOT with `script_pubkey` the derived taproot
-script, `{"opcode", "cost", "args": ["<hex node>"]}` for reserved
+script, `{"opcode"}` plus the operand under its entry's argument name
+(`"height"`, `"time"`, `"blocks"`, `"units"`) for the time asserts,
+`{"opcode", "cost", "args": ["<hex node>"]}` for reserved
 conditions) or `{"error": "<code>"}`. Every rejection rule in
 CONDITIONS.md section 1 and VALIDATION.md rule 6 has at least one case.
 

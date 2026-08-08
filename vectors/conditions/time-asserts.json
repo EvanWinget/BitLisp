@@ -1,0 +1,204 @@
+{
+ "schema": "bitlisp-vector-v0",
+ "suite": "conditions",
+ "spec": "CONDITIONS.md time asserts: operand domains, arity, encoding",
+ "cases": [
+  {
+   "name": "lockheight_parses",
+   "conditions": "ffff20ff8200908080",
+   "expect": {
+    "parsed": [
+     {
+      "opcode": 32,
+      "height": 144
+     }
+    ]
+   }
+  },
+  {
+   "name": "lockheight_zero",
+   "conditions": "ffff20ff808080",
+   "expect": {
+    "parsed": [
+     {
+      "opcode": 32,
+      "height": 0
+     }
+    ]
+   }
+  },
+  {
+   "name": "lockheight_domain_max",
+   "conditions": "ffff20ff841dcd64ff8080",
+   "expect": {
+    "parsed": [
+     {
+      "opcode": 32,
+      "height": 499999999
+     }
+    ]
+   }
+  },
+  {
+   "name": "locktime_domain_min",
+   "conditions": "ffff21ff841dcd65008080",
+   "expect": {
+    "parsed": [
+     {
+      "opcode": 33,
+      "time": 500000000
+     }
+    ]
+   }
+  },
+  {
+   "name": "locktime_domain_max",
+   "conditions": "ffff21ff8500ffffffff8080",
+   "expect": {
+    "parsed": [
+     {
+      "opcode": 33,
+      "time": 4294967295
+     }
+    ]
+   }
+  },
+  {
+   "name": "seqheight_parses",
+   "conditions": "ffff22ff8200908080",
+   "expect": {
+    "parsed": [
+     {
+      "opcode": 34,
+      "blocks": 144
+     }
+    ]
+   }
+  },
+  {
+   "name": "seqheight_domain_max",
+   "conditions": "ffff22ff8300ffff8080",
+   "expect": {
+    "parsed": [
+     {
+      "opcode": 34,
+      "blocks": 65535
+     }
+    ]
+   }
+  },
+  {
+   "name": "seqtime_parses",
+   "conditions": "ffff23ff8200a98080",
+   "expect": {
+    "parsed": [
+     {
+      "opcode": 35,
+      "units": 169
+     }
+    ]
+   }
+  },
+  {
+   "name": "seqtime_zero",
+   "conditions": "ffff23ff808080",
+   "expect": {
+    "parsed": [
+     {
+      "opcode": 35,
+      "units": 0
+     }
+    ]
+   }
+  },
+  {
+   "name": "lockheight_at_threshold",
+   "conditions": "ffff20ff841dcd65008080",
+   "expect": {
+    "error": "bad_condition_arg"
+   }
+  },
+  {
+   "name": "locktime_below_threshold",
+   "conditions": "ffff21ff841dcd64ff8080",
+   "expect": {
+    "error": "bad_condition_arg"
+   }
+  },
+  {
+   "name": "locktime_over_32_bits",
+   "conditions": "ffff21ff8501000000008080",
+   "expect": {
+    "error": "bad_condition_arg"
+   }
+  },
+  {
+   "name": "lockheight_negative",
+   "conditions": "ffff20ff81ff8080",
+   "expect": {
+    "error": "bad_condition_arg"
+   }
+  },
+  {
+   "name": "seqheight_over_16_bits",
+   "conditions": "ffff22ff830100008080",
+   "expect": {
+    "error": "bad_condition_arg"
+   }
+  },
+  {
+   "name": "seqtime_negative",
+   "conditions": "ffff23ff81ff8080",
+   "expect": {
+    "error": "bad_condition_arg"
+   }
+  },
+  {
+   "name": "seqtime_domain_max",
+   "conditions": "ffff23ff8300ffff8080",
+   "expect": {
+    "parsed": [
+     {
+      "opcode": 35,
+      "units": 65535
+     }
+    ]
+   }
+  },
+  {
+   "name": "seqtime_over_16_bits",
+   "conditions": "ffff23ff830100008080",
+   "expect": {
+    "error": "bad_condition_arg"
+   }
+  },
+  {
+   "name": "lockheight_no_operand",
+   "conditions": "ffff208080",
+   "expect": {
+    "error": "bad_condition_arity"
+   }
+  },
+  {
+   "name": "lockheight_two_operands",
+   "conditions": "ffff20ff01ff028080",
+   "expect": {
+    "error": "bad_condition_arity"
+   }
+  },
+  {
+   "name": "seqheight_nonminimal_operand",
+   "conditions": "ffff22ff8200648080",
+   "expect": {
+    "error": "bad_condition_arg"
+   }
+  },
+  {
+   "name": "lockheight_operand_is_pair",
+   "conditions": "ffff20ffff01808080",
+   "expect": {
+    "error": "bad_condition_arg"
+   }
+  }
+ ]
+}
