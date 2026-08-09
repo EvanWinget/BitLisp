@@ -68,9 +68,23 @@ def oracle_outputs_hash(tx):
     ).digest()
 
 
-SCRIPTS = (b"", b"\x51", b"\x00\x14" + b"\xbb" * 20, b"\x51\x20" + b"\x22" * 32)
-SCRIPT_SIGS = (b"", b"\x00", b"\x47" + b"\xdd" * 71)
+# The 253-byte entries put a two-byte compact-size length prefix in
+# both derivations, the first length the one-byte encoding cannot
+# carry, so the oracle cross-check exercises that branch.
+SCRIPTS = (
+    b"",
+    b"\x51",
+    b"\x00\x14" + b"\xbb" * 20,
+    b"\x51\x20" + b"\x22" * 32,
+    b"\x6a" + b"\xcc" * 252,
+)
+SCRIPT_SIGS = (b"", b"\x00", b"\x47" + b"\xdd" * 71, b"\xdd" * 253)
 AMOUNTS = (0, 1, 546, 2**32)
+
+# A truncated comparison passes every flip below its cut, so
+# metamorphic flips always cover the first, a middle, and the last
+# operand byte rather than one sampled position.
+FLIP_POSITIONS = (0, 15, 31)
 
 output_specs = st.tuples(st.sampled_from(SCRIPTS), st.sampled_from(AMOUNTS))
 input_specs = st.tuples(
@@ -80,7 +94,7 @@ input_specs = st.tuples(
 )
 versions = st.sampled_from((0, 1, 2, 0x80000002, 0xFFFFFFFF))
 locktimes = st.sampled_from((0, 499_999_999, 500_000_000, 0xFFFFFFFF))
-flip_positions = st.integers(min_value=0, max_value=31)
+carrier_indexes = st.integers(min_value=0, max_value=2)
 
 
 def build_tx(version, locktime, inputs, outputs, conds, txid_prefix=b"\x01"):
@@ -116,24 +130,27 @@ transactions = st.tuples(
 )
 
 
-def reseal(tx, conds):
-    """The same transaction with the first input's condition list
-    replaced. Conditions are witness data, so neither derived
-    quantity changes."""
-    first = tx.inputs[0]
+def reseal(tx, conds, carrier=0):
+    """The same transaction with the carrier input's condition list
+    replaced, the carrier index taken modulo the input count so any
+    input can carry the seals. Conditions are witness data, so
+    neither derived quantity changes."""
+    carrier %= len(tx.inputs)
+    old = tx.inputs[carrier]
     replaced = TxInput(
-        txid=first.txid,
-        index=first.index,
-        script_pubkey=first.script_pubkey,
-        amount=first.amount,
-        sequence=first.sequence,
+        txid=old.txid,
+        index=old.index,
+        script_pubkey=old.script_pubkey,
+        amount=old.amount,
+        sequence=old.sequence,
         conditions=tuple(conds),
-        script_sig=first.script_sig,
+        script_sig=old.script_sig,
     )
+    inputs = tx.inputs[:carrier] + (replaced,) + tx.inputs[carrier + 1 :]
     return Transaction(
         version=tx.version,
         locktime=tx.locktime,
-        inputs=(replaced,) + tx.inputs[1:],
+        inputs=inputs,
         outputs=tx.outputs,
     )
 
@@ -161,27 +178,30 @@ def test_derivations_match_core_oracle(spec):
     assert tx.outputs_hash == oracle_outputs_hash(tx)
 
 
-@given(transactions, flip_positions)
+@given(transactions, carrier_indexes)
 @EXAMPLES
-def test_lone_seal_iff_operand_matches(spec, position):
-    """A lone SEAL is satisfied exactly when its operand is the
-    transaction's txid, and any single flipped bit rejects with the
-    family's error."""
+def test_lone_seal_iff_operand_matches(spec, carrier):
+    """A lone SEAL on any carrying input is satisfied exactly when
+    its operand is the transaction's txid, and a flip at the first,
+    a middle, or the last operand byte rejects with the family's
+    error."""
     tx = build_tx(*spec, conds=())
     operand = oracle_txid(tx)
-    assert outcome(reseal(tx, (Seal(operand),))) is None
-    flipped = reseal(tx, (Seal(flip(operand, position)),))
-    assert outcome(flipped) == "unsatisfied_seal_assert"
+    assert outcome(reseal(tx, (Seal(operand),), carrier)) is None
+    for position in FLIP_POSITIONS:
+        flipped = reseal(tx, (Seal(flip(operand, position)),), carrier)
+        assert outcome(flipped) == "unsatisfied_seal_assert"
 
 
-@given(transactions, flip_positions)
+@given(transactions, carrier_indexes)
 @EXAMPLES
-def test_lone_outputs_seal_iff_operand_matches(spec, position):
+def test_lone_outputs_seal_iff_operand_matches(spec, carrier):
     tx = build_tx(*spec, conds=())
     operand = oracle_outputs_hash(tx)
-    assert outcome(reseal(tx, (SealOutputs(operand),))) is None
-    flipped = reseal(tx, (SealOutputs(flip(operand, position)),))
-    assert outcome(flipped) == "unsatisfied_seal_assert"
+    assert outcome(reseal(tx, (SealOutputs(operand),), carrier)) is None
+    for position in FLIP_POSITIONS:
+        flipped = reseal(tx, (SealOutputs(flip(operand, position)),), carrier)
+        assert outcome(flipped) == "unsatisfied_seal_assert"
 
 
 @given(transactions, transactions)
@@ -269,20 +289,21 @@ def test_outputs_seal_reads_outputs_alone_and_seal_reads_everything(
         )
 
 
-@given(transactions, st.booleans())
+@given(transactions, st.booleans(), carrier_indexes)
 @EXAMPLES
-def test_duplication_and_list_order_change_nothing(spec, satisfied):
+def test_duplication_and_list_order_change_nothing(spec, satisfied, carrier):
     """Duplicating a seal within its input and reordering the
-    condition list never change the outcome, satisfied or not."""
+    condition list never change the outcome, satisfied or not,
+    whichever input carries the seals."""
     tx = build_tx(*spec, conds=())
     operand = oracle_txid(tx)
     if not satisfied:
-        operand = flip(operand, 0)
+        operand = flip(operand, 31)
     conds = (Seal(operand), SealOutputs(oracle_outputs_hash(tx)))
-    base = outcome(reseal(tx, conds))
+    base = outcome(reseal(tx, conds, carrier))
     assert base == (None if satisfied else "unsatisfied_seal_assert")
-    assert outcome(reseal(tx, conds + conds)) == base
-    assert outcome(reseal(tx, conds[::-1])) == base
+    assert outcome(reseal(tx, conds + conds, carrier)) == base
+    assert outcome(reseal(tx, conds[::-1], carrier)) == base
 
 
 @given(transactions)
