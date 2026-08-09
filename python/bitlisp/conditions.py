@@ -45,6 +45,8 @@ ASSERT_ANNOUNCEMENT = 0x41
 SEND_MESSAGE = 0x42
 RECEIVE_MESSAGE = 0x43
 RESERVE_FEE = 0x50
+SEAL = 0x60
+SEAL_OUTPUTS = 0x61
 _RESERVED_START = 0x80
 
 MAX_MESSAGE_SIZE = 1024
@@ -340,6 +342,26 @@ class ReserveFee:
 
 
 @dataclass(frozen=True)
+class Seal:
+    """Asserts the spending transaction's own txid, fixing every
+    non-witness byte of the transaction that carries it."""
+
+    txid: bytes
+
+    opcode = SEAL
+
+
+@dataclass(frozen=True)
+class SealOutputs:
+    """Asserts the spending transaction's outputs hash, fixing every
+    output slot's content and order and nothing else."""
+
+    outputs_hash: bytes
+
+    opcode = SEAL_OUTPUTS
+
+
+@dataclass(frozen=True)
 class Reserved:
     """No enforced semantics, only the declared cost. args holds the
     raw argument nodes after the cost, unconstrained by design."""
@@ -441,7 +463,7 @@ def _parse_time_assert(args, name, cls, low, high):
     return cls(value)
 
 
-def _parse_self_assert_bytes(args, name, cls, size):
+def _parse_fixed_bytes(args, name, cls, size):
     """One atom operand of exactly size bytes."""
     if len(args) != 1:
         raise BitLispError(
@@ -731,11 +753,11 @@ def _parse_condition(node):
             SEQUENCE_VALUE_MAX,
         )
     if opcode == ASSERT_MY_OUTPOINT:
-        return _parse_self_assert_bytes(
+        return _parse_fixed_bytes(
             args, "ASSERT_MY_OUTPOINT", AssertMyOutpoint, OUTPOINT_SIZE
         )
     if opcode == ASSERT_MY_TXID:
-        return _parse_self_assert_bytes(args, "ASSERT_MY_TXID", AssertMyTxid, 32)
+        return _parse_fixed_bytes(args, "ASSERT_MY_TXID", AssertMyTxid, 32)
     if opcode == ASSERT_MY_SCRIPTPUBKEY:
         return _parse_assert_my_scriptpubkey(args)
     if opcode == ASSERT_MY_AMOUNT:
@@ -752,6 +774,10 @@ def _parse_condition(node):
         return _parse_receive_message(args)
     if opcode == RESERVE_FEE:
         return _parse_reserve_fee(args)
+    if opcode == SEAL:
+        return _parse_fixed_bytes(args, "SEAL", Seal, 32)
+    if opcode == SEAL_OUTPUTS:
+        return _parse_fixed_bytes(args, "SEAL_OUTPUTS", SealOutputs, 32)
     raise BitLispError("bad_condition_opcode", f"invalid opcode {opcode:#04x}")
 
 

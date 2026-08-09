@@ -39,6 +39,7 @@ CODES = frozenset(
         "unbalanced_message",
         "unsatisfied_announcement_assert",
         "unsatisfied_sig_assert",
+        "unsatisfied_seal_assert",
         "insufficient_fee",
     }
 )

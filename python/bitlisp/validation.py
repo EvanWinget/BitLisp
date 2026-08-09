@@ -30,6 +30,13 @@ runs last: it is the costly check, and ordering it after every
 other rule means it runs only on transactions the rest of the
 validator accepts.
 
+The seals check under rule 2's assert clause as well, reading the
+two quantities the transaction view derives from the assembled
+transaction: its own txid and its outputs hash. Both derivations
+exclude witness data, and condition lists are witness data, so
+the operands a seal carries never feed back into the quantity
+they are compared against.
+
 Rule 3, message scoping: the addressed pair contributes signed
 weights to a per-transaction ledger keyed by (sender specifier,
 receiver specifier, message), and every key must net to zero.
@@ -66,6 +73,8 @@ from .conditions import (
     CreateOutputTaproot,
     ReceiveMessage,
     ReserveFee,
+    Seal,
+    SealOutputs,
     SendMessage,
     Specifier,
 )
@@ -366,6 +375,35 @@ def check_fee_reserve(tx):
         )
 
 
+def check_seals(tx):
+    """The seal family: each condition is an equality against a
+    quantity derived from the assembled transaction, SEAL against
+    its txid, SEAL_OUTPUTS against its outputs hash. Derived only
+    when a seal is present: most transactions carry none."""
+    txid = None
+    outputs_hash = None
+    for tx_input in tx.inputs:
+        for cond in tx_input.conditions or ():
+            if isinstance(cond, Seal):
+                if txid is None:
+                    txid = tx.txid
+                if cond.txid != txid:
+                    raise BitLispError(
+                        "unsatisfied_seal_assert",
+                        f"SEAL demands {cond.txid.hex()}, the spending "
+                        f"transaction's txid is {txid.hex()}",
+                    )
+            elif isinstance(cond, SealOutputs):
+                if outputs_hash is None:
+                    outputs_hash = tx.outputs_hash
+                if cond.outputs_hash != outputs_hash:
+                    raise BitLispError(
+                        "unsatisfied_seal_assert",
+                        f"SEAL_OUTPUTS demands {cond.outputs_hash.hex()}, "
+                        f"the outputs hash is {outputs_hash.hex()}",
+                    )
+
+
 def validate_transaction(tx):
     """Every validation rule that has landed so far, stage 2 work
     before stage 4, signature verification last (stage 5)."""
@@ -375,4 +413,5 @@ def validate_transaction(tx):
     check_messages(tx)
     check_announcements(tx)
     check_fee_reserve(tx)
+    check_seals(tx)
     check_signature_asserts(tx)
