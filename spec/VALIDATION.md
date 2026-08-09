@@ -1,8 +1,8 @@
 # BitLisp Condition Validation
 
 Status: in progress. The transaction view, the claims-and-asserts
-principle, the validation stages, and rules 1, 2, 3, 4, and 6 are
-normative. Rule 5 is designed in architecture sessions, lands
+principle, the validation stages, and rules 1, 2, 3, 4, 6, and 7
+are normative. Rule 5 is designed in architecture sessions, lands
 here as prose first, and only then gets implemented. Ground rule 4:
 this layer gets invariants and adversarial vectors before any feature
 work.
@@ -50,9 +50,10 @@ script is simply an unmatched slot.
 ## Claims and asserts
 
 A condition constrains the transaction through claims, asserts,
-and message records, and in no other way. Each vocabulary entry in
-`spec/CONDITIONS.md` states which of these it produces. An entry
-may produce none: rule 6's reserved conditions constrain nothing.
+message records, and fee reserves, and in no other way. Each
+vocabulary entry in `spec/CONDITIONS.md` states which of these it
+produces. An entry may produce none: rule 6's reserved conditions
+constrain nothing.
 
 - A **claim** requires a resource of the transaction and consumes
   it. The output claims of rule 1 are the only claim kind defined
@@ -71,12 +72,20 @@ may produce none: rule 6's reserved conditions constrain nothing.
   Satisfaction is consumed one for one as with a claim, but both
   directions demand: an unmatched send and an unmatched receive
   are equally invalid.
+- A **fee reserve** demands that the transaction's fee reach a
+  quantity. Reserves are counted, not idempotent: rule 7 sums
+  every reserve of every BitLisp input and compares the fee
+  against the total once. A reserve consumes no resource and is
+  assigned no satisfier: the same fee covers every reserve
+  jointly by covering their sum.
 
 The implication runs one way only. No rule in this document
 constrains a part of the transaction that no condition claims,
-reads, or records against. An output slot no claim consumes, an input that is not a
-BitLisp input, and a fact no assert reads are all unconstrained.
-Rule 2 states the consequences.
+reads, records, or reserves against. An input that is not a
+BitLisp input, a fact no assert reads, and the content of an
+output slot no claim consumes are all unconstrained. When a
+reserve is present, rule 7 reads every input's and every slot's
+amount through the fee. Rule 2 states the consequences.
 
 **Composition guarantee.** Let two transactions each be valid
 under this document, with no outpoint consumed in both, and with
@@ -95,7 +104,10 @@ a transaction has a single locktime field, so height-locked and
 time-locked spends cannot share any transaction on the network
 today. The message ledger of rule 3 preserves this guarantee
 arithmetically: concatenation adds the two ledgers, and sums of
-zeros are zero. Relaxing this paragraph changes what wallets may
+zeros are zero. The fee reserve of rule 7 preserves it the same
+way: fees are non-negative and sum under concatenation, reserves
+sum, so two covered reserves concatenate into a covered reserve.
+Relaxing this paragraph changes what wallets may
 safely batch and requires a recorded design decision.
 
 ## Validation stages
@@ -112,8 +124,9 @@ and no check reads more context than its stage provides.
    empty in v0: no rule in this document reads them, and the time
    asserts read the transaction's own fields instead.
 4. Whole-transaction work: claim assignment, cross-input pairing,
-   and facts of the assembled transaction's fields (version,
-   locktime, and the spending inputs' sequences).
+   facts of the assembled transaction's fields (version,
+   locktime, and the spending inputs' sequences), and quantities
+   derived from the assembled transaction (the fee).
 5. Batch signature verification over the collected
    (public key, message) pairs.
 
@@ -174,10 +187,10 @@ document.
 A transaction is valid under this document if and only if every
 condition of every BitLisp input is well-formed (the encoding
 rules of `spec/CONDITIONS.md` and rule 6, the stage 1 checks),
-every claim is assigned a satisfier, every assert holds, and the
-message ledger of rule 3 balances. No other property of the
-transaction's inputs and output slots affects validity under this
-document.
+every claim is assigned a satisfier, every assert holds, the
+message ledger of rule 3 balances, and the fee covers rule 7's
+reserve. No other property of the transaction's inputs and output
+slots affects validity under this document.
 
 ### 3. Message scoping
 
@@ -319,6 +332,8 @@ as its entry in `spec/CONDITIONS.md` states:
 - **Message records are counted.** Each occurrence contributes
   its own weight to rule 3's ledger: duplicating one half of a
   balanced pair unbalances it.
+- **Fee reserves are counted.** Each occurrence adds its operand
+  to rule 7's total: duplicating a reserve doubles the demand.
 - **Asserts are idempotent within their input.** An assert reads
   a fact and consumes nothing, so identical occurrences in one
   input's condition list hold or fail together. Identical
@@ -328,8 +343,8 @@ as its entry in `spec/CONDITIONS.md` states:
   and fail in another. Occurrences with differing operands are
   checked independently, and the transaction is valid only if
   every one holds.
-- **A condition producing no claim, assert, or record constrains
-  nothing.** Identical ANNOUNCE occurrences within one input
+- **A condition producing no claim, assert, record, or reserve
+  constrains nothing.** Identical ANNOUNCE occurrences within one input
   create one fact, so duplicating an ANNOUNCE within its input
   never changes any assert's outcome. ANNOUNCE conditions of
   different inputs create distinct facts under rule 3, whatever
@@ -337,8 +352,8 @@ as its entry in `spec/CONDITIONS.md` states:
   their declared cost under rule 6.
 
 This classification binds future rules. An entry whose
-occurrences must accumulate is defined to produce claims or
-records, never asserts. An entry defined as an assert commits to
+occurrences must accumulate is defined to produce claims,
+records, or reserves, never asserts. An entry defined as an assert commits to
 idempotence within its input: no meaning may attach to how many
 times it occurs in one condition list.
 
@@ -390,6 +405,27 @@ non-standard for relay and mining, in the manner of Bitcoin's
 upgradable NOPs, so that future assignments do not confiscate
 in-flight spends.
 
+### 7. The fee reserve
+
+The transaction's **fee** is the sum of every input's amount
+minus the sum of every output slot's amount. Every input and
+every slot contributes, BitLisp or not, claimed or not. The
+transaction view's preconditions make the fee well-defined and
+non-negative.
+
+Each RESERVE_FEE condition of a BitLisp input produces a **fee
+reserve** of its operand's value. The transaction is valid under
+this rule if and only if the fee is at least the sum of all fee
+reserves (`insufficient_fee`). The sum and the comparison are
+exact integer arithmetic: no width bounds them, and a sum no fee
+can reach fails the comparison like any other. A transaction with
+no fee reserve satisfies this rule: the fee is at least the empty
+sum.
+
+This rule is stage 4 work: the fee reads every input's amount and
+every output slot's amount, so the outcome changes when spends
+are recombined into a different transaction.
+
 ## Invariants
 
 The `hypothesis` suite in `python/tests/` must enforce the following
@@ -413,11 +449,10 @@ it enforceable, and lands with that rule:
   cover that output's content turns it invalid (rule 1).
 - Metamorphic: mutating the content of any exactly-claimed output
   (amount off by one, script byte flip) causes rejection (rule 1).
-- Adding an output slot to a valid transaction never turns it
-  invalid, and adding a non-BitLisp input never turns it invalid
-  (rule 2, over the landed vocabulary: an entry whose assert reads
-  a fact that additions change, such as a fee floor, re-scopes the
-  slot half of this invariant when it lands, while the merge
+- Adding an output slot to a valid transaction carrying no fee
+  reserve never turns it invalid, and adding a non-BitLisp input
+  never turns it invalid: an added slot never raises the fee,
+  an added input never lowers it (rules 2 and 7, the merge
   invariant below is permanent).
 - Merge: two valid transactions consuming disjoint outpoints, with
   same-typed locktime fields, whose concatenation under the greater
@@ -462,3 +497,15 @@ it enforceable, and lands with that rule:
   ceiling when it lands). Copying a condition to a different
   input is not duplication in this sense: the copy reads its own
   input's fields and creates its own facts.
+- Increasing a fee reserve's operand never turns an invalid
+  transaction valid, and decreasing it never turns a valid
+  transaction invalid (rule 7).
+- Replacing a fee reserve with two whose operands sum to it,
+  within one input or split across two BitLisp inputs, never
+  changes the outcome (rule 7).
+- Metamorphic: on a valid transaction whose fee equals its
+  summed reserve, raising any reserve operand by one causes
+  rejection (rule 7).
+- Metamorphic: on a valid transaction whose fee equals its
+  summed reserve, appending an output slot of positive amount
+  causes rejection (rule 7).
