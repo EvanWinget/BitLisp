@@ -29,6 +29,7 @@ Section 4 registers the rules that have no external reference at all.
 | C12 | per-spend coordination cap | 1,024 message, announcement, and concurrent-assert conditions per spend, enforced by today's deployed binary, removed under the hard fork 2 pricing flag | no cap in v0 | Deployed Chia's cap is the pre-pricing spam bound and CHIP-0049 replaces it with per-condition pricing. Rule 5 is the pre-registered home for the same cap-or-price decision here, so v0 records the gap rather than adopting a bound upstream is removing. Recorded 2026-08-07 with decision 16, final decision owed by rule 5. | none until rule 5 lands |
 | C13 | birth asserts | ASSERT_MY_BIRTH_HEIGHT and ASSERT_MY_BIRTH_SECONDS, two-phase: differing occurrences must-equal at parse, then exact equality against the coin record's confirmation height and timestamp at the node layer | declined | Checking them reads when the prevout confirmed, the chain read the decision 15 shape excludes, and no base-consensus field enforces exact birth (BIP 68 enforces minimum age, the monotone form the sequence asserts already carry). Usage research 2026-08-08: added by CHIP-0014 with no standalone stated motivation, and a GitHub-wide search found only definitional hits, no deployed first-party puzzle emits them. Their one systemic role in Chia, anchoring the relative-before windows, is played at base consensus by BIP 68 here. A chain-read assert stays addable through the reserved tier, the reverse migration cannot happen. Ratified 2026-08-08, decision 20. | `conditions/self-asserts.json` gap cases pin 0x34 and 0x35 invalid |
 | C14 | ephemeral assert | ASSERT_EPHEMERAL, the coin was created in the same block it is spent in, plus a companion rule forbidding relative timelocks and birth asserts on ephemeral spends | declined, structurally inexpressible | A Bitcoin transaction cannot spend its own outputs (an input would need the txid of a transaction whose txid depends on that input), and validation scope is one transaction, so the asserted fact is always false. The companion interlock is also moot: BIP 68 anchors relative locks at prevout confirmation at base consensus. Reintroduction trigger recorded: package-level validation, if it ever exists, makes the fact expressible again through the reserved tier. Ratified 2026-08-08, decision 20. | `conditions/self-asserts.json` gap cases pin 0x36 invalid |
+| C15 | RESERVE_FEE operand domain | any canonical uint below 2^64, an operand exceeding the achievable fee is well-formed and fails the fee comparison | 0 to MAX_MONEY, larger operands rejected at parse | The landed amount-operand convention (CREATE_OUTPUT, ASSERT_MY_AMOUNT). An operand above MAX_MONEY exceeds every possible fee, so the only observable difference is the error surface: `bad_condition_arg` at stage 1 instead of `insufficient_fee` at stage 4. Chia's checked-sum overflow error is likewise subsumed: with exact arithmetic the oversized sum simply fails the comparison. The hardened implementation must reproduce this with a wide or checked accumulator: a wrapping 64-bit sum would turn an unreachable demand satisfiable, the accept-invalid direction. Ratified 2026-08-09, decision 21. | `conditions/reserve-fee.json` domain cases |
 
 ## 2. Reference provenance
 
@@ -137,6 +138,25 @@ Section 4 registers the rules that have no external reference at all.
   fork flag and 0 before it, isolated by probe from generator
   byte cost. The declined conditions' usage research (CHIP-0014
   text, GitHub-wide code search) is recorded at C13 and C14.
+- **Fee-reserve semantics (verified 2026-08-09).** Pinned against
+  the deployed binary for the fee family design by 16 probes of
+  chia_rs `get_conditions_from_spendbundle` under the
+  COST_CONDITIONS flag, all confirming a source read of
+  `conditions.rs` at the pinned wheel's 0.46.0 tag. RESERVE_FEE
+  accumulates by checked sum within a spend and across spends,
+  the fee (removals minus additions) must be at least the total
+  with boundary equality passing, and the comparison runs inside
+  the consensus layer's own `validate_conditions`, not in the
+  caller. The operand is a canonical uint below 2^64, zero
+  legal, with negative, non-canonical, and above-64-bit operands
+  all mapped to the one family error (a 9-byte encoding with a
+  protective leading zero is canonical there, per sanitize_uint's
+  size allowance), and checked-sum overflow mapped to the same
+  code. Cost is the generic 200 under the fork flag and 0 before
+  it, a rule 5 input. Trailing extra arguments are rejected at
+  this always-mempool-strict entry point, with consensus
+  leniency established by the source read alone, the C10
+  divergence area.
 - **BIP341 wallet test vectors** are vendored as data into
   `vectors/upstream/bip341/` with a provenance sibling, and are the
   primary tweak-derivation oracle for CREATE_OUTPUT_TAPROOT. The
@@ -488,7 +508,17 @@ Section 4 registers the rules that have no external reference at all.
       its amount leaves the difference to whoever assembles the
       transaction, accepted deliberately, with per-spend value
       protection expressible through own-amount asserts, claims,
-      and a fee reserve once those entries land.
+      and a fee reserve once those entries land. Corrected
+      2026-08-09 during the fee family's adversarial review: the
+      fee reserve does not belong on that list. Its floor is a
+      transaction-global demand satisfiable from any input's
+      value, so an aggregator who adds their own input can
+      capture a spend's surplus while meeting the reserve from
+      the added value, the surplus_capture_with_attacker_input
+      vector. Per-spend value protection is the other two items
+      alone: assert your amount and claim all of it, leaving no
+      surplus to capture. The reserve buys fee assurance, not
+      value protection.
     - Composition guarantee. Two transactions valid under the
       layer, consuming disjoint outpoints, concatenate into a
       valid transaction whenever the concatenation satisfies the
@@ -886,10 +916,87 @@ Section 4 registers the rules that have no external reference at all.
       family by reusing rule 3's normative table: amount,
       scriptPubKey, and the taproot assert are content-committed
       and stable, txid and outpoint are location-committed and
-      not. The register's seventh entry still waits on the
-      signature design, the other half of the identity work.
+      not. The recombination-stability entry decision 12 owes the
+      register still waits on the signature design, the other
+      half of the identity work.
     Rule 4's sort binding covers the family with no new text:
     self asserts are idempotent within their carrying input.
+
+21. **The fee family: RESERVE_FEE adopted, the transaction-wide
+    quantity asserts declined.** RATIFIED (decisions by Evan,
+    2026-08-09, designed in the fee-family chat session after a
+    steelman pass over each question). Seven parts:
+    - Sequencing. The unit was chosen over rule 5 after Evan asked
+      whether the condition set should complete before costing:
+      rule 5's framework should be designed with its dominant cost
+      driver in the set (Chia prices an AGG_SIG pair at 1,200,000
+      against the 200 generic), the pre-registered free-tier
+      decision may read differently with signatures present, and
+      both precedents (Chia's original costs, CHIP-0049) priced a
+      complete deployed vocabulary in one pass. Queue: the AGG_SIG
+      family next, rule 5 last as the Phase 2 closer. Decision
+      19's counted-sort deferral anticipated this unit's sort
+      question only, so the sequencing is decided fresh here.
+    - RESERVE_FEE adopted at `0x50`, matching deployed Chia
+      exactly under the match-by-default policy: every occurrence
+      accumulates by checked sum within and across inputs, the
+      fee (inputs minus outputs) must be at least the total, and
+      boundary equality passes. Probe-verified against the
+      chia_rs wheel (16 probes, provenance in section 2). Numeric
+      continuity with Chia's opcode 52 is impossible: 52 is
+      `0x34`, inside the self-assert block's recorded decline
+      gap, so the entry opens the `0x50` fees block.
+    - The fee reserve is the fourth condition sort, beside
+      claims, asserts, and message records. It is not an assert
+      (duplication changes the demand, asserts commit to
+      idempotence under rule 4) and not a claim (rule 1's
+      equality-only sentence guards the claim matcher's
+      algorithmic class, and a divisible scalar resource would
+      relax it for no benefit). The message-record precedent of
+      decision 16 established the new-sort path. Rule 4 gains
+      the counted-reserve bullet, and validation rule 7 states
+      the one aggregation rule.
+    - ASSERT_FEE_LE declined. The transaction-wide form is the
+      merge-poison decision 14 pre-registered: an aggregate upper
+      bound vetoes strangers' decisions about strangers' value.
+      The composition-safe per-input re-shape (a bound on this
+      input's own fee contribution) is a redundant conjunction by
+      the decomposition proof: an input's contribution is its
+      amount minus the sum of its claims, so ASSERT_MY_AMOUNT
+      plus the program's own claims already pins it, the decision
+      20 precedent for declining re-encodings. Whole-transaction
+      exactness stays where it belongs, in signatures: the
+      taproot key path with SIGHASH_ALL today, the AGG_SIG
+      binding menu when that family lands.
+    - ASSERT_OUTPUT_COUNT declined in both forms, the closest
+      call of the session (steelmanned at 65 percent confidence
+      before ratification). The exact form is merge-poison per
+      decision 14. The floor form survives the composition
+      guarantee (counts are non-negative and sum) and is a
+      genuine expressiveness gap (claims force slots only by
+      naming content), but no identified program wants slots of
+      unspecified content, and consensus surface without a user
+      loses to the quality mandate. The reserved tier is the
+      recorded reintroduction path if a use case materializes.
+      ASSERT_INPUT_COUNT declined mirroring it: an asymmetric
+      resolution of the grid row would need a rationale that does
+      not exist, and the thin use case (a co-spender exists) is
+      served more strongly by the message family.
+    - The witness-dependent cells of decision 9's grid (weight,
+      fee rate) declined as self-referential: the witness
+      contains the program making the claim. A stripped-measure
+      definition stays possible through the reserved tier and
+      would want Phase 4's measurement evidence first.
+    - Error and encoding mechanics. One field-grouped error,
+      `insufficient_fee`, covering the unmet comparison, per the
+      decision 15 and 20 grouping precedent (Chia likewise maps
+      every family failure to one code). The operand takes the
+      landed amount-operand convention, divergence C15. Stage 4,
+      and the stage assignment doubles as the recombination
+      class per decision 11: a fee floor survives the guarantee's
+      valid-merge arithmetic yet an aggregator rebuilding the
+      transaction can still break it, which is exactly the
+      stage 4 re-check.
 
 ## 4. Novel-layer register
 
@@ -905,8 +1012,9 @@ for an oracle, per ground rule 4:
 | 4. Duplicates and multiplicity | normative | `vectors/validation/duplicates.json`: the strictest-wins oracle tests translated to identical and differing time asserts within one input, identical asserts across two and three inputs including the diverging final-sequence counterexample, ANNOUNCE duplication within an input and copies across inputs including the new-fact flip, duplicated announcement asserts at loose and script commitments, and duplicated reserved conditions on both sides of the cost floor, plus the in-place duplication-invariance invariant. The counted-sort boundaries stay pinned where they landed: duplicate claims in `vectors/validation/create-output.json`, duplicate message halves in `vectors/validation/messages.json`. Chia's remaining dedup tests are mempool spend-dedup machinery, declined in decision 19 |
 | 5. Per-condition costing | pending | CHIP-0049 precedent comparison plus cost-conservation properties |
 | 6. Reserved conditions | normative | encoding vectors in `vectors/conditions/`, every error path pinned |
+| 7. The fee reserve | normative | `vectors/validation/reserve-fee.json`: the probe corpus translated from the chia_rs oracle (within-spend and cross-input accumulation, boundary equality, one-short rejection, zero reserve, a reserve stack no fee can reach) plus the fee-theft grafted-output regression vector, the surplus-capture acceptance vector pinning what the reserve does not protect, the above-2^32 and off-boundary separating cases from the review's mutation pass, and the operand-monotonicity, split, and boundary invariants |
 
-Decision 12 adds a seventh entry to this register when the identity
+Decision 12 adds one more entry to this register when the identity
 and signature designs land: the recombination-stability
 classification, whose adversarial surface is recombination of valid
 spends into transactions their authors never assembled. No deployed
