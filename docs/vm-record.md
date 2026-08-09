@@ -320,7 +320,7 @@ phase that owes the answer.
    evaluation-time triggers need several times the harness budget
    and the deserialization trigger needs about ten times the witness
    ceiling. Two ways to close the row, to be decided with the Phase
-   3 budget mapping. Either record the maximum grantable budget and
+   4 budget mapping. Either record the maximum grantable budget and
    the embedding's input-size bound and prove every cap unreachable,
    making the row permanently dead the way VM.md section 2 argues
    the wire cap dead, or mirror the caps fail-closed so the two

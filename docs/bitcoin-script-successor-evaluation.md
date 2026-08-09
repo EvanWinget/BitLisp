@@ -243,7 +243,7 @@ The introspection steelman is stronger than §4.3's one-line summary conveys, an
 
 Both points are risk arguments rather than capability arguments, and both are answerable by work this document already mandates: obligation 1's spec-and-adversarial-vectors discipline for the novel validator, and the §7 template discipline for aggregation stability. The capability asymmetries in §10.2 stood uncontested through the first exchange, which also yielded concessions from the introspection side on accumulating checks and softfork extensibility while leaving the arithmetic and the gate untouched.
 
-Verdict: conditions over introspection stands, at 70% rather than 72%. The residual is now better localized: it is not "maybe introspection is more capable" but "maybe the novel validator's correctness risk outweighs the capability margins." That is the question hostile review should be pointed at.
+Verdict: conditions over introspection stands. The exercise itself moved the figure from the original 72% to 70%, and the §11 evidence later raised it to the 80% recorded in §8 (2026-08-07). The residual is now better localized: it is not "maybe introspection is more capable" but "maybe the novel validator's correctness risk outweighs the capability margins." That is the question hostile review should be pointed at.
 
 ---
 
