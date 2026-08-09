@@ -8,11 +8,24 @@ that conserve value. Violations here raise ValueError: a malformed
 model is a harness bug, never a spend failure.
 """
 
+import hashlib
 from dataclasses import dataclass
 
 from .conditions import MAX_MONEY
 
 _UINT32_MAX = 0xFFFFFFFF
+
+
+def _compact_size(n):
+    """Bitcoin's variable-length count prefix, the wire encoding of
+    list lengths and byte-string lengths."""
+    if n < 0xFD:
+        return n.to_bytes(1, "little")
+    if n <= 0xFFFF:
+        return b"\xfd" + n.to_bytes(2, "little")
+    if n <= 0xFFFFFFFF:
+        return b"\xfe" + n.to_bytes(4, "little")
+    return b"\xff" + n.to_bytes(8, "little")
 
 
 def _check_amount(amount, what):
@@ -32,9 +45,10 @@ def _check_script(script, what):
 
 @dataclass(frozen=True)
 class TxInput:
-    """One input: the outpoint it consumes, that output's content, and
-    the sequence. conditions is None for a non-BitLisp input, else the
-    parsed condition list its program evaluation produced."""
+    """One input: the outpoint it consumes, that output's content, the
+    sequence, and the legacy scriptSig, empty for every segwit input.
+    conditions is None for a non-BitLisp input, else the parsed
+    condition list its program evaluation produced."""
 
     txid: bytes
     index: int
@@ -42,6 +56,7 @@ class TxInput:
     amount: int
     sequence: int
     conditions: tuple | None = None
+    script_sig: bytes = b""
 
     def __post_init__(self):
         if not isinstance(self.txid, bytes) or len(self.txid) != 32:
@@ -54,6 +69,8 @@ class TxInput:
         _check_amount(self.amount, "input")
         if self.conditions is not None and not isinstance(self.conditions, tuple):
             raise ValueError("conditions must be a tuple or None")
+        if not isinstance(self.script_sig, bytes):
+            raise ValueError("scriptSig must be bytes")
 
     @property
     def outpoint(self):
@@ -74,6 +91,16 @@ class TxOutput:
     @property
     def content(self):
         return (self.script_pubkey, self.amount)
+
+    @property
+    def wire(self):
+        """The slot's wire serialization: the 8-byte little-endian
+        amount, then the length-prefixed scriptPubKey."""
+        return (
+            self.amount.to_bytes(8, "little")
+            + _compact_size(len(self.script_pubkey))
+            + self.script_pubkey
+        )
 
 
 @dataclass(frozen=True)
@@ -111,3 +138,30 @@ class Transaction:
             raise ValueError(
                 f"outputs {out_total} exceed inputs {in_total}, value not conserved"
             )
+
+    @property
+    def txid(self):
+        """The transaction's own id: the double-SHA256 of its
+        serialization without witness data. Condition lists, programs,
+        and solutions are witness data, so nothing a BitLisp input
+        carries changes this value. Distinct from an input's txid,
+        which names the past transaction that created its prevout."""
+        data = bytearray(self.version.to_bytes(4, "little"))
+        data += _compact_size(len(self.inputs))
+        for tx_input in self.inputs:
+            data += tx_input.txid
+            data += tx_input.index.to_bytes(4, "little")
+            data += _compact_size(len(tx_input.script_sig)) + tx_input.script_sig
+            data += tx_input.sequence.to_bytes(4, "little")
+        data += _compact_size(len(self.outputs))
+        for output in self.outputs:
+            data += output.wire
+        data += self.locktime.to_bytes(4, "little")
+        return hashlib.sha256(hashlib.sha256(bytes(data)).digest()).digest()
+
+    @property
+    def outputs_hash(self):
+        """The single SHA256 of every output slot's wire serialization
+        in order, the value a taproot sighash commits to as its
+        outputs commitment."""
+        return hashlib.sha256(b"".join(o.wire for o in self.outputs)).digest()

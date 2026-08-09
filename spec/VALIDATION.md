@@ -41,11 +41,33 @@ A transaction is:
 - `locktime`, a 32-bit unsigned integer
 - `inputs`, an ordered list. Each input carries the outpoint it
   consumes (a 32-byte txid and a 32-bit index), the consumed output's
-  `scriptPubKey` and `amount`, and a 32-bit `sequence`. A BitLisp
-  input additionally carries the condition list its evaluation
-  produced.
+  `scriptPubKey` and `amount`, a 32-bit `sequence`, and a
+  `scriptSig`, the legacy signature field, empty for every segwit
+  input. A BitLisp input additionally carries the condition list its
+  evaluation produced.
 - `outputs`, an ordered list of slots. Each slot's content is the
   pair (`scriptPubKey`, `amount`). Slots are addressed by index.
+
+Two quantities are derived from these fields, the way rule 7
+derives the fee. The transaction's **txid** is the double-SHA256
+of its serialization without witness data, in Bitcoin's wire
+encoding: the 4-byte little-endian version, the input count, each
+input's outpoint (32 txid bytes then the 4-byte little-endian
+index), length-prefixed `scriptSig`, and 4-byte little-endian
+`sequence`, the output count, each slot's 8-byte little-endian
+`amount` and length-prefixed `scriptPubKey`, then the 4-byte
+little-endian locktime. The counts and length prefixes use
+Bitcoin's compact-size encoding: one byte for values below 253,
+otherwise a prefix byte `0xfd`, `0xfe`, or `0xff` followed by the
+value in 2, 4, or 8 little-endian bytes respectively. The
+transaction's **outputs hash** is the single SHA256 of the
+concatenated wire serialization of every output slot in order,
+each slot's 8-byte little-endian `amount` then its
+length-prefixed `scriptPubKey`, with no count prefix. This is the
+`sha_outputs` value of BIP 341, which base consensus computes for
+every taproot sighash. Witness data enters neither derivation, so
+a BitLisp input's program, solution, and signatures never change
+either value.
 
 Validation is defined only over transactions that satisfy Bitcoin's
 base consensus rules. The reference transaction model enforces the
@@ -94,29 +116,41 @@ reads, records, or reserves against. An input that is not a
 BitLisp input, a fact no assert reads, and the content of an
 output slot no claim consumes are all unconstrained. When a
 reserve is present, rule 7 reads every input's and every slot's
-amount through the fee. Rule 2 states the consequences.
+amount through the fee. When a seal condition of
+`spec/CONDITIONS.md` is present, its assert reads every
+non-witness byte of the transaction through the txid, or every
+output slot through the outputs hash. Rule 2 states the
+consequences.
 
 **Composition guarantee.** Let two transactions each be valid
-under this document, with no outpoint consumed in both, and with
-locktime fields of the same type: both height-typed or both
-time-typed. Their concatenation is the inputs of both followed by
-the outputs of both, carrying the greater of the two version
-fields and the greater of the two locktime fields. If the
-concatenation satisfies the transaction view's preconditions,
-then no rule in this document rejects it. Every rule and every
-vocabulary entry must preserve this property. A vocabulary entry
-whose assert reads a fact that a concatenation satisfying these
-hypotheses can falsify, such as an upper bound on a quantity that
-concatenation sums or an exact count, must not be defined. The
-same-type hypothesis is Bitcoin's own constraint, not a new one:
-a transaction has a single locktime field, so height-locked and
-time-locked spends cannot share any transaction on the network
-today. The message ledger of rule 3 preserves this guarantee
-arithmetically: concatenation adds the two ledgers, and sums of
-zeros are zero. The fee reserve of rule 7 preserves it the same
-way: fees are non-negative and sum under concatenation, reserves
-sum, so two covered reserves concatenate into a covered reserve.
-Relaxing this paragraph changes what wallets may
+under this document, with no outpoint consumed in both, with no
+seal condition of `spec/CONDITIONS.md` in any input's condition
+list, and with locktime fields of the same type: both
+height-typed or both time-typed. Their concatenation is the
+inputs of both followed by the outputs of both, carrying the
+greater of the two version fields and the greater of the two
+locktime fields. If the concatenation satisfies the transaction
+view's preconditions, then no rule in this document rejects it.
+Every rule and every vocabulary entry must preserve this
+property. A vocabulary entry whose assert reads a fact that a
+concatenation satisfying these hypotheses can falsify, such as an
+upper bound on a quantity that concatenation sums or an exact
+count, must not be defined. The seal family is the sole
+exception, and it is excluded by hypothesis rather than
+grandfathered: a seal's meaning is that the transaction must not
+be altered, a demand with no composition-safe shape, so its
+entries scope this guarantee instead of breaking it. A sealed
+transaction declares itself unbatchable, and a wallet detects the
+declaration from the seal opcodes alone before attempting a
+batch. The same-type hypothesis is Bitcoin's own constraint, not
+a new one: a transaction has a single locktime field, so
+height-locked and time-locked spends cannot share any transaction
+on the network today. The message ledger of rule 3 preserves this
+guarantee arithmetically: concatenation adds the two ledgers, and
+sums of zeros are zero. The fee reserve of rule 7 preserves it
+the same way: fees are non-negative and sum under concatenation,
+reserves sum, so two covered reserves concatenate into a covered
+reserve. Relaxing this paragraph changes what wallets may
 safely batch and requires a recorded design decision.
 
 ## Validation stages
@@ -138,7 +172,8 @@ condition's operands.
 4. Whole-transaction work: claim assignment, cross-input pairing,
    facts of the assembled transaction's fields (version,
    locktime, and the spending inputs' sequences), and quantities
-   derived from the assembled transaction (the fee).
+   derived from the assembled transaction (the fee, the txid, and
+   the outputs hash).
 5. Signature verification over the collected
    (public key, digest, signature) triples.
 
@@ -481,7 +516,11 @@ it enforceable, and lands with that rule:
 - No output satisfies two conditions, k identical claims require k
   distinct slots (rule 1).
 - Validation is invariant under input reordering, output reordering,
-  and condition-list reordering (rules 1 and 3).
+  and condition-list reordering (rules 1 and 3). The seal family is
+  the recorded exemption for input and output reordering: a seal
+  reads the serialization order through the txid or the outputs
+  hash. Condition-list reordering never changes an outcome, seals
+  included.
 - Removing a condition from a valid transaction never turns it
   invalid, and adding a condition to an invalid transaction never
   turns it valid: constraints only tighten (rule 1, scoped to claim
@@ -494,14 +533,18 @@ it enforceable, and lands with that rule:
 - Metamorphic: mutating the content of any exactly-claimed output
   (amount off by one, script byte flip) causes rejection (rule 1).
 - Adding an output slot to a valid transaction carrying no fee
-  reserve never turns it invalid, and adding a non-BitLisp input
-  never turns it invalid: an added slot never raises the fee,
-  an added input never lowers it (rules 2 and 7, the merge
+  reserve and no seal condition never turns it invalid, and adding
+  a non-BitLisp input to a valid transaction carrying no SEAL
+  never turns it invalid: an added slot never raises the fee, an
+  added input never lowers it, and the seal family is the recorded
+  exemption because both additions change the txid and an added
+  slot changes the outputs hash (rules 2 and 7, the merge
   invariant below is permanent).
-- Merge: two valid transactions consuming disjoint outpoints, with
-  same-typed locktime fields, whose concatenation under the greater
-  version and greater locktime the transaction view admits,
-  concatenate into a valid transaction (composition guarantee).
+- Merge: two valid transactions consuming disjoint outpoints,
+  carrying no seal condition, with same-typed locktime fields,
+  whose concatenation under the greater version and greater
+  locktime the transaction view admits, concatenate into a valid
+  transaction (composition guarantee).
 - A transaction with no BitLisp inputs validates regardless of its
   shape (rule 2).
 - Increasing any time assert's operand never turns an invalid
@@ -563,3 +606,25 @@ it enforceable, and lands with that rule:
 - Variant separation: a satisfied triple re-emitted at any other
   family opcode, operands identical, causes rejection: the
   per-variant tags never share a digest (rule 8).
+- A lone seal is satisfied exactly when its operand equals the
+  quantity it reads, the txid or the outputs hash, failing
+  otherwise with the family's error (seals).
+- Metamorphic: on a valid transaction carrying a satisfied seal,
+  flipping any byte of the operand causes rejection, and so does
+  any mutation that changes what the seal reads: for SEAL any
+  change to the non-witness serialization, for SEAL_OUTPUTS any
+  change to the serialized slot list, such as moving a slot past
+  a slot of differing content (seals).
+- A SEAL_OUTPUTS outcome is unchanged by the transaction's
+  version, locktime, sequences, scriptSigs, and input list: the
+  outcome is a function of the operand and the output slots alone
+  (seals).
+- Whenever a SEAL is satisfied, the SEAL_OUTPUTS carrying the
+  transaction's outputs hash is satisfied on the same transaction:
+  the txid commits to the outputs (seals).
+- Sealed merge: concatenating a valid transaction carrying a
+  satisfied seal with any other transaction is rejected: the
+  satisfied operand equals the unmerged quantity, and
+  concatenation appends inputs and outputs, so it changes every
+  txid and every outputs hash (seals, the scoped merge invariant
+  above keeps the guarantee for everything else).
