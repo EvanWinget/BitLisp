@@ -1,0 +1,175 @@
+{
+ "schema": "bitlisp-vector-v0",
+ "suite": "conditions",
+ "spec": "CONDITIONS.md signature asserts, section 1 encoding rules",
+ "cases": [
+  {
+   "name": "parse_every_variant",
+   "conditions": "ffff10ffa05559db40d11a625321d2b362c7430b0c874b27b5e6a63f4ee9848aa9f9e1688bff8e766563746f72206d657373616765ffc04001da20649cf599d6dcab49379f55cfcab813628a95e8f7da8f58b61601adde146f89ee526d09ed45d7883004cf890eea8b3dde23f0dd0af06507e2278e50a82b80ffff11ffa05559db40d11a625321d2b362c7430b0c874b27b5e6a63f4ee9848aa9f9e1688bff8e766563746f72206d657373616765ffc040c4d842babc3066fd95e990a61be42df807b36e772fa9ad6e43f9c0fdf4bda7c3806dd4a35b61953efdfa7c8021a397dcbdbec40c36523dcc7faec7e35c18d9dd80ffff12ffa05559db40d11a625321d2b362c7430b0c874b27b5e6a63f4ee9848aa9f9e1688bff8e766563746f72206d657373616765ffc0406db9366adf76db3893d73ee0f5b5146678f95952a8241d22eeecd6500ae92812753e90f168816f9159e618ab04fbe60bfbed1e2b9d801416be82fc780b56c59e80ffff13ffa05559db40d11a625321d2b362c7430b0c874b27b5e6a63f4ee9848aa9f9e1688bff8e766563746f72206d657373616765ffc0404193847f2f68ae43b4a16555f6421b0ec3eaaebe18d2670f87b5cd3e14d888ecbc0ae2f025571d63e4a117a438614687585b6562ed098ab289781ece036c578380ffff14ffa05559db40d11a625321d2b362c7430b0c874b27b5e6a63f4ee9848aa9f9e1688bff8e766563746f72206d657373616765ffc040f38871d078b68b4fb3bb03d502ac88096aee712caf9c5ae048c4614ed29fc15d6533740d2b89b1764776b662b68d155b2263d805e0317624db4d0de971f99c3d80ffff15ffa05559db40d11a625321d2b362c7430b0c874b27b5e6a63f4ee9848aa9f9e1688bff8e766563746f72206d657373616765ffc0402824145f3c03fad1e1ba1e72f33b6af1c6b6d90add678fa7fb5c83b457c6a22f360d209edc47231a5b5a24d8321a7f37077afd7c89ffab9a83d82cd756cef2cc80ffff16ffa05559db40d11a625321d2b362c7430b0c874b27b5e6a63f4ee9848aa9f9e1688bff80ffc040fbc2fb6e218d8c066bf693f0dad59a50edc7061b173eed33687d3d9c6401af109ee3d7b5654b7d80961822884d6b296255c3b155e9ee5b4923f0c1fd4fbadeb080ffff17ffa05559db40d11a625321d2b362c7430b0c874b27b5e6a63f4ee9848aa9f9e1688bff8e766563746f72206d657373616765ffc04001a4a2dfdf60e70d71656754fe4048be622d42e583a86da23266c18414142523569218e20ee3e97f90506d9e51f558964615cb1d31c3461c6899246ab1ade0af8080",
+   "expect": {
+    "parsed": [
+     {
+      "opcode": 16,
+      "pubkey": "5559db40d11a625321d2b362c7430b0c874b27b5e6a63f4ee9848aa9f9e1688b",
+      "message": "766563746f72206d657373616765",
+      "signature": "01da20649cf599d6dcab49379f55cfcab813628a95e8f7da8f58b61601adde146f89ee526d09ed45d7883004cf890eea8b3dde23f0dd0af06507e2278e50a82b"
+     },
+     {
+      "opcode": 17,
+      "pubkey": "5559db40d11a625321d2b362c7430b0c874b27b5e6a63f4ee9848aa9f9e1688b",
+      "message": "766563746f72206d657373616765",
+      "signature": "c4d842babc3066fd95e990a61be42df807b36e772fa9ad6e43f9c0fdf4bda7c3806dd4a35b61953efdfa7c8021a397dcbdbec40c36523dcc7faec7e35c18d9dd"
+     },
+     {
+      "opcode": 18,
+      "pubkey": "5559db40d11a625321d2b362c7430b0c874b27b5e6a63f4ee9848aa9f9e1688b",
+      "message": "766563746f72206d657373616765",
+      "signature": "6db9366adf76db3893d73ee0f5b5146678f95952a8241d22eeecd6500ae92812753e90f168816f9159e618ab04fbe60bfbed1e2b9d801416be82fc780b56c59e"
+     },
+     {
+      "opcode": 19,
+      "pubkey": "5559db40d11a625321d2b362c7430b0c874b27b5e6a63f4ee9848aa9f9e1688b",
+      "message": "766563746f72206d657373616765",
+      "signature": "4193847f2f68ae43b4a16555f6421b0ec3eaaebe18d2670f87b5cd3e14d888ecbc0ae2f025571d63e4a117a438614687585b6562ed098ab289781ece036c5783"
+     },
+     {
+      "opcode": 20,
+      "pubkey": "5559db40d11a625321d2b362c7430b0c874b27b5e6a63f4ee9848aa9f9e1688b",
+      "message": "766563746f72206d657373616765",
+      "signature": "f38871d078b68b4fb3bb03d502ac88096aee712caf9c5ae048c4614ed29fc15d6533740d2b89b1764776b662b68d155b2263d805e0317624db4d0de971f99c3d"
+     },
+     {
+      "opcode": 21,
+      "pubkey": "5559db40d11a625321d2b362c7430b0c874b27b5e6a63f4ee9848aa9f9e1688b",
+      "message": "766563746f72206d657373616765",
+      "signature": "2824145f3c03fad1e1ba1e72f33b6af1c6b6d90add678fa7fb5c83b457c6a22f360d209edc47231a5b5a24d8321a7f37077afd7c89ffab9a83d82cd756cef2cc"
+     },
+     {
+      "opcode": 22,
+      "pubkey": "5559db40d11a625321d2b362c7430b0c874b27b5e6a63f4ee9848aa9f9e1688b",
+      "message": "",
+      "signature": "fbc2fb6e218d8c066bf693f0dad59a50edc7061b173eed33687d3d9c6401af109ee3d7b5654b7d80961822884d6b296255c3b155e9ee5b4923f0c1fd4fbadeb0"
+     },
+     {
+      "opcode": 23,
+      "pubkey": "5559db40d11a625321d2b362c7430b0c874b27b5e6a63f4ee9848aa9f9e1688b",
+      "message": "766563746f72206d657373616765",
+      "signature": "01a4a2dfdf60e70d71656754fe4048be622d42e583a86da23266c18414142523569218e20ee3e97f90506d9e51f558964615cb1d31c3461c6899246ab1ade0af"
+     }
+    ]
+   }
+  },
+  {
+   "name": "off_curve_pubkey_is_shape_legal",
+   "conditions": "ffff17ffa0eefdea4cdb677750a420fee807eacf21eb9898ae79b9768766e4faa04a2d4a34ff8e766563746f72206d657373616765ffc04001a4a2dfdf60e70d71656754fe4048be622d42e583a86da23266c18414142523569218e20ee3e97f90506d9e51f558964615cb1d31c3461c6899246ab1ade0af8080",
+   "expect": {
+    "parsed": [
+     {
+      "opcode": 23,
+      "pubkey": "eefdea4cdb677750a420fee807eacf21eb9898ae79b9768766e4faa04a2d4a34",
+      "message": "766563746f72206d657373616765",
+      "signature": "01a4a2dfdf60e70d71656754fe4048be622d42e583a86da23266c18414142523569218e20ee3e97f90506d9e51f558964615cb1d31c3461c6899246ab1ade0af"
+     }
+    ]
+   }
+  },
+  {
+   "name": "message_1024_parses",
+   "conditions": "ffff16ffa05559db40d11a625321d2b362c7430b0c874b27b5e6a63f4ee9848aa9f9e1688bffc400ababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababffc04001a4a2dfdf60e70d71656754fe4048be622d42e583a86da23266c18414142523569218e20ee3e97f90506d9e51f558964615cb1d31c3461c6899246ab1ade0af8080",
+   "expect": {
+    "parsed": [
+     {
+      "opcode": 22,
+      "pubkey": "5559db40d11a625321d2b362c7430b0c874b27b5e6a63f4ee9848aa9f9e1688b",
+      "message": "abababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababab",
+      "signature": "01a4a2dfdf60e70d71656754fe4048be622d42e583a86da23266c18414142523569218e20ee3e97f90506d9e51f558964615cb1d31c3461c6899246ab1ade0af"
+     }
+    ]
+   }
+  },
+  {
+   "name": "arity_two",
+   "conditions": "ffff17ffa05559db40d11a625321d2b362c7430b0c874b27b5e6a63f4ee9848aa9f9e1688bff8e766563746f72206d6573736167658080",
+   "expect": {
+    "error": "bad_condition_arity"
+   }
+  },
+  {
+   "name": "arity_four",
+   "conditions": "ffff17ffa05559db40d11a625321d2b362c7430b0c874b27b5e6a63f4ee9848aa9f9e1688bff8e766563746f72206d657373616765ffc04001a4a2dfdf60e70d71656754fe4048be622d42e583a86da23266c18414142523569218e20ee3e97f90506d9e51f558964615cb1d31c3461c6899246ab1ade0afff788080",
+   "expect": {
+    "error": "bad_condition_arity"
+   }
+  },
+  {
+   "name": "pubkey_31_bytes",
+   "conditions": "ffff17ff9f5559db40d11a625321d2b362c7430b0c874b27b5e6a63f4ee9848aa9f9e168ff8e766563746f72206d657373616765ffc04001a4a2dfdf60e70d71656754fe4048be622d42e583a86da23266c18414142523569218e20ee3e97f90506d9e51f558964615cb1d31c3461c6899246ab1ade0af8080",
+   "expect": {
+    "error": "bad_condition_arg"
+   }
+  },
+  {
+   "name": "pubkey_33_bytes",
+   "conditions": "ffff17ffa15559db40d11a625321d2b362c7430b0c874b27b5e6a63f4ee9848aa9f9e1688b00ff8e766563746f72206d657373616765ffc04001a4a2dfdf60e70d71656754fe4048be622d42e583a86da23266c18414142523569218e20ee3e97f90506d9e51f558964615cb1d31c3461c6899246ab1ade0af8080",
+   "expect": {
+    "error": "bad_condition_arg"
+   }
+  },
+  {
+   "name": "message_1025_bytes",
+   "conditions": "ffff16ffa05559db40d11a625321d2b362c7430b0c874b27b5e6a63f4ee9848aa9f9e1688bffc401abababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababffc04001a4a2dfdf60e70d71656754fe4048be622d42e583a86da23266c18414142523569218e20ee3e97f90506d9e51f558964615cb1d31c3461c6899246ab1ade0af8080",
+   "expect": {
+    "error": "bad_condition_arg"
+   }
+  },
+  {
+   "name": "signature_63_bytes",
+   "conditions": "ffff17ffa05559db40d11a625321d2b362c7430b0c874b27b5e6a63f4ee9848aa9f9e1688bff8e766563746f72206d657373616765ffbf01a4a2dfdf60e70d71656754fe4048be622d42e583a86da23266c18414142523569218e20ee3e97f90506d9e51f558964615cb1d31c3461c6899246ab1ade08080",
+   "expect": {
+    "error": "bad_condition_arg"
+   }
+  },
+  {
+   "name": "signature_65_bytes",
+   "conditions": "ffff17ffa05559db40d11a625321d2b362c7430b0c874b27b5e6a63f4ee9848aa9f9e1688bff8e766563746f72206d657373616765ffc04101a4a2dfdf60e70d71656754fe4048be622d42e583a86da23266c18414142523569218e20ee3e97f90506d9e51f558964615cb1d31c3461c6899246ab1ade0af008080",
+   "expect": {
+    "error": "bad_condition_arg"
+   }
+  },
+  {
+   "name": "signature_pair_rejected",
+   "conditions": "ffff17ffa05559db40d11a625321d2b362c7430b0c874b27b5e6a63f4ee9848aa9f9e1688bff8e766563746f72206d657373616765ffffc04001a4a2dfdf60e70d71656754fe4048be622d42e583a86da23266c18414142523569218e20ee3e97f90506d9e51f558964615cb1d31c3461c6899246ab1ade0af808080",
+   "expect": {
+    "error": "bad_condition_arg"
+   }
+  },
+  {
+   "name": "message_pair_rejected",
+   "conditions": "ffff17ffa05559db40d11a625321d2b362c7430b0c874b27b5e6a63f4ee9848aa9f9e1688bffff8e766563746f72206d65737361676580ffc04001a4a2dfdf60e70d71656754fe4048be622d42e583a86da23266c18414142523569218e20ee3e97f90506d9e51f558964615cb1d31c3461c6899246ab1ade0af8080",
+   "expect": {
+    "error": "bad_condition_arg"
+   }
+  },
+  {
+   "name": "pubkey_pair_rejected",
+   "conditions": "ffff17ffffa05559db40d11a625321d2b362c7430b0c874b27b5e6a63f4ee9848aa9f9e1688b80ff8e766563746f72206d657373616765ffc04001a4a2dfdf60e70d71656754fe4048be622d42e583a86da23266c18414142523569218e20ee3e97f90506d9e51f558964615cb1d31c3461c6899246ab1ade0af8080",
+   "expect": {
+    "error": "bad_condition_arg"
+   }
+  },
+  {
+   "name": "arity_checked_before_operands",
+   "conditions": "ffff17ff9f5559db40d11a625321d2b362c7430b0c874b27b5e6a63f4ee9848aa9f9e168ff8e766563746f72206d657373616765ffc04001a4a2dfdf60e70d71656754fe4048be622d42e583a86da23266c18414142523569218e20ee3e97f90506d9e51f558964615cb1d31c3461c6899246ab1ade0afff788080",
+   "expect": {
+    "error": "bad_condition_arity"
+   }
+  },
+  {
+   "name": "family_gap_0x18_invalid",
+   "conditions": "ffff18ffa05559db40d11a625321d2b362c7430b0c874b27b5e6a63f4ee9848aa9f9e1688bff8e766563746f72206d657373616765ffc04001a4a2dfdf60e70d71656754fe4048be622d42e583a86da23266c18414142523569218e20ee3e97f90506d9e51f558964615cb1d31c3461c6899246ab1ade0af8080",
+   "expect": {
+    "error": "bad_condition_opcode"
+   }
+  }
+ ]
+}
