@@ -38,6 +38,14 @@ from bitlisp import (
     TxOutput,
     validate_transaction,
 )
+from bitlisp.conditions import (
+    AssertMyAmount,
+    AssertMyOutpoint,
+    AssertMyScriptPubKey,
+    AssertMyTaproot,
+    AssertMyTxid,
+)
+from bitlisp.secp256k1 import taproot_output_key
 from hypothesis import given
 from hypothesis import strategies as st
 
@@ -46,6 +54,11 @@ IDEMPOTENT = (
     AssertLocktimeTime,
     AssertSequenceHeight,
     AssertSequenceTime,
+    AssertMyOutpoint,
+    AssertMyTxid,
+    AssertMyScriptPubKey,
+    AssertMyAmount,
+    AssertMyTaproot,
     Announce,
     AssertAnnouncement,
     Reserved,
@@ -62,15 +75,34 @@ def _outpoint(txid):
     return txid + (0).to_bytes(4, "little")
 
 
-def _pool(other_txid, other_script):
+_TAPROOT_IK = bytes.fromhex(
+    "187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27"
+)
+_TAPROOT_SPK = b"\x51\x20" + taproot_output_key(_TAPROOT_IK, b"")
+
+
+def _pool(own_txid, own_script, other_txid, other_script):
     """Condition candidates for one input. Announcer specifiers,
     receiver specifiers, and payloads collide across the pools of
     both inputs, so generated transactions land on both sides of
     every landed rule, and the never-announced payload keeps the
-    announcement error path exercised."""
+    announcement error path exercised. The self asserts pair each
+    input's own values with the other input's, so satisfied and
+    failing asserts are both dense, and the taproot assert always
+    fails here (neither input script is a taproot script), keeping
+    a failing assert's idempotence exercised."""
     return (
         CreateOutput(SCRIPT_A, 1),
         CreateOutput(SCRIPT_B, 1),
+        AssertMyOutpoint(_outpoint(own_txid)),
+        AssertMyOutpoint(_outpoint(other_txid)),
+        AssertMyTxid(own_txid),
+        AssertMyTxid(other_txid),
+        AssertMyScriptPubKey(own_script),
+        AssertMyScriptPubKey(other_script),
+        AssertMyAmount(0),
+        AssertMyAmount(1),
+        AssertMyTaproot(_TAPROOT_IK, b"", _TAPROOT_SPK),
         AssertLocktimeHeight(600),
         AssertLocktimeHeight(700),
         AssertLocktimeTime(500_000_600),
@@ -91,8 +123,8 @@ def _pool(other_txid, other_script):
     )
 
 
-POOL_A = _pool(TXID_B, SCRIPT_B)
-POOL_B = _pool(TXID_A, SCRIPT_A)
+POOL_A = _pool(TXID_A, SCRIPT_A, TXID_B, SCRIPT_B)
+POOL_B = _pool(TXID_B, SCRIPT_B, TXID_A, SCRIPT_A)
 
 conds_a = st.lists(st.sampled_from(POOL_A), max_size=4)
 conds_b = st.lists(st.sampled_from(POOL_B), max_size=4)
