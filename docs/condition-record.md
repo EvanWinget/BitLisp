@@ -1239,7 +1239,22 @@ Section 4 registers the rules that have no external reference at all.
       signature menu that needs none: separated, one keyed input
       seals for the whole transaction and the signature family
       stays uniformly merge-safe. MuSig2 remains orthogonal
-      above the layer either way.
+      above the layer either way. A factored pair, SEAL_INPUTS
+      and SEAL_OUTPUTS composing into SEAL, was raised by Evan
+      at PR review and declined: no deployed input-side hash
+      covers outpoints, scriptSigs, and sequences, and version
+      and locktime belong to neither half, so the conjunction
+      either fails the same fields as the declined BIP 341 pair
+      or requires a bespoke consensus hash whose name misstates
+      its coverage. Standalone SEAL_INPUTS is the SIGHASH_NONE
+      posture, inputs fixed while anyone redirects the outputs,
+      a deployed footgun with no known legitimate users. The
+      unfactored SEAL also names the fact downstream protocols
+      consume, the transaction's identity, in one operand
+      against a quantity every node already computes. The
+      subsumption between the landed pair follows the
+      outpoint-implies-txid precedent, and an input-side seal
+      keeps the reserved tier as its reintroduction path.
     - The guarantee's second scoping, the amendment this unit
       exists to record. The hypothesis gains the no-seal clause
       beside decision 15's same-typed-locktime clause, and the
