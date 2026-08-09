@@ -34,6 +34,7 @@ Section 4 registers the rules that have no external reference at all.
 | C17 | signature digest construction | final message = program message ++ binding data ++ 32-byte suffix, ME's suffix the genesis challenge verbatim, the six variant suffixes derived sha256(genesis challenge ++ opcode byte), UNSAFE suffixless, variable-length concatenation | digest = BIP340 tagged hash, one ASCII tag per variant, fixed-length binding fields before the message | Byte compatibility is already impossible under the curve substitution, so only semantic parity binds, and what each variant commits to is preserved. Chia's concatenation is non-injective, probe-found during the research pass: an AGG_SIG_AMOUNT signature for amount 128 also verifies for a zero-amount coin with the amount encoding absorbed into the message, because amount 0 encodes as zero bytes. Fixed-length fields under per-variant tags make the ambiguity class inexpressible, in the deployed Bitcoin idiom. Ratified 2026-08-09, decision 23. | `validation/signature-asserts.json` binding cases |
 | C18 | raw-mode replay firewall | AGG_SIG_UNSAFE messages of 32 or more bytes may not end with any of the seven domain suffixes, a consensus rule in every regime | no firewall | The firewall patches the seam of suffix-at-the-end domain separation: a raw message could otherwise imitate a suffixed one. Under per-variant tagged hashes the raw digest and every bound digest live in disjoint domains by construction, so the rule has nothing to guard. A consensus rule deleted rather than ported. Ratified 2026-08-09, decision 23. | `validation/signature-asserts.json` raw cases |
 | C19 | duplicate signature conditions | counted: every occurrence is charged and pushed, and the aggregate signature must include a duplicated (pk, msg) pair exactly as many times as it occurs (probe P9: aggregated once fails, aggregated twice passes) | idempotent facts under rule 4's assert classification: identical triples in one input hold or fail together | Chia's counted semantics is BLS aggregate arithmetic, not design intent: the pairing equation happens to demand each pushed pair. A self-contained triple verifies or it does not, and occurrence count carries no meaning, which is rule 4's assert commitment. Cost stays per occurrence under rule 5's accounting, matching Chia's parse-time charging. Ratified 2026-08-09, decision 23. | `validation/duplicates.json` signature cases |
+| C20 | the seal family | no equivalent: coin identity is content-derived from parent, program hash, and amount, so a spend's authorization is indifferent to which aggregate bundle carries it and bundles need no seal | SEAL and SEAL_OUTPUTS, asserts pinning the spending transaction's own txid and its BIP 341 outputs hash | A pure addition, not a divergence of shared semantics. Bitcoin output identity is positional: the txid commits to the whole transaction, so an intercepted covenant spend can be rebuilt around a grafted output with every condition still holding, the surplus-capture gap rule 7's acceptance vector pins. The seal is the consensus answer to the aggregation qualification in section 4.4 of the evaluation doc. Ratified 2026-08-09, decision 24. | `validation/seals.json` |
 
 ## 2. Reference provenance
 
@@ -1029,6 +1030,16 @@ Section 4 registers the rules that have no external reference at all.
       valid-merge arithmetic yet an aggregator rebuilding the
       transaction can still break it, which is exactly the
       stage 4 re-check.
+    - Amended 2026-08-09 by decision 24. The decline rationale's
+      sentence placing whole-transaction exactness in signatures
+      pointed at the AGG_SIG binding menu, and decision 23 then
+      declined the menu's whole-transaction variant as
+      merge-poison. Exactness lives in the seal family at the
+      conditions layer, and in the key path's SIGHASH_ALL for key
+      spends. The surplus fact closes the same way: the reserve
+      never protected surplus, SEAL_OUTPUTS is the mechanism that
+      does, so the wallet discipline relaxes from "reserve
+      exactly what you pay" to "or seal your outputs."
 
 22. **Error codes are diagnostic, fail-fast is the contract.**
     RATIFIED (decision by Evan, 2026-08-09, raised by the fee
@@ -1187,6 +1198,117 @@ Section 4 registers the rules that have no external reference at all.
       seal amends the guarantee paragraph that requires its own
       recorded decision.
 
+24. **The seal family.** RATIFIED (decisions by Evan, 2026-08-09,
+    designed in the seal chat session, scope pre-registered by
+    decision 23's sequencing bullet from Evan's mempool-immutability
+    challenge). Eight parts:
+    - The threat, and why it is real. The signature asserts bind
+      prevout facts and never the spending transaction's effects,
+      so a broadcast covenant spend whose input carries surplus
+      beyond its claims can be rebuilt in flight with a grafted
+      output capturing the surplus, every condition still
+      holding. Rule 7's surplus-capture acceptance vector pinned
+      the gap deliberately. The seal is the opt-in close: a
+      condition whose fact is the assembled transaction itself.
+    - The two entries and their postures. SEAL pins the txid,
+      fixing every non-witness byte, the SIGHASH_ALL posture.
+      SEAL_OUTPUTS pins the BIP 341 outputs hash, fixing output
+      content and order while leaving the input side open, the
+      ALL-with-ANYONECANPAY posture: an added input can only
+      raise the fee, which makes it the fee-bumping shape. The
+      txid and not the wtxid because the operand lives in the
+      witness and the txid excludes it, so the equality is
+      well-defined where a wtxid seal is an unfindable hash fixed
+      point. The same exclusion is what lets parties agree the
+      txid before any signature exists, the presigned-transaction
+      property segwit created, with the recorded protocol
+      footnote that every input of a coordinated sealed
+      transaction must be segwit, legacy scriptSig signatures
+      being the one thing that moves a txid at signing time.
+    - Option steelmen, each declined. Exact counts pin neither
+      content nor order, and were already merge-poison per
+      decision 21. The BIP 341 hash pair alone leaves version,
+      locktime, and sequences unpinned, so an interceptor could
+      still flip RBF signaling or shift a locktime under holding
+      hashes. A ninth signature variant binding the spending txid
+      fails the controller-and-vault idiom's keyless value coins
+      by welding the key to the seal, is precisely the
+      whole-transaction variant decision 23 declined, and would
+      drag the guarantee's carve-out into the middle of a
+      signature menu that needs none: separated, one keyed input
+      seals for the whole transaction and the signature family
+      stays uniformly merge-safe. MuSig2 remains orthogonal
+      above the layer either way.
+    - The guarantee's second scoping, the amendment this unit
+      exists to record. The hypothesis gains the no-seal clause
+      beside decision 15's same-typed-locktime clause, and the
+      must-not-define sentence records the family as its sole
+      exception. The principle distinguishing it from the
+      declined merge-poison entries: each of those smuggled
+      unbatchability into vocabulary whose purpose was something
+      else and had a composition-safe re-shape or a signature
+      home, while immutability is the negation of batchability
+      and has no composition-safe form at all. A seal is the
+      input's own declared, opcode-visible refusal to be
+      batched, so the guarantee keeps its purpose, telling
+      wallets what they may safely batch, by exclusion rather
+      than relaxation. Three invariants take the matching
+      no-seal hypotheses (reorder, slot and input addition,
+      merge), and the sealed-merge rejection is itself pinned as
+      an invariant.
+    - The transaction view completion, with a recorded delta
+      from the ratified shape. The design chat ratified a txid
+      field, since the view lacked the scriptSigs of legacy
+      non-BitLisp inputs that the txid commits to. It landed
+      instead as the completion: each input carries its
+      scriptSig, empty for segwit inputs, and the txid and
+      outputs hash are derived the way rule 7 derives the fee. A
+      carried txid field would have been a free-floating input
+      with a consistency obligation no rule checks, the
+      accept-invalid direction if ever fed inconsistently, while
+      a derived quantity is consistent by construction and the
+      merge invariants recompute it honestly under mutation.
+      Same decision, safer mechanism, delta recorded here.
+    - Sort, error, and mechanics. Both conditions are asserts
+      under rule 4's idempotence commitment, stage 4, checked
+      under rule 2's assert clause like the time asserts. Two
+      SEALs with differing operands are jointly unsatisfiable
+      with no special rule, one transaction having one txid. One
+      family error, `unsatisfied_seal_assert`, both facts being
+      projections of transaction identity, per the grouping
+      precedent and decision 22's freedom. Opcodes 0x60 and 0x61
+      open the seals block, the first block with no Chia
+      numbering to continue (C20 records the family as a pure
+      addition). Cost pre-registration for rule 5: SEAL is a
+      32-byte compare, SEAL_OUTPUTS one SHA256 over the outputs
+      serialization, computable once per transaction whatever
+      the occurrence count.
+    - The footgun, stated with rule 8's bluntness. The operand
+      arrives in the solution, witness data nothing protects, so
+      a seal no signature commits to seals nothing: the
+      interceptor substitutes the matching operand as they
+      rebuild. The family preamble's guidance paragraph states
+      it, the delegated-program idiom is the prescribed
+      composition, one binding signature anywhere in the
+      transaction suffices, and a fully keyless transaction has
+      no immutability for anything to provide, a fact about
+      keyless spending rather than a gap. This is also the
+      second compensating control for decision 23's
+      fixed-message rewrite footgun, alongside its regression
+      vectors: Phase 3 tooling composes the seal into signed
+      messages by default.
+    - Novel-layer treatment and the third timing class. No
+      oracle exists (C20), so the register takes the vendored
+      Bitcoin Core framework as the serialization oracle for
+      both derivations, plus the adversarial corpus in
+      `validation/seals.json` led by the grafted-output
+      interception regression pair, the companion to rule 7's
+      surplus-capture acceptance vector. Decision 12's register
+      gains a third timing class beyond content and location
+      fields: seal operands are spend-time facts, never knowable
+      at authoring, never baked into programs, always
+      solution-supplied.
+
 ## 4. Novel-layer register
 
 The validation rules have no external reference: no deployed system
@@ -1196,7 +1318,7 @@ for an oracle, per ground rule 4:
 | rule | status | oracle substitute |
 | --- | --- | --- |
 | 1. Injective multiset output matching | normative | hypothesis invariant suite (injectivity, reorder invariance, monotonicity, metamorphic mutations) plus the adversarial corpus in `vectors/validation/`, opening with the duplicate-CREATE_COIN theft vector |
-| 2. Mixed-transaction rule | normative | `vectors/validation/mixed-transaction.json`: five acceptance vectors (mixed, plain-only, unclaimed slots, merge, surplus capture) and one rule 1 boundary rejection, plus the addition-monotonicity, merge, and plain-only invariants. The time assert family checks under this rule's assert clause: `vectors/validation/time-asserts.json` with BIP 65 and BIP 68 field semantics as the double reference, plus the operand-monotonicity and boundary-flip invariants. The self assert family checks under the same clause: `vectors/validation/self-asserts.json` with the probe corpus translated to prevout equality cases, the BIP341 tweak derivation shared with CREATE_OUTPUT_TAPROOT as the taproot assert's oracle, plus the outpoint-implies-txid and recombination-invariance invariants |
+| 2. Mixed-transaction rule | normative | `vectors/validation/mixed-transaction.json`: five acceptance vectors (mixed, plain-only, unclaimed slots, merge, surplus capture) and one rule 1 boundary rejection, plus the addition-monotonicity, merge, and plain-only invariants. The time assert family checks under this rule's assert clause: `vectors/validation/time-asserts.json` with BIP 65 and BIP 68 field semantics as the double reference, plus the operand-monotonicity and boundary-flip invariants. The self assert family checks under the same clause: `vectors/validation/self-asserts.json` with the probe corpus translated to prevout equality cases, the BIP341 tweak derivation shared with CREATE_OUTPUT_TAPROOT as the taproot assert's oracle, plus the outpoint-implies-txid and recombination-invariance invariants. The seal family checks under the same clause with no Chia reference at all (divergence C20): `vectors/validation/seals.json` with the grafted-output interception regression pair, the sealed-merge rejection cases, and the fee-input-addition acceptance pinning what SEAL_OUTPUTS permits, the vendored Bitcoin Core framework as the serialization oracle for the txid and outputs-hash derivations, plus the operand byte-flip, sealed-merge, SEAL-implies-SEAL_OUTPUTS, and outputs-only-dependence invariants |
 | 3. Message scoping | normative | `vectors/validation/messages.json` and `vectors/validation/announcements.json`: the probe corpus translated from the chia_rs oracle (balance, multiplicity, mode-key, self-send, order cases) plus adversarial wrong-address and forgery cases, and the balanced-pair, announcement-monotonicity, and byte-flip invariants |
 | 4. Duplicates and multiplicity | normative | `vectors/validation/duplicates.json`: the strictest-wins oracle tests translated to identical and differing time asserts within one input, identical asserts across two and three inputs including the diverging final-sequence counterexample, ANNOUNCE duplication within an input and copies across inputs including the new-fact flip, duplicated announcement asserts at loose and script commitments, and duplicated reserved conditions on both sides of the cost floor, plus the identical-signature-triple and copied-triple-across-inputs cases from the signature assert unit, plus the in-place duplication-invariance invariant. The counted-sort boundaries stay pinned where they landed: duplicate claims in `vectors/validation/create-output.json`, duplicate message halves in `vectors/validation/messages.json`. Chia's remaining dedup tests are mempool spend-dedup machinery, declined in decision 19 |
 | 5. Per-condition costing | pending | CHIP-0049 precedent comparison plus cost-conservation properties |
@@ -1209,7 +1331,10 @@ recombination-stability classification now covers every landed
 binding surface, the rule 3 specifier table for messages and
 announcements, the self assert family preamble, and the signature
 assert family preamble, each stating the same two classes over the
-same prevout fields. Its adversarial surface, recombination of
+same prevout fields. Decision 24 adds a third timing class outside
+the prevout fields: seal operands are spend-time facts, in
+existence only once the spending transaction is assembled, never
+knowable at authoring and always solution-supplied. Its adversarial surface, recombination of
 valid spends into transactions their authors never assembled, is
 exercised by the merge invariants and the recombination vectors of
 those families, rather than translated tests, because no deployed
