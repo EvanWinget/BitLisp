@@ -23,6 +23,12 @@ A term enters this table in the same PR that introduces it.
 | ASSERT_LOCKTIME_TIME | OP_CHECKLOCKTIMEVERIFY, time type | ASSERT_SECONDS_ABSOLUTE | the same shape against a time-typed nLockTime, wall-clock meaning is whatever base consensus gives the field |
 | ASSERT_SEQUENCE_HEIGHT | OP_CHECKSEQUENCEVERIFY, block count | ASSERT_HEIGHT_RELATIVE | requires an unsigned version of at least 2 and an enabled height-typed sequence value at or above the operand |
 | ASSERT_SEQUENCE_TIME | OP_CHECKSEQUENCEVERIFY, 512-second units | ASSERT_SECONDS_RELATIVE | the same shape with the time type flag, the operand counts the field's own 512-second units |
+| self asserts | nearest relative is the sighash, which commits prevout data through a signature | the ASSERT_MY_* family | the family asserting the spending input's own prevout data, landed 2026-08-08 (condition-record decision 20) |
+| ASSERT_MY_OUTPOINT | asserts the input's own outpoint | ASSERT_MY_COIN_ID | the outpoint in wire serialization, txid then little-endian index |
+| ASSERT_MY_TXID | asserts the txid half of the input's outpoint | ASSERT_MY_PARENT_ID | a deliberate strict subset of ASSERT_MY_OUTPOINT, the index left unconstrained |
+| ASSERT_MY_SCRIPTPUBKEY | asserts the spent output's scriptPubKey | ASSERT_MY_PUZZLEHASH | raw script bytes per divergence C1, empty script allowed as prevout content |
+| ASSERT_MY_AMOUNT | asserts the spent output's amount | ASSERT_MY_AMOUNT | numeric equality in satoshis |
+| ASSERT_MY_TAPROOT | verifies the spent scriptPubKey against the BIP341 tweak of its components | none | the assert-side mirror of CREATE_OUTPUT_TAPROOT, the self-propagation covenant primitive |
 | satisfier | compare miniscript satisfactions, which are spender-side | none | the transaction resource assigned to a claim, one per claim. A miniscript satisfaction is what the spender gives a script, a satisfier is what the transaction gives a claim |
 | composition guarantee | batching and coinjoin practice, no consensus equivalent | spend bundle aggregation, offers | two valid transactions with disjoint outpoints concatenate into a valid transaction (VALIDATION.md preamble, condition-record decision 14) |
 | spend | input plus its witness | coin spend | one input's evaluation and conditions |

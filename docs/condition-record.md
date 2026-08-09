@@ -27,6 +27,8 @@ Section 4 registers the rules that have no external reference at all.
 | C10 | condition argument arity | consensus accepts trailing extra arguments, strict arity only under the mempool flag (STRICT_ARGS_COUNT) | strict arity everywhere | One validator, one behavior, reject the ambiguous case. Verified in chia_rs conditions.rs: check_nil runs only under the mempool flag. Already the landed behavior of every prior family, recorded as a divergence here because the message probes surfaced it. Ratified 2026-08-07, decision 16. | `conditions/messages.json` arity cases |
 | C11 | broadcast conditions | four announcement codes, announcer bound by coin id or puzzle hash, namespacing by payload prefix convention | two conditions, announcer precision chosen by the assert through the shared specifier grammar, namespace a first-class operand | Decision 10's safety rationale upheld against the match-by-default policy: the prefix convention produced inadvertently insecure spends, CHIP-0025's own stated motivation. Chia's two flavors survive as commitment values 7 and 2. Ratified 2026-08-07, decision 16. | `validation/announcements.json` |
 | C12 | per-spend coordination cap | 1,024 message, announcement, and concurrent-assert conditions per spend, enforced by today's deployed binary, removed under the hard fork 2 pricing flag | no cap in v0 | Deployed Chia's cap is the pre-pricing spam bound and CHIP-0049 replaces it with per-condition pricing. Rule 5 is the pre-registered home for the same cap-or-price decision here, so v0 records the gap rather than adopting a bound upstream is removing. Recorded 2026-08-07 with decision 16, final decision owed by rule 5. | none until rule 5 lands |
+| C13 | birth asserts | ASSERT_MY_BIRTH_HEIGHT and ASSERT_MY_BIRTH_SECONDS, two-phase: differing occurrences must-equal at parse, then exact equality against the coin record's confirmation height and timestamp at the node layer | declined | Checking them reads when the prevout confirmed, the chain read the decision 15 shape excludes, and no base-consensus field enforces exact birth (BIP 68 enforces minimum age, the monotone form the sequence asserts already carry). Usage research 2026-08-08: added by CHIP-0014 with no standalone stated motivation, and a GitHub-wide search found only definitional hits, no deployed first-party puzzle emits them. Their one systemic role in Chia, anchoring the relative-before windows, is played at base consensus by BIP 68 here. A chain-read assert stays addable through the reserved tier, the reverse migration cannot happen. Ratified 2026-08-08, decision 20. | `conditions/self-asserts.json` gap cases pin 0x34 and 0x35 invalid |
+| C14 | ephemeral assert | ASSERT_EPHEMERAL, the coin was created in the same block it is spent in, plus a companion rule forbidding relative timelocks and birth asserts on ephemeral spends | declined, structurally inexpressible | A Bitcoin transaction cannot spend its own outputs (an input would need the txid of a transaction whose txid depends on that input), and validation scope is one transaction, so the asserted fact is always false. The companion interlock is also moot: BIP 68 anchors relative locks at prevout confirmation at base consensus. Reintroduction trigger recorded: package-level validation, if it ever exists, makes the fact expressible again through the reserved tier. Ratified 2026-08-08, decision 20. | `conditions/self-asserts.json` gap cases pin 0x36 invalid |
 
 ## 2. Reference provenance
 
@@ -116,6 +118,25 @@ Section 4 registers the rules that have no external reference at all.
   entry below: the condition table has no multiplier, no argument
   sensitivity, and no shape selector, so rule 5 weighs the two as
   separate precedents.
+- **Self-assert semantics (verified 2026-08-08).** Pinned against
+  the deployed binary for the ASSERT_MY_* design by 25 probes of
+  chia_rs `run_block_generator2` under the COST_CONDITIONS flag,
+  all confirming a source read of `conditions.rs`,
+  `condition_sanitizers.rs`, and `check_time_locks.rs` at the
+  pinned wheel's 0.46.0 tag. The four spend-data asserts check
+  immediately at parse by exact equality against the spend's own
+  data, hash operands are exactly 32 bytes, amount and birth
+  operands are canonical unsigned ints that error on negatives
+  and overflow rather than collapsing to unsatisfiable. Birth
+  asserts are two-phase, must-equal at parse and exact equality
+  against the coin record at the node layer, and they share the
+  not-ephemeral interlock with the relative timelocks.
+  ASSERT_EPHEMERAL takes no arguments and requires a same-block
+  creator spend matching by puzzle hash and amount with the hint
+  ignored. The whole family prices at the generic 200 under the
+  fork flag and 0 before it, isolated by probe from generator
+  byte cost. The declined conditions' usage research (CHIP-0014
+  text, GitHub-wide code search) is recorded at C13 and C14.
 - **BIP341 wallet test vectors** are vendored as data into
   `vectors/upstream/bip341/` with a provenance sibling, and are the
   primary tweak-derivation oracle for CREATE_OUTPUT_TAPROOT. The
@@ -774,6 +795,101 @@ Section 4 registers the rules that have no external reference at all.
     error, and carries no stage assignment. Implementation delta
     nil: the implementation already checks every occurrence, and
     the vectors and the new invariant prove it.
+20. **The self assert family.** RATIFIED (decisions by Evan,
+    2026-08-08). Five conditions asserting equality against the
+    spending input's own prevout data, opcodes 0x30 to 0x33 and
+    0x37, the first occupants of validation stage 2, enforcing
+    through rule 2's assert clause with no VALIDATION.md change.
+    Design session held in chat after an oracle research pass
+    (probe provenance in section 2). Sub-decisions:
+    - Separate opcodes, not a specifier-mode encoding. A
+      mode-based draft reusing rule 3's commitment grammar was
+      considered and dropped: for asserts every field combination
+      decomposes into separate single-field conditions, so
+      combination modes would be redundant re-encodings of the
+      same fact, where the message family's mode halves are
+      irreducible parts of the matching key. Deployed Chia draws
+      the same line, separate ASSERT_MY_* opcodes beside
+      CHIP-0025's mode-based messages, so the readable choice is
+      also the match-Chialisp one. Splitting the message pair
+      into per-combination opcodes for uniformity was considered
+      and declined, preserving the key semantics would take 128
+      opcodes, 64 sender-receiver combinations per direction.
+    - Offset numbering, 0x30 plus k for Chia's 70 plus k.
+      Identity continuity is impossible: Chia's 70 to 73 are hex
+      0x46 to 0x49, inside the message family's block. 0x34 to
+      0x36 stay invalid as the visible gap for the three declined
+      conditions, in Chia's own order, and ASSERT_MY_TAPROOT
+      takes 0x37, Chia's unused 77.
+    - Field substitutions inherited from decision 16: coin id to
+      outpoint, parent id to creating txid, puzzle hash to spent
+      scriptPubKey, amount unchanged. ASSERT_MY_TXID asserts a
+      strict subset of ASSERT_MY_OUTPOINT, deliberately: in Chia
+      the parent id is not recoverable from the hashed coin id,
+      here the txid is a visible prefix of the outpoint, and the
+      pair is kept for schema completeness with the redundancy
+      recorded rather than discovered. The spec entry states the
+      subset relation so no reader mistakes it for a distinct
+      fact.
+    - Birth asserts declined, the C13 row records the research
+      and the BIP 68 substitute. The single-valued-fact pattern
+      they carry in Chia stays out per decision 19: every fact a
+      v0 assert reads is in the validator's hands.
+    - ASSERT_EPHEMERAL declined as structurally inexpressible,
+      the C14 row records the reasoning and the package-level
+      reintroduction trigger.
+    - ASSERT_MY_TAPROOT adopted, closing the Phase 2 flag
+      (self-construction verification cannot be a VM op in a pure
+      VM). The assert-side mirror of CREATE_OUTPUT_TAPROOT's
+      derivation (D-CC2), compared against the spent scriptPubKey
+      instead of claiming an output slot. It is the covenant
+      primitive for self-propagation: a program pins the internal
+      key, takes the merkle root from its witness arguments,
+      proves its own construction with the assert, and recreates
+      itself with CREATE_OUTPUT_TAPROOT from the same operands.
+      Without it the raw scriptPubKey assert hands the program 34
+      opaque bytes and a lying witness breaks the covenant chain
+      at the first hop.
+    - The quantum consideration, raised by Evan in the design
+      chat against the public conversations about disabling
+      taproot key-path spends. The condition verifies
+      construction by a deterministic tweak equation, not
+      spendability, and carries no signature, so no quantum
+      scenario falsifies it. The explicit internal-key operand
+      lets a program prove in-band that its key path is
+      classically unspendable by pinning a NUMS point, a property
+      a raw scriptPubKey assert cannot express. That protection
+      is classical only, a correction from the five-agent review
+      to the design chat's stronger framing: the tweaked output
+      key is exposed in the scriptPubKey, and a quantum adversary
+      computes its discrete log directly without ever needing the
+      internal key, which is exactly why the public
+      disable-key-path proposals are consensus rules rather than
+      program-level commitments. A NUMS-only variant
+      with the internal key fixed in the spec was considered and
+      declined: the general form subsumes it, forcing it would
+      kill cooperative key-path designs, and the safety
+      preference belongs in authoring-tool defaults, the decision
+      15 precedent for Todd's height-only position. A future
+      quantum-resistant output type is covered unstructured by
+      CREATE_OUTPUT and ASSERT_MY_SCRIPTPUBKEY from day one.
+      Structured entries for it land in the family blocks while
+      v0 is still pre-deployment, and only through the reserved
+      tier after deployment: in-family gaps are invalid, not
+      reserved, so assigning one post-deployment would loosen
+      validity, the direction a soft fork cannot take.
+    - Errors grouped by the field read, three codes for five
+      conditions (outpoint, scriptPubKey, amount), mirroring
+      decision 15's two-error precedent for the time asserts and
+      chosen over Chia's per-condition codes.
+    - The decision 12 stability classification extends to the
+      family by reusing rule 3's normative table: amount,
+      scriptPubKey, and the taproot assert are content-committed
+      and stable, txid and outpoint are location-committed and
+      not. The register's seventh entry still waits on the
+      signature design, the other half of the identity work.
+    Rule 4's sort binding covers the family with no new text:
+    self asserts are idempotent within their carrying input.
 
 ## 4. Novel-layer register
 
@@ -784,7 +900,7 @@ for an oracle, per ground rule 4:
 | rule | status | oracle substitute |
 | --- | --- | --- |
 | 1. Injective multiset output matching | normative | hypothesis invariant suite (injectivity, reorder invariance, monotonicity, metamorphic mutations) plus the adversarial corpus in `vectors/validation/`, opening with the duplicate-CREATE_COIN theft vector |
-| 2. Mixed-transaction rule | normative | `vectors/validation/mixed-transaction.json`: five acceptance vectors (mixed, plain-only, unclaimed slots, merge, surplus capture) and one rule 1 boundary rejection, plus the addition-monotonicity, merge, and plain-only invariants. The time assert family checks under this rule's assert clause: `vectors/validation/time-asserts.json` with BIP 65 and BIP 68 field semantics as the double reference, plus the operand-monotonicity and boundary-flip invariants |
+| 2. Mixed-transaction rule | normative | `vectors/validation/mixed-transaction.json`: five acceptance vectors (mixed, plain-only, unclaimed slots, merge, surplus capture) and one rule 1 boundary rejection, plus the addition-monotonicity, merge, and plain-only invariants. The time assert family checks under this rule's assert clause: `vectors/validation/time-asserts.json` with BIP 65 and BIP 68 field semantics as the double reference, plus the operand-monotonicity and boundary-flip invariants. The self assert family checks under the same clause: `vectors/validation/self-asserts.json` with the probe corpus translated to prevout equality cases, the BIP341 tweak derivation shared with CREATE_OUTPUT_TAPROOT as the taproot assert's oracle, plus the outpoint-implies-txid and recombination-invariance invariants |
 | 3. Message scoping | normative | `vectors/validation/messages.json` and `vectors/validation/announcements.json`: the probe corpus translated from the chia_rs oracle (balance, multiplicity, mode-key, self-send, order cases) plus adversarial wrong-address and forgery cases, and the balanced-pair, announcement-monotonicity, and byte-flip invariants |
 | 4. Duplicates and multiplicity | normative | `vectors/validation/duplicates.json`: the strictest-wins oracle tests translated to identical and differing time asserts within one input, identical asserts across two and three inputs including the diverging final-sequence counterexample, ANNOUNCE duplication within an input and copies across inputs including the new-fact flip, duplicated announcement asserts at loose and script commitments, and duplicated reserved conditions on both sides of the cost floor, plus the in-place duplication-invariance invariant. The counted-sort boundaries stay pinned where they landed: duplicate claims in `vectors/validation/create-output.json`, duplicate message halves in `vectors/validation/messages.json`. Chia's remaining dedup tests are mempool spend-dedup machinery, declined in decision 19 |
 | 5. Per-condition costing | pending | CHIP-0049 precedent comparison plus cost-conservation properties |
