@@ -30,6 +30,10 @@ Section 4 registers the rules that have no external reference at all.
 | C13 | birth asserts | ASSERT_MY_BIRTH_HEIGHT and ASSERT_MY_BIRTH_SECONDS, two-phase: differing occurrences must-equal at parse, then exact equality against the coin record's confirmation height and timestamp at the node layer | declined | Checking them reads when the prevout confirmed, the chain read the decision 15 shape excludes, and no base-consensus field enforces exact birth (BIP 68 enforces minimum age, the monotone form the sequence asserts already carry). Usage research 2026-08-08: added by CHIP-0014 with no standalone stated motivation, and a GitHub-wide search found only definitional hits, no deployed first-party puzzle emits them. Their one systemic role in Chia, anchoring the relative-before windows, is played at base consensus by BIP 68 here. A chain-read assert stays addable through the reserved tier, the reverse migration cannot happen. Ratified 2026-08-08, decision 20. | `conditions/self-asserts.json` gap cases pin 0x34 and 0x35 invalid |
 | C14 | ephemeral assert | ASSERT_EPHEMERAL, the coin was created in the same block it is spent in, plus a companion rule forbidding relative timelocks and birth asserts on ephemeral spends | declined, structurally inexpressible | A Bitcoin transaction cannot spend its own outputs (an input would need the txid of a transaction whose txid depends on that input), and validation scope is one transaction, so the asserted fact is always false. The companion interlock is also moot: BIP 68 anchors relative locks at prevout confirmation at base consensus. Reintroduction trigger recorded: package-level validation, if it ever exists, makes the fact expressible again through the reserved tier. Ratified 2026-08-08, decision 20. | `conditions/self-asserts.json` gap cases pin 0x36 invalid |
 | C15 | RESERVE_FEE operand domain | any canonical uint below 2^64, an operand exceeding the achievable fee is well-formed and fails the fee comparison | 0 to MAX_MONEY, larger operands rejected at parse | The landed amount-operand convention (CREATE_OUTPUT, ASSERT_MY_AMOUNT). An operand above MAX_MONEY exceeds every possible fee, so the only observable difference is the error surface: `bad_condition_arg` at stage 1 instead of `insufficient_fee` at stage 4. Chia's checked-sum overflow error is likewise subsumed: with exact arithmetic the oversized sum simply fails the comparison. The hardened implementation must reproduce this with a wide or checked accumulator: a wrapping 64-bit sum would turn an unreachable demand satisfiable, the accept-invalid direction. Ratified 2026-08-09, decision 21. | `conditions/reserve-fee.json` domain cases |
+| C16 | signature carrier | eight AGG_SIG conditions carry (pubkey, message), one aggregated BLS12-381 signature at the spend-bundle level satisfies every pair through a single aggregate verification | each condition carries its own 64-byte BIP340 signature as a third operand and verifies as a self-contained triple | secp256k1 has no deployed aggregation, so per-pair signatures are forced and only their location was open. The taproot annex was considered and declined: a contested namespace BitLisp does not own, annex-bearing transactions are non-standard under today's relay policy, and our leaf version already owns its witness (reintroduction trigger: a ratified upstream annex format plus relay). An external per-input signature list was declined for its positional pairing convention, a silent-failure surface the triple avoids. Ratified 2026-08-09, decision 23. | `validation/signature-asserts.json` |
+| C17 | signature digest construction | final message = program message ++ binding data ++ 32-byte suffix, ME's suffix the genesis challenge verbatim, the six variant suffixes derived sha256(genesis challenge ++ opcode byte), UNSAFE suffixless, variable-length concatenation | digest = BIP340 tagged hash, one ASCII tag per variant, fixed-length binding fields before the message | Byte compatibility is already impossible under the curve substitution, so only semantic parity binds, and what each variant commits to is preserved. Chia's concatenation is non-injective, probe-found during the research pass: an AGG_SIG_AMOUNT signature for amount 128 also verifies for a zero-amount coin with the amount encoding absorbed into the message, because amount 0 encodes as zero bytes. Fixed-length fields under per-variant tags make the ambiguity class inexpressible, in the deployed Bitcoin idiom. Ratified 2026-08-09, decision 23. | `validation/signature-asserts.json` binding cases |
+| C18 | raw-mode replay firewall | AGG_SIG_UNSAFE messages of 32 or more bytes may not end with any of the seven domain suffixes, a consensus rule in every regime | no firewall | The firewall patches the seam of suffix-at-the-end domain separation: a raw message could otherwise imitate a suffixed one. Under per-variant tagged hashes the raw digest and every bound digest live in disjoint domains by construction, so the rule has nothing to guard. A consensus rule deleted rather than ported. Ratified 2026-08-09, decision 23. | `validation/signature-asserts.json` raw cases |
+| C19 | duplicate signature conditions | counted: every occurrence is charged and pushed, and the aggregate signature must include a duplicated (pk, msg) pair exactly as many times as it occurs (probe P9: aggregated once fails, aggregated twice passes) | idempotent facts under rule 4's assert classification: identical triples in one input hold or fail together | Chia's counted semantics is BLS aggregate arithmetic, not design intent: the pairing equation happens to demand each pushed pair. A self-contained triple verifies or it does not, and occurrence count carries no meaning, which is rule 4's assert commitment. Cost stays per occurrence under rule 5's accounting, matching Chia's parse-time charging. Ratified 2026-08-09, decision 23. | `validation/duplicates.json` signature cases |
 
 ## 2. Reference provenance
 
@@ -157,6 +161,34 @@ Section 4 registers the rules that have no external reference at all.
   this always-mempool-strict entry point, with consensus
   leniency established by the source read alone, the C10
   divergence area.
+- **Signature-condition semantics (verified 2026-08-09).** Pinned
+  against the deployed binary for the signature assert design by
+  probes of chia_rs `get_conditions_from_spendbundle` and
+  `validate_clvm_and_signature`, the entry point that runs the
+  real aggregate verification, all confirming a source read of
+  `conditions.rs`, `make_aggsig_final_message.rs`, and
+  `spendbundle_validation.rs` at the pinned wheel's 0.46.0 tag.
+  The per-variant final message construction was confirmed end to
+  end for all eight opcodes: the predicted message was signed and
+  the aggregate accepted it, and a wrong-construction signature
+  failed. Final message = program message ++ binding data ++
+  32-byte suffix, ME's suffix the genesis challenge verbatim and
+  each variant's derived sha256(challenge ++ opcode byte),
+  verified against all six mainnet constants. Amount binding uses
+  the canonical minimal int encoding, empty for zero, verified at
+  0, 127, 128, and 2^63, which is the C17 injectivity wart.
+  Pubkey operand exactly 48 bytes then point-validated with
+  infinity rejected, message capped at 1024 by the announcement
+  sanitizer, the UNSAFE tail firewall enforced in every regime
+  with exact-tail matching only. Duplicate pairs counted at the
+  signature layer (aggregated once fails, twice passes),
+  reconfirming the rule 4 pass's P9 probe at the verifying entry
+  point. AGG_SIG_COST is 1,200,000 per occurrence charged
+  unconditionally in both regimes, the per-condition delta
+  isolated by probe pre-fork and post-fork, so CHIP-0049 left
+  AGG_SIG pricing untouched, a rule 5 input. Mempool prior art:
+  any signature condition kills dedup eligibility, and the ME and
+  parent-binding variants kill fast-forward eligibility.
 - **BIP341 wallet test vectors** are vendored as data into
   `vectors/upstream/bip341/` with a provenance sibling, and are the
   primary tweak-derivation oracle for CREATE_OUTPUT_TAPROOT. The
@@ -1031,6 +1063,130 @@ Section 4 registers the rules that have no external reference at all.
     independently, outside the consensus contract. This closes
     the precedence flag as unpinned by design.
 
+23. **The signature assert family.** RATIFIED (decisions by Evan,
+    2026-08-09, designed in one chat session after the oracle
+    research pass, each item steelmanned with a stated confidence
+    before ratification). Seven parts:
+    - Scheme and carrier. BIP340 Schnorr over secp256k1, 32-byte
+      x-only keys, 64-byte signatures, the VM's one scheme (D2 in
+      `docs/vm-record.md` demands one curve and one scheme in the
+      consensus core, and its rationale pre-registered condition
+      layer batchability). BLS-style aggregation does not exist
+      deployed on secp256k1, so each declared pair needs its own
+      signature, a question Chia's bundle-level aggregate never
+      faced. The signature rides as the condition's third
+      operand: self-contained triples, no positional pairing
+      convention, no witness-format change. The taproot annex
+      and an external per-input signature section were considered
+      and declined, C16 records both rationales. MuSig2 key
+      aggregation survives the choice untouched: n signers can
+      appear as one key and one signature above this layer.
+    - Digest shape. Program-composed messages, matching deployed
+      Chia and the program-composed shape the execution plan's
+      vocabulary item recorded from the start, with the
+      consensus-appended binding data per variant. The
+      alternative, a consensus-composed digest hashing the
+      input's own emitted conditions into every signature in the
+      sighash style, was steelmanned and declined: program
+      composition strictly contains it (a program can compose its
+      message as a conditions commitment, the delegated-program
+      idiom, and Phase 3 tooling makes that the default), the
+      forced form cannot be composed away by protocols that need
+      partial commitments (the CHIP-0011 retrofit is the recorded
+      evidence such protocols exist), and the reversibility
+      asymmetry that decided the timelock shape and the birth
+      asserts applies verbatim: a conditions-hash variant stays
+      addable through the reserved tier, pre-registered here as
+      the reintroduction path. The cost is real and recorded: the
+      fixed-message rewrite footgun (a signature over bytes that
+      commit to nothing lets an interceptor rewrite the spend's
+      effects) moves from inexpressible to tooling-prevented.
+      Evan ratified this item on my recommendation with the
+      compensating control ratified alongside: the footgun gets
+      dedicated adversarial regression vectors and the PR review
+      guide leads with that attack.
+    - Domain separation. BIP340 tagged hashes, one ASCII tag per
+      variant, fixed-length binding fields ahead of the
+      variable-length message. C17 records the injectivity wart
+      in Chia's suffix construction that the probes surfaced, and
+      C18 records the firewall this construction deletes.
+    - The menu and its names. All eight variants adopted, the
+      full CHIP-0011 geometry: launching trimmed and hard-forking
+      the rest in is the recorded evidence a menu declined is a
+      menu retrofitted. Field substitutions follow decision 16's
+      specifier table: parent id to creating txid, puzzle hash to
+      spent scriptPubKey, coin id to outpoint, amount to amount.
+      Stability classes carry over from the rule 3 table:
+      scriptPubKey and amount bindings knowable at authoring
+      time, txid and outpoint bindings existing only once the
+      creating transaction is final, closing decision 12's
+      register obligation for the signature design. Names: my
+      CHECKSIG_* draft was revised mid-chat by the decision 18
+      precedent, OP_CHECKSIG imports the sighash expectation that
+      a signature commits to the transaction's effects, exactly
+      the guarantee this design deliberately does not provide,
+      and familiarity that misleads loses to precision. Evan then
+      caught the remaining ambiguity in spec review: bare
+      ASSERT_SIG_TXID does not say whose txid, and the spending
+      transaction's own txid is both the sighash reader's
+      assumption and the coming seal operand. The bound variants
+      therefore adopt the self-assert MY convention,
+      ASSERT_SIG_MY_*, with ASSERT_SIG_RAW keeping no MY because
+      it binds nothing about its input, an asymmetry that is
+      itself informative. Opcodes 0x10 to 0x17 in the landed
+      signatures block, offset continuity 0x10+k with Chia 43+k
+      in Chia's own order, after my 0x60 chat proposal collided
+      with the landed block table, the numbering-correction
+      pattern of decision 20 repeating.
+    - ASSERT_SIG_RAW adopted. The in-VM `secp_verify` covers raw
+      verification functionally, so the condition is not needed
+      for expressiveness, and Chia ships both layers anyway
+      because they complement: the VM op is eager, serial, and
+      branchable (its result steers program logic), the
+      condition is deferred, batched at stage 5, and
+      all-or-nothing. Batch verification of n Schnorr signatures
+      approaches half the cost of n serial checks, which is what
+      consensus validity wants and a branching program cannot
+      use. Rule 8's guidance paragraph states the replay
+      property bluntly: RAW imports attestations, it does not
+      authorize spends.
+    - Composition and the merge analysis. Every variant binds
+      prevout facts or program-chosen bytes, all fixed before any
+      transaction exists, so every signature survives
+      concatenation and the composition guarantee needs no
+      relaxation, the direct payoff of decision 12's
+      bind-to-prevout-data discipline. A whole-transaction
+      binding variant is declined as merge-poison, the
+      ASSERT_FEE_LE precedent in signature shape. The MEV
+      analysis from the design chat is recorded here as
+      rationale: transaction merging hands miners no value
+      beyond the fee already theirs (redirecting overpaid fee
+      into a grafted output is pocket-to-pocket relabeling, with
+      two footnotes, coinbase maturity and fee-statistics
+      legibility), third-party fee skimming is self-defeating in
+      open relay (the skim lowers the fee on more bytes, so the
+      original outbids it, leaving eclipse-class attacks as the
+      residual), and the genuine costs are wallet fee discipline
+      (reserve exactly what you pay, decision 21's surplus
+      fact) and in-flight txid malleability, recorded in the
+      evaluation doc's aggregation qualification and answered at
+      consensus by the seal family below.
+    - Sequencing and the seal. Ratified in the same chat, raised
+      by Evan's challenge that senders need mempool immutability
+      once they sign: a seal family, SEAL pinning the spending
+      transaction's own txid and SEAL_OUTPUTS pinning the BIP341
+      outputs hash, lands as its own unit after this one and
+      before rule 5, so costing prices the complete vocabulary.
+      Its full design record, including the option steelmen
+      (exact counts fail on output order, the BIP341 pair alone
+      fails on the version, locktime, and sequence fields, a
+      sealed signature variant fails keyless coins), the
+      composition guarantee's second scoping, and the decision
+      21 amendment its adoption entails, lands with that unit.
+      Two PRs, not one: neither unit is trivially small, and the
+      seal amends the guarantee paragraph that requires its own
+      recorded decision.
+
 ## 4. Novel-layer register
 
 The validation rules have no external reference: no deployed system
@@ -1042,15 +1198,20 @@ for an oracle, per ground rule 4:
 | 1. Injective multiset output matching | normative | hypothesis invariant suite (injectivity, reorder invariance, monotonicity, metamorphic mutations) plus the adversarial corpus in `vectors/validation/`, opening with the duplicate-CREATE_COIN theft vector |
 | 2. Mixed-transaction rule | normative | `vectors/validation/mixed-transaction.json`: five acceptance vectors (mixed, plain-only, unclaimed slots, merge, surplus capture) and one rule 1 boundary rejection, plus the addition-monotonicity, merge, and plain-only invariants. The time assert family checks under this rule's assert clause: `vectors/validation/time-asserts.json` with BIP 65 and BIP 68 field semantics as the double reference, plus the operand-monotonicity and boundary-flip invariants. The self assert family checks under the same clause: `vectors/validation/self-asserts.json` with the probe corpus translated to prevout equality cases, the BIP341 tweak derivation shared with CREATE_OUTPUT_TAPROOT as the taproot assert's oracle, plus the outpoint-implies-txid and recombination-invariance invariants |
 | 3. Message scoping | normative | `vectors/validation/messages.json` and `vectors/validation/announcements.json`: the probe corpus translated from the chia_rs oracle (balance, multiplicity, mode-key, self-send, order cases) plus adversarial wrong-address and forgery cases, and the balanced-pair, announcement-monotonicity, and byte-flip invariants |
-| 4. Duplicates and multiplicity | normative | `vectors/validation/duplicates.json`: the strictest-wins oracle tests translated to identical and differing time asserts within one input, identical asserts across two and three inputs including the diverging final-sequence counterexample, ANNOUNCE duplication within an input and copies across inputs including the new-fact flip, duplicated announcement asserts at loose and script commitments, and duplicated reserved conditions on both sides of the cost floor, plus the in-place duplication-invariance invariant. The counted-sort boundaries stay pinned where they landed: duplicate claims in `vectors/validation/create-output.json`, duplicate message halves in `vectors/validation/messages.json`. Chia's remaining dedup tests are mempool spend-dedup machinery, declined in decision 19 |
+| 4. Duplicates and multiplicity | normative | `vectors/validation/duplicates.json`: the strictest-wins oracle tests translated to identical and differing time asserts within one input, identical asserts across two and three inputs including the diverging final-sequence counterexample, ANNOUNCE duplication within an input and copies across inputs including the new-fact flip, duplicated announcement asserts at loose and script commitments, and duplicated reserved conditions on both sides of the cost floor, plus the identical-signature-triple and copied-triple-across-inputs cases from the signature assert unit, plus the in-place duplication-invariance invariant. The counted-sort boundaries stay pinned where they landed: duplicate claims in `vectors/validation/create-output.json`, duplicate message halves in `vectors/validation/messages.json`. Chia's remaining dedup tests are mempool spend-dedup machinery, declined in decision 19 |
 | 5. Per-condition costing | pending | CHIP-0049 precedent comparison plus cost-conservation properties |
 | 6. Reserved conditions | normative | encoding vectors in `vectors/conditions/`, every error path pinned |
 | 7. The fee reserve | normative | `vectors/validation/reserve-fee.json`: the probe corpus translated from the chia_rs oracle (within-spend and cross-input accumulation, boundary equality, one-short rejection, zero reserve, a reserve stack no fee can reach) plus the fee-theft grafted-output regression vector, the surplus-capture acceptance vector pinning what the reserve does not protect, the above-2^32 and off-boundary separating cases from the review's mutation pass, and the operand-monotonicity, split, and boundary invariants |
+| 8. Signature asserts | normative | `vectors/validation/signature-asserts.json`: satisfied and failing triples for every variant with signatures produced by the vendored Bitcoin Core framework signer (the recorded `secp_verify` signing oracle), the fixed-message rewrite regression pair pinning the decision 23 footgun, variant-separation cases pinning txid against outpoint, raw against bound in both directions, and each single-field variant against the two-field variant extending it (exhaustive pair separation lives in the hypothesis invariant), raw-mode replay acceptance pinning what RAW does not protect, plus the own-data-only, operand byte-flip, and variant-separation invariants. The BIP340 official vectors bind the verification relation itself through the shared `secp_verify` implementation |
 
-Decision 12 adds one more entry to this register when the identity
-and signature designs land: the recombination-stability
-classification, whose adversarial surface is recombination of valid
-spends into transactions their authors never assembled. No deployed
+Decision 12's register obligation is closed as of decision 23: the
+recombination-stability classification now covers every landed
+binding surface, the rule 3 specifier table for messages and
+announcements, the self assert family preamble, and the signature
+assert family preamble, each stating the same two classes over the
+same prevout fields. Its adversarial surface, recombination of
+valid spends into transactions their authors never assembled, is
+exercised by the merge invariants and the recombination vectors of
+those families, rather than translated tests, because no deployed
 system exercises that surface at scale (the aggregation reality
-check in section 11.2 of the evaluation doc), so it gets invariants
-and adversarial recombination vectors rather than translated tests.
+check in section 11.2 of the evaluation doc).

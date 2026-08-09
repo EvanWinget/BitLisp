@@ -21,6 +21,15 @@ different transaction can change an outcome. The taproot assert's
 scriptPubKey is derived at parse, so here it compares like the
 plain script assert.
 
+Rule 8, the signature asserts, check under the same clause and
+read the same own-prevout data as the self asserts, plus their own
+operands. Each is a self-contained (pubkey, digest, signature)
+triple under BIP340, with the digest a tagged hash of the
+variant's binding fields then the program's message. Verification
+runs last: it is the costly check, and ordering it after every
+other rule means it runs only on transactions the rest of the
+validator accepts.
+
 Rule 3, message scoping: the addressed pair contributes signed
 weights to a per-transaction ledger keyed by (sender specifier,
 receiver specifier, message), and every key must net to zero.
@@ -33,10 +42,13 @@ constrains nothing. Both checks stay counting problems like rule
 once per commitment value in use before the asserts run.
 """
 
+import hashlib
 from collections import Counter
 
+from . import secp256k1
 from .conditions import (
     LOCKTIME_THRESHOLD,
+    SIG_BINDINGS,
     SPECIFIER_OPERANDS,
     Announce,
     AssertAnnouncement,
@@ -49,6 +61,7 @@ from .conditions import (
     AssertMyTxid,
     AssertSequenceHeight,
     AssertSequenceTime,
+    AssertSig,
     CreateOutput,
     CreateOutputTaproot,
     ReceiveMessage,
@@ -289,6 +302,50 @@ def check_announcements(tx):
                 )
 
 
+_SIG_TAG_HASHES = {
+    opcode: hashlib.sha256(tag.encode("ascii")).digest()
+    for opcode, (_, tag, _) in SIG_BINDINGS.items()
+}
+
+
+def _sig_digest(cond, tx_input):
+    """The tagged-hash digest a signature assert verifies against:
+    sha256(sha256(tag) || sha256(tag) || binding fields || message),
+    the fields fixed-length ahead of the variable-length message."""
+    tag_hash = _SIG_TAG_HASHES[cond.opcode]
+    data = bytearray(tag_hash + tag_hash)
+    for kind in SIG_BINDINGS[cond.opcode][2]:
+        if kind == "txid":
+            data += tx_input.txid
+        elif kind == "spk_hash":
+            data += hashlib.sha256(tx_input.script_pubkey).digest()
+        elif kind == "amount8":
+            data += tx_input.amount.to_bytes(8, "little")
+        elif kind == "outpoint":
+            data += tx_input.txid + tx_input.index.to_bytes(4, "little")
+        else:
+            raise AssertionError(f"unknown binding field {kind!r}")
+    data += cond.message
+    return hashlib.sha256(data).digest()
+
+
+def check_signature_asserts(tx):
+    """Rule 8. Every signature assert's triple must verify under
+    BIP340 against its variant's digest. A pubkey that lifts to no
+    curve point fails verification here, never parse: the operand
+    was shape-legal and the signature simply does not verify."""
+    for tx_input in tx.inputs:
+        for cond in tx_input.conditions or ():
+            if isinstance(cond, AssertSig) and not secp256k1.verify(
+                cond.pubkey, _sig_digest(cond, tx_input), cond.signature
+            ):
+                raise BitLispError(
+                    "unsatisfied_sig_assert",
+                    f"{cond.name} signature does not verify for pubkey "
+                    f"{cond.pubkey.hex()}",
+                )
+
+
 def check_fee_reserve(tx):
     """Rule 7. The fee, inputs minus outputs, must be at least the
     exact sum of every fee reserve of every BitLisp input. Reserves
@@ -311,10 +368,11 @@ def check_fee_reserve(tx):
 
 def validate_transaction(tx):
     """Every validation rule that has landed so far, stage 2 work
-    before stage 4."""
+    before stage 4, signature verification last (stage 5)."""
     check_self_asserts(tx)
     check_output_claims(tx)
     check_time_asserts(tx)
     check_messages(tx)
     check_announcements(tx)
     check_fee_reserve(tx)
+    check_signature_asserts(tx)

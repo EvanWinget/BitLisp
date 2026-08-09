@@ -6,7 +6,7 @@ compares the two validation layers. It is the condition-layer companion
 to [opcode-comparison.md](opcode-comparison.md). The BitLisp columns
 restate [spec/CONDITIONS.md](../spec/CONDITIONS.md) and
 [spec/VALIDATION.md](../spec/VALIDATION.md), which are the normative
-sources. Divergence ids (C1 to C15) and decision ids (D-CC2) refer to
+sources. Divergence ids (C1 to C19) and decision ids (D-CC2) refer to
 [condition-record.md](condition-record.md).
 
 There is no bllsh column. bllsh has no condition layer at all: its
@@ -60,13 +60,15 @@ to encapsulate. The nearest relative anywhere is bllsh's
 
 | Capability | Chia | BitLisp |
 | --- | --- | --- |
-| signature asserts | `AGG_SIG_ME` 50, `AGG_SIG_UNSAFE` 49, and six spend-binding variants 43 to 48 (parent, puzzle, amount combinations), BLS12-381 aggregated, message suffixed with the committed spend fields and a domain separator | planned, a secp AGG_SIG family with program-composed messages, membership and count open |
+| signature asserts | `AGG_SIG_ME` 50, `AGG_SIG_UNSAFE` 49, and six spend-binding variants 43 to 48 (parent, puzzle, amount combinations), BLS12-381 aggregated, message suffixed with the committed spend fields and a domain separator | landed, the signature assert family at `0x10` to `0x17` in Chia's opcode order: `ASSERT_SIG_MY_*` over the same binding menu re-addressed to prevout fields plus `ASSERT_SIG_RAW`, per-condition BIP340 triples with tagged-hash digests (decision 23, divergences C16 to C19) |
 
 The signature scheme divergence is inherited from the VM layer:
 BitLisp declined the BLS family and verifies BIP340 Schnorr over
 secp256k1 (divergences D1 and D2 in `docs/vm-record.md`). Chia
-composes each variant's message by appending fixed spend fields.
-The BitLisp family's message-composition design is the open item.
+composes each variant's message by appending fixed spend fields
+and a suffix. BitLisp landed the program-composed message under a
+per-variant tagged-hash digest with fixed-length binding fields
+(decision 23 and divergence C17 in `docs/condition-record.md`).
 
 ## Time asserts
 
@@ -194,15 +196,16 @@ specs of the same shape.
 
 ## Observations
 
-- **Where Phase 2 stands.** Sixteen vocabulary entries are
-  normative: `CREATE_OUTPUT`, `CREATE_OUTPUT_TAPROOT`, the four
-  time asserts, the five self asserts (decision 20), the message
-  family (`SEND_MESSAGE`, `RECEIVE_MESSAGE`, `ANNOUNCE`,
+- **Where Phase 2 stands.** Twenty-four vocabulary entries are
+  normative: `CREATE_OUTPUT`, `CREATE_OUTPUT_TAPROOT`, the eight
+  signature asserts (decision 23), the four time asserts, the
+  five self asserts (decision 20), the message family
+  (`SEND_MESSAGE`, `RECEIVE_MESSAGE`, `ANNOUNCE`,
   `ASSERT_ANNOUNCEMENT`), and `RESERVE_FEE` (decision 21). One
-  family is planned with membership open, the secp AGG_SIG
-  family. Of the seven validation rules, 1, 2, 3, 4, 6, and 7 are
-  normative and 5 is pending, deliberately last so costing prices
-  the complete vocabulary.
+  family is planned, the seal pair ratified 2026-08-09. Of the
+  eight validation rules, 1, 2, 3, 4, 6, 7, and 8 are normative
+  and 5 is pending, deliberately last so costing prices the
+  complete vocabulary.
 - **Reference coverage is uneven by design.** The ported entries
   (timelocks, messages, `RESERVE_FEE`, the AGG_SIG and `ASSERT_MY_*`
   shapes) have deployed Chia semantics to translate tests from. The
@@ -218,11 +221,10 @@ specs of the same shape.
   have to be individually declined, the architecture excludes them.
   Widening the view is the structural decision any future port of
   them would have to make first.
-- **Chia's vocabulary is larger, 35 assigned opcodes against a v0
-  plan in the teens.** The gap is mostly the six spend-binding
-  AGG_SIG variants, the four announcements (whose transaction-scoped
-  broadcast counterpart is now planned, decision 10), the four
-  before-style asserts, and the chain-state family above. The
+- **Chia's vocabulary is larger, 35 assigned opcodes against
+  BitLisp's 24.** The remaining gap is the four before-style
+  asserts, the chain-state family above, and the announcement
+  flavors BitLisp folds into two conditions (decision 16). The
   curation direction matches the VM layer: keep the deployed
   semantics where the model fits, shrink where Bitcoin's transaction
   model already provides the guarantee, and route everything

@@ -23,6 +23,14 @@ RESERVED_COST_FLOOR = 500
 
 CREATE_OUTPUT = 0x01
 CREATE_OUTPUT_TAPROOT = 0x02
+ASSERT_SIG_MY_TXID = 0x10
+ASSERT_SIG_MY_SCRIPTPUBKEY = 0x11
+ASSERT_SIG_MY_AMOUNT = 0x12
+ASSERT_SIG_MY_SCRIPTPUBKEY_AMOUNT = 0x13
+ASSERT_SIG_MY_TXID_AMOUNT = 0x14
+ASSERT_SIG_MY_TXID_SCRIPTPUBKEY = 0x15
+ASSERT_SIG_RAW = 0x16
+ASSERT_SIG_MY_OUTPOINT = 0x17
 ASSERT_LOCKTIME_HEIGHT = 0x20
 ASSERT_LOCKTIME_TIME = 0x21
 ASSERT_SEQUENCE_HEIGHT = 0x22
@@ -41,6 +49,58 @@ _RESERVED_START = 0x80
 
 MAX_MESSAGE_SIZE = 1024
 OUTPOINT_SIZE = 36
+SIG_PUBKEY_SIZE = 32
+SIG_SIGNATURE_SIZE = 64
+
+# Each signature assert's name, digest tag, and binding fields. The
+# digest is tagged_hash(tag, binding fields || message) with every
+# binding field fixed-length before the variable-length message, so
+# equal digests imply equal fields and equal messages. RAW binds
+# nothing: its digest commits to the message alone, under its own
+# tag, which is what keeps a RAW triple and a bound triple in
+# disjoint domains with no further rule.
+SIG_BINDINGS = {
+    ASSERT_SIG_MY_TXID: (
+        "ASSERT_SIG_MY_TXID",
+        "BitLisp/sig/my_txid",
+        ("txid",),
+    ),
+    ASSERT_SIG_MY_SCRIPTPUBKEY: (
+        "ASSERT_SIG_MY_SCRIPTPUBKEY",
+        "BitLisp/sig/my_scriptpubkey",
+        ("spk_hash",),
+    ),
+    ASSERT_SIG_MY_AMOUNT: (
+        "ASSERT_SIG_MY_AMOUNT",
+        "BitLisp/sig/my_amount",
+        ("amount8",),
+    ),
+    ASSERT_SIG_MY_SCRIPTPUBKEY_AMOUNT: (
+        "ASSERT_SIG_MY_SCRIPTPUBKEY_AMOUNT",
+        "BitLisp/sig/my_scriptpubkey_amount",
+        ("spk_hash", "amount8"),
+    ),
+    ASSERT_SIG_MY_TXID_AMOUNT: (
+        "ASSERT_SIG_MY_TXID_AMOUNT",
+        "BitLisp/sig/my_txid_amount",
+        ("txid", "amount8"),
+    ),
+    ASSERT_SIG_MY_TXID_SCRIPTPUBKEY: (
+        "ASSERT_SIG_MY_TXID_SCRIPTPUBKEY",
+        "BitLisp/sig/my_txid_scriptpubkey",
+        ("txid", "spk_hash"),
+    ),
+    ASSERT_SIG_RAW: (
+        "ASSERT_SIG_RAW",
+        "BitLisp/sig/raw",
+        (),
+    ),
+    ASSERT_SIG_MY_OUTPOINT: (
+        "ASSERT_SIG_MY_OUTPOINT",
+        "BitLisp/sig/my_outpoint",
+        ("outpoint",),
+    ),
+}
 
 # A participant specifier names an input's prevout data at one of
 # eight precisions. The commitment value's bits select the fields:
@@ -188,6 +248,23 @@ class AssertMyTaproot:
     script_pubkey: bytes
 
     opcode = ASSERT_MY_TAPROOT
+
+
+@dataclass(frozen=True)
+class AssertSig:
+    """Asserts that signature is a valid BIP340 signature by pubkey
+    over the digest of this opcode's tag, binding fields, and
+    message. The binding fields are read from the carrying input at
+    validation, so the parsed condition holds operands only."""
+
+    opcode: int
+    pubkey: bytes
+    message: bytes
+    signature: bytes
+
+    @property
+    def name(self):
+        return SIG_BINDINGS[self.opcode][0]
 
 
 @dataclass(frozen=True)
@@ -424,6 +501,32 @@ def _parse_assert_my_taproot(args):
     return AssertMyTaproot(internal_key, merkle_root, script_pubkey)
 
 
+def _parse_assert_sig(opcode, args):
+    name = SIG_BINDINGS[opcode][0]
+    if len(args) != 3:
+        raise BitLispError(
+            "bad_condition_arity", f"{name} takes 3 arguments, got {len(args)}"
+        )
+    pubkey, message, signature = args
+    if not is_atom(pubkey):
+        raise BitLispError("bad_condition_arg", f"{name} pubkey must be an atom")
+    if len(pubkey) != SIG_PUBKEY_SIZE:
+        raise BitLispError(
+            "bad_condition_arg",
+            f"{name} pubkey must be {SIG_PUBKEY_SIZE} bytes, got {len(pubkey)}",
+        )
+    message = _parse_payload_atom(message, f"{name} message")
+    if not is_atom(signature):
+        raise BitLispError("bad_condition_arg", f"{name} signature must be an atom")
+    if len(signature) != SIG_SIGNATURE_SIZE:
+        raise BitLispError(
+            "bad_condition_arg",
+            f"{name} signature must be {SIG_SIGNATURE_SIZE} bytes, "
+            f"got {len(signature)}",
+        )
+    return AssertSig(opcode, pubkey, message, signature)
+
+
 def _parse_payload_atom(atom, what):
     """A message, namespace, or payload: an atom of 0 to 1024 bytes."""
     if not is_atom(atom):
@@ -593,6 +696,8 @@ def _parse_condition(node):
         return _parse_create_output(args)
     if opcode == CREATE_OUTPUT_TAPROOT:
         return _parse_create_output_taproot(args)
+    if opcode in SIG_BINDINGS:
+        return _parse_assert_sig(opcode, args)
     if opcode == ASSERT_LOCKTIME_HEIGHT:
         return _parse_time_assert(
             args,

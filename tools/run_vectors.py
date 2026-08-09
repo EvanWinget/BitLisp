@@ -149,6 +149,7 @@ def _condition_json(cond):
         AssertMyTxid,
         AssertSequenceHeight,
         AssertSequenceTime,
+        AssertSig,
         CreateOutput,
         CreateOutputTaproot,
         ReceiveMessage,
@@ -178,6 +179,13 @@ def _condition_json(cond):
             "merkle_root": cond.merkle_root.hex(),
             "amount": cond.amount,
             "script_pubkey": cond.script_pubkey.hex(),
+        }
+    if isinstance(cond, AssertSig):
+        return {
+            "opcode": cond.opcode,
+            "pubkey": cond.pubkey.hex(),
+            "message": cond.message.hex(),
+            "signature": cond.signature.hex(),
         }
     if isinstance(cond, AssertMyOutpoint):
         return {"opcode": cond.opcode, "outpoint": cond.outpoint.hex()}
@@ -268,6 +276,10 @@ def run_conditions_case(case):
 
     RESERVE_FEE pins {"opcode", "reserve"} with the reserve as an
     integer.
+
+    The signature asserts pin {"opcode", "pubkey", "message",
+    "signature"}, all three operands hex, the same shape for every
+    family opcode since the variant lives in the opcode.
     """
     from bitlisp import BitLispError, deserialize, parse_conditions
     from bitlisp.errors import CODES
