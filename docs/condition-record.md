@@ -998,6 +998,39 @@ Section 4 registers the rules that have no external reference at all.
       transaction can still break it, which is exactly the
       stage 4 re-check.
 
+22. **Error codes are diagnostic, fail-fast is the contract.**
+    RATIFIED (decision by Evan, 2026-08-09, raised by the fee
+    family review's surviving check-reorder mutant and the
+    cross-rule precedence flag from the self assert PR, settled
+    in chat after a steelman of complete error enumeration). A
+    transaction violating more than one condition-layer rule is
+    invalid under each, and an implementation conforms by
+    rejecting it with any violated rule's code. The corpus pins
+    codes only for transactions violating a single rule, so
+    check order never affects conformance, and the spec states
+    the freedom explicitly in the VALIDATION.md preamble.
+    Complete enumeration was considered and declined on three
+    grounds:
+    - Fail-fast bounds the work an invalid transaction can
+      extract, the denial-of-service property every deployed
+      consensus validator shares. Complete enumeration makes
+      every invalid transaction cost full validation, and rule
+      5's coming budgets want the opposite.
+    - The set of all errors is not well-defined, because
+      failures gate evaluability in the stage frame's dependency
+      order: a spend whose conditions fail stage 1 parsing has
+      no rule 7 question to answer. Defining which rules stay
+      evaluable after which failures would be diagnostic
+      machinery living in consensus text.
+    - Identical-set reporting would widen the
+      cross-implementation conformance surface for zero
+      consensus benefit, against the minimal-surface mindset.
+    Full-enumeration diagnostics are recorded as tooling: the
+    Phase 3 compiler and the Phase 5 playground can wrap the
+    reference validator and collect each rule's verdict
+    independently, outside the consensus contract. This closes
+    the precedence flag as unpinned by design.
+
 ## 4. Novel-layer register
 
 The validation rules have no external reference: no deployed system
