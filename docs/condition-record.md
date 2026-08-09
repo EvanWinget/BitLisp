@@ -1038,8 +1038,9 @@ Section 4 registers the rules that have no external reference at all.
       conditions layer, and in the key path's SIGHASH_ALL for key
       spends. The surplus fact closes the same way: the reserve
       never protected surplus, SEAL_OUTPUTS is the mechanism that
-      does, so the wallet discipline relaxes from "reserve
-      exactly what you pay" to "or seal your outputs."
+      does. The wallet fee discipline decision 23 recorded as a
+      cost of the signature design, reserve exactly what you
+      intend to pay, gains the alternative: seal your outputs.
 
 22. **Error codes are diagnostic, fail-fast is the contract.**
     RATIFIED (decision by Evan, 2026-08-09, raised by the fee
@@ -1279,10 +1280,17 @@ Section 4 registers the rules that have no external reference at all.
       precedent and decision 22's freedom. Opcodes 0x60 and 0x61
       open the seals block, the first block with no Chia
       numbering to continue (C20 records the family as a pure
-      addition). Cost pre-registration for rule 5: SEAL is a
-      32-byte compare, SEAL_OUTPUTS one SHA256 over the outputs
-      serialization, computable once per transaction whatever
-      the occurrence count.
+      addition). Cost pre-registration for rule 5: each
+      occurrence is a 32-byte compare against a quantity
+      computable once per transaction whatever the occurrence
+      count, and both quantities are ones a node already
+      materializes, the txid as the transaction's identity and
+      the outputs hash for every taproot sighash. A validator
+      computing them from scratch pays one serialization pass
+      per quantity, linear in the transaction for SEAL and in
+      the outputs for SEAL_OUTPUTS, so rule 5 should price the
+      compare and account the derivations as shared
+      transaction-level work, not charge a hash per occurrence.
     - The footgun, stated with rule 8's bluntness. The operand
       arrives in the solution, witness data nothing protects, so
       a seal no signature commits to seals nothing: the
@@ -1318,9 +1326,9 @@ for an oracle, per ground rule 4:
 | rule | status | oracle substitute |
 | --- | --- | --- |
 | 1. Injective multiset output matching | normative | hypothesis invariant suite (injectivity, reorder invariance, monotonicity, metamorphic mutations) plus the adversarial corpus in `vectors/validation/`, opening with the duplicate-CREATE_COIN theft vector |
-| 2. Mixed-transaction rule | normative | `vectors/validation/mixed-transaction.json`: five acceptance vectors (mixed, plain-only, unclaimed slots, merge, surplus capture) and one rule 1 boundary rejection, plus the addition-monotonicity, merge, and plain-only invariants. The time assert family checks under this rule's assert clause: `vectors/validation/time-asserts.json` with BIP 65 and BIP 68 field semantics as the double reference, plus the operand-monotonicity and boundary-flip invariants. The self assert family checks under the same clause: `vectors/validation/self-asserts.json` with the probe corpus translated to prevout equality cases, the BIP341 tweak derivation shared with CREATE_OUTPUT_TAPROOT as the taproot assert's oracle, plus the outpoint-implies-txid and recombination-invariance invariants. The seal family checks under the same clause with no Chia reference at all (divergence C20): `vectors/validation/seals.json` with the grafted-output interception regression pair, the sealed-merge rejection cases, and the fee-input-addition acceptance pinning what SEAL_OUTPUTS permits, the vendored Bitcoin Core framework as the serialization oracle for the txid and outputs-hash derivations, plus the operand byte-flip, sealed-merge, SEAL-implies-SEAL_OUTPUTS, and outputs-only-dependence invariants |
+| 2. Mixed-transaction rule | normative | `vectors/validation/mixed-transaction.json`: five acceptance vectors (mixed, plain-only, unclaimed slots, merge, surplus capture) and one rule 1 boundary rejection, plus the addition-monotonicity, merge, and plain-only invariants. The time assert family checks under this rule's assert clause: `vectors/validation/time-asserts.json` with BIP 65 and BIP 68 field semantics as the double reference, plus the operand-monotonicity and boundary-flip invariants. The self assert family checks under the same clause: `vectors/validation/self-asserts.json` with the probe corpus translated to prevout equality cases, the BIP341 tweak derivation shared with CREATE_OUTPUT_TAPROOT as the taproot assert's oracle, plus the outpoint-implies-txid and recombination-invariance invariants. The seal family checks under the same clause with no Chia reference at all (divergence C20): `vectors/validation/seals.json` with the grafted-output interception regression pair, the sealed-merge rejection case, and the fee-input-addition acceptance pinning what SEAL_OUTPUTS permits, the vendored Bitcoin Core framework as the serialization oracle for the txid and outputs-hash derivations, plus the operand byte-flip, sealed-merge, SEAL-implies-SEAL_OUTPUTS, and outputs-only-dependence invariants |
 | 3. Message scoping | normative | `vectors/validation/messages.json` and `vectors/validation/announcements.json`: the probe corpus translated from the chia_rs oracle (balance, multiplicity, mode-key, self-send, order cases) plus adversarial wrong-address and forgery cases, and the balanced-pair, announcement-monotonicity, and byte-flip invariants |
-| 4. Duplicates and multiplicity | normative | `vectors/validation/duplicates.json`: the strictest-wins oracle tests translated to identical and differing time asserts within one input, identical asserts across two and three inputs including the diverging final-sequence counterexample, ANNOUNCE duplication within an input and copies across inputs including the new-fact flip, duplicated announcement asserts at loose and script commitments, and duplicated reserved conditions on both sides of the cost floor, plus the identical-signature-triple and copied-triple-across-inputs cases from the signature assert unit, plus the in-place duplication-invariance invariant. The counted-sort boundaries stay pinned where they landed: duplicate claims in `vectors/validation/create-output.json`, duplicate message halves in `vectors/validation/messages.json`. Chia's remaining dedup tests are mempool spend-dedup machinery, declined in decision 19 |
+| 4. Duplicates and multiplicity | normative | `vectors/validation/duplicates.json`: the strictest-wins oracle tests translated to identical and differing time asserts within one input, identical asserts across two and three inputs including the diverging final-sequence counterexample, ANNOUNCE duplication within an input and copies across inputs including the new-fact flip, duplicated announcement asserts at loose and script commitments, and duplicated reserved conditions on both sides of the cost floor, plus the identical-signature-triple and copied-triple-across-inputs cases from the signature assert unit, plus the in-place seal duplication and copied-seal-across-inputs cases from the seal unit, plus the in-place duplication-invariance invariant. The counted-sort boundaries stay pinned where they landed: duplicate claims in `vectors/validation/create-output.json`, duplicate message halves in `vectors/validation/messages.json`. Chia's remaining dedup tests are mempool spend-dedup machinery, declined in decision 19 |
 | 5. Per-condition costing | pending | CHIP-0049 precedent comparison plus cost-conservation properties |
 | 6. Reserved conditions | normative | encoding vectors in `vectors/conditions/`, every error path pinned |
 | 7. The fee reserve | normative | `vectors/validation/reserve-fee.json`: the probe corpus translated from the chia_rs oracle (within-spend and cross-input accumulation, boundary equality, one-short rejection, zero reserve, a reserve stack no fee can reach) plus the fee-theft grafted-output regression vector, the surplus-capture acceptance vector pinning what the reserve does not protect, the above-2^32 and off-boundary separating cases from the review's mutation pass, and the operand-monotonicity, split, and boundary invariants |

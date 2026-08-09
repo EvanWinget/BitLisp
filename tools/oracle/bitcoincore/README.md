@@ -8,8 +8,9 @@ This is the code Core itself uses to cross-check its consensus
 signing, verification, and wire encoding, continuously validated in
 Core's own CI. It is test tooling only: nothing under
 `python/bitlisp/` imports it. Its consumers are `tools/diff_secp.py`
-and the randomized invariants in `python/tests/test_secp256k1.py`
-and `python/tests/test_seal_invariants.py`.
+and the test suites `python/tests/test_secp256k1.py`,
+`test_taproot.py`, `test_signature_assert_invariants.py`, and
+`test_seal_invariants.py`.
 
 ## Provenance
 
@@ -35,9 +36,10 @@ Ours, not upstream: the two `__init__.py` files and
 `test_framework/util.py`, a minimal stub of the three helpers the
 vendored files import, so the verbatim files resolve their imports
 without dragging in Core's full test utility module. Two of the
-stubbed helpers (`assert_not_equal`, `assert_equal`) run on live
-verification, signing, and deserialization paths, so the stubs
-reproduce upstream semantics exactly.
+stubbed helpers run live: `assert_not_equal` on verification and
+signing paths, and `assert_equal` at import time on messages.py's
+serialization sanity check. Both stubs reproduce upstream
+semantics exactly.
 
 The vendored files are exempt from repository lint, like
 `vectors/upstream/`. Refreshing this snapshot is an upstream pin bump

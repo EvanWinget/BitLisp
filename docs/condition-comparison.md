@@ -6,7 +6,7 @@ compares the two validation layers. It is the condition-layer companion
 to [opcode-comparison.md](opcode-comparison.md). The BitLisp columns
 restate [spec/CONDITIONS.md](../spec/CONDITIONS.md) and
 [spec/VALIDATION.md](../spec/VALIDATION.md), which are the normative
-sources. Divergence ids (C1 to C19) and decision ids (D-CC2) refer to
+sources. Divergence ids (C1 to C20) and decision ids (D-CC2) refer to
 [condition-record.md](condition-record.md).
 
 There is no bllsh column. bllsh has no condition layer at all: its
@@ -26,8 +26,7 @@ Sources, as read on 2026-07-31:
   review) revises costs but not the vocabulary, and is noted where
   it matters.
 - **BitLisp**: spec/CONDITIONS.md and spec/VALIDATION.md, Phase 2 in
-  progress, plus the planned-entry list in CONDITIONS.md section 2
-  and the Phase 2 plan in
+  progress, plus the Phase 2 plan in
   [execution-plan.md](execution-plan.md).
 
 Opcode numbers are not comparable across columns. BitLisp lays its
@@ -35,13 +34,12 @@ code space out fresh (divergence C4) rather than inheriting Chia's
 assignments. Chia opcodes are written in decimal, upstream's
 convention, and BitLisp opcodes in hex, the CONDITIONS.md convention.
 
-The BitLisp column uses four statuses. **Normative** entries are in
-CONDITIONS.md today. **Planned** entries are named in the
-CONDITIONS.md planned list and land across Phase 2. **Open** items
-await a named design decision. **Not in the v0 plan** means no entry
-and no recorded decision, which is not the same as declined: the
-consensus outcome is that the opcode is invalid, and the reserved
-tier is the future path.
+The BitLisp column uses three statuses. **Normative** entries are in
+CONDITIONS.md today, and the vocabulary v0 table is complete: no
+entry remains planned. **Open** items await a named design decision.
+**Not in the v0 plan** means no entry and no recorded decision,
+which is not the same as declined: the consensus outcome is that
+the opcode is invalid, and the reserved tier is the future path.
 
 ## Output creation
 
@@ -156,10 +154,26 @@ The fee floor is the ported entry, matching Chia's deployed
 checked-sum semantics exactly. The once-planned universal asserts
 (`ASSERT_FEE_LE`, `ASSERT_OUTPUT_COUNT`) are recorded declines:
 the transaction-wide forms are forbidden by the composition
-guarantee, the per-input fee bound decomposes into landed
+guarantee (whose sole recorded exception is the seal family
+below), the per-input fee bound decomposes into landed
 vocabulary, and the composition-safe count floors had no
 identified user. Decision 21 in the condition record carries the
 full rationale and the reserved-tier reintroduction path.
+
+## Seals
+
+| Capability | Chia | BitLisp |
+| --- | --- | --- |
+| pin the spending transaction | absent, coin identity is content-derived so a spend's authorization is indifferent to which aggregate bundle carries it | `SEAL` `0x60`, normative, asserts the spending transaction's own txid (C20, decision 24) |
+| pin the outputs alone | absent, same reason | `SEAL_OUTPUTS` `0x61`, normative, asserts the BIP 341 outputs hash, the fee-bumping posture (C20, decision 24) |
+
+The seal family is the one pure addition in the vocabulary, born
+from Bitcoin's positional output identity: an intercepted covenant
+spend can otherwise be rebuilt around a grafted output with every
+condition still holding. Chia never faces the problem, which is
+why no Chia column entry exists to port. Sealed transactions are
+excluded from the composition guarantee by its own hypothesis,
+the family's recorded scoping.
 
 ## No-op and forward compatibility
 
@@ -196,16 +210,15 @@ specs of the same shape.
 
 ## Observations
 
-- **Where Phase 2 stands.** Twenty-four vocabulary entries are
-  normative: `CREATE_OUTPUT`, `CREATE_OUTPUT_TAPROOT`, the eight
-  signature asserts (decision 23), the four time asserts, the
-  five self asserts (decision 20), the message family
-  (`SEND_MESSAGE`, `RECEIVE_MESSAGE`, `ANNOUNCE`,
-  `ASSERT_ANNOUNCEMENT`), and `RESERVE_FEE` (decision 21). One
-  family is planned, the seal pair ratified 2026-08-09. Of the
-  eight validation rules, 1, 2, 3, 4, 6, 7, and 8 are normative
-  and 5 is pending, deliberately last so costing prices the
-  complete vocabulary.
+- **Where Phase 2 stands.** Twenty-six vocabulary entries are
+  normative and the v0 table is complete: `CREATE_OUTPUT`,
+  `CREATE_OUTPUT_TAPROOT`, the eight signature asserts (decision
+  23), the four time asserts, the five self asserts (decision
+  20), the message family (`SEND_MESSAGE`, `RECEIVE_MESSAGE`,
+  `ANNOUNCE`, `ASSERT_ANNOUNCEMENT`), `RESERVE_FEE` (decision
+  21), and the seal pair (decision 24). Of the eight validation
+  rules, 1, 2, 3, 4, 6, 7, and 8 are normative and 5 is pending,
+  deliberately last so costing prices the complete vocabulary.
 - **Reference coverage is uneven by design.** The ported entries
   (timelocks, messages, `RESERVE_FEE`, the AGG_SIG and `ASSERT_MY_*`
   shapes) have deployed Chia semantics to translate tests from. The
@@ -222,7 +235,7 @@ specs of the same shape.
   Widening the view is the structural decision any future port of
   them would have to make first.
 - **Chia's vocabulary is larger, 35 assigned opcodes against
-  BitLisp's 24.** The remaining gap is the four before-style
+  BitLisp's 26.** The remaining gap is the four before-style
   asserts, the chain-state family above, and the announcement
   flavors BitLisp folds into two conditions (decision 16). The
   curation direction matches the VM layer: keep the deployed
