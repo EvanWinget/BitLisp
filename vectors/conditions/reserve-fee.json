@@ -1,0 +1,129 @@
+{
+ "schema": "bitlisp-vector-v0",
+ "suite": "conditions",
+ "spec": "CONDITIONS.md RESERVE_FEE entry and section 1 encoding",
+ "cases": [
+  {
+   "name": "reserve_parses",
+   "conditions": "ffff50ff82012c8080",
+   "expect": {
+    "parsed": [
+     {
+      "opcode": 80,
+      "reserve": 300
+     }
+    ]
+   }
+  },
+  {
+   "name": "zero_reserve_parses",
+   "conditions": "ffff50ff808080",
+   "expect": {
+    "parsed": [
+     {
+      "opcode": 80,
+      "reserve": 0
+     }
+    ]
+   }
+  },
+  {
+   "name": "max_money_reserve_parses",
+   "conditions": "ffff50ff870775f05a0740008080",
+   "expect": {
+    "parsed": [
+     {
+      "opcode": 80,
+      "reserve": 2100000000000000
+     }
+    ]
+   }
+  },
+  {
+   "name": "above_max_money_rejected",
+   "conditions": "ffff50ff870775f05a0740018080",
+   "expect": {
+    "error": "bad_condition_arg"
+   }
+  },
+  {
+   "name": "negative_reserve_rejected",
+   "conditions": "ffff50ff81ff8080",
+   "expect": {
+    "error": "bad_condition_arg"
+   }
+  },
+  {
+   "name": "noncanonical_zero_rejected",
+   "conditions": "ffff50ff008080",
+   "expect": {
+    "error": "bad_condition_arg"
+   }
+  },
+  {
+   "name": "noncanonical_hundred_rejected",
+   "conditions": "ffff50ff8200648080",
+   "expect": {
+    "error": "bad_condition_arg"
+   }
+  },
+  {
+   "name": "nine_byte_operand_rejected",
+   "conditions": "ffff50ff890100000000000000008080",
+   "expect": {
+    "error": "bad_condition_arg"
+   }
+  },
+  {
+   "name": "missing_operand_rejected",
+   "conditions": "ffff508080",
+   "expect": {
+    "error": "bad_condition_arity"
+   }
+  },
+  {
+   "name": "two_operands_rejected",
+   "conditions": "ffff50ff64ff8200c88080",
+   "expect": {
+    "error": "bad_condition_arity"
+   }
+  },
+  {
+   "name": "pair_operand_rejected",
+   "conditions": "ffff50ffff82012c808080",
+   "expect": {
+    "error": "bad_condition_arg"
+   }
+  },
+  {
+   "name": "duplicates_parse_individually",
+   "conditions": "ffff50ff82012c80ffff50ff82012c8080",
+   "expect": {
+    "parsed": [
+     {
+      "opcode": 80,
+      "reserve": 300
+     },
+     {
+      "opcode": 80,
+      "reserve": 300
+     }
+    ]
+   }
+  },
+  {
+   "name": "fees_block_gap_0x51_invalid",
+   "conditions": "ffff51ff82012c8080",
+   "expect": {
+    "error": "bad_condition_opcode"
+   }
+  },
+  {
+   "name": "fees_block_gap_0x5f_invalid",
+   "conditions": "ffff5fff8201f48080",
+   "expect": {
+    "error": "bad_condition_opcode"
+   }
+  }
+ ]
+}
