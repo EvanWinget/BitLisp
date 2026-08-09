@@ -98,6 +98,7 @@ CONDITIONS.md section 1 and VALIDATION.md rule 6 has at least one case.
                 "script_pubkey": "<hex>",
                 "amount": 60000,
                 "sequence": 4294967295,
+                "script_sig": "<hex, optional>",
                 "conditions": "<hex node>"
             }
         ],
@@ -107,9 +108,12 @@ CONDITIONS.md section 1 and VALIDATION.md rule 6 has at least one case.
 }
 ```
 
-`sequence` is optional and defaults to 4294967295. An input without a
-`conditions` key is a non-BitLisp input, one with the key is a BitLisp
-input whose program evaluation produced that condition list. `expect`
+`sequence` is optional and defaults to 4294967295. `script_sig` is
+optional and defaults to empty, the correct value for every segwit
+input: it exists because a SEAL reads legacy scriptSig bytes through
+the txid. An input without a `conditions` key is a non-BitLisp
+input, one with the key is a BitLisp input whose program evaluation
+produced that condition list. `expect`
 is `{"valid": true}` or `{"error": "<code>"}`. The transaction must
 satisfy the model's base rules (value conservation, ranges, distinct
 outpoints): a case violating them is a malformed vector, not an
