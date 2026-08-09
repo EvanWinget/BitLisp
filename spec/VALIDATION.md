@@ -15,6 +15,15 @@ specified in [CONDITIONS.md](CONDITIONS.md).
 Target property: a reviewer who has read only this document can predict
 the outcome of every vector in `vectors/validation/`.
 
+Every rule names the error code its violation raises. A
+transaction that violates exactly one rule of the condition layer
+is rejected with that rule's code, and vectors pin the code. A
+transaction that violates more than one rule is invalid under
+each of them, and an implementation conforms by rejecting it with
+any violated rule's code. Rejection is the consensus outcome, the
+code is diagnostic, and no vector pins the code of a transaction
+violating more than one rule.
+
 ## Transaction view
 
 Validation is a pure function of the transaction below. No other
