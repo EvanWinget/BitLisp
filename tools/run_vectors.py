@@ -155,6 +155,8 @@ def _condition_json(cond):
         ReceiveMessage,
         Reserved,
         ReserveFee,
+        Seal,
+        SealOutputs,
         SendMessage,
     )
 
@@ -231,6 +233,10 @@ def _condition_json(cond):
         }
     if isinstance(cond, ReserveFee):
         return {"opcode": cond.opcode, "reserve": cond.reserve}
+    if isinstance(cond, Seal):
+        return {"opcode": cond.opcode, "txid": cond.txid.hex()}
+    if isinstance(cond, SealOutputs):
+        return {"opcode": cond.opcode, "outputs_hash": cond.outputs_hash.hex()}
     if isinstance(cond, Reserved):
         return {
             "opcode": cond.opcode,
@@ -280,6 +286,9 @@ def run_conditions_case(case):
     The signature asserts pin {"opcode", "pubkey", "message",
     "signature"}, all three operands hex, the same shape for every
     family opcode since the variant lives in the opcode.
+
+    The seals pin {"opcode"} plus their operand under its entry's
+    name ("txid", "outputs_hash"), as hex.
     """
     from bitlisp import BitLispError, deserialize, parse_conditions
     from bitlisp.errors import CODES
@@ -337,10 +346,11 @@ def _tx_from_json(obj):
     decoded_inputs = []
     for entry in obj["inputs"]:
         entry_required = {"txid", "index", "script_pubkey", "amount"}
+        entry_optional = {"sequence", "conditions", "script_sig"}
         entry_keys = set(entry)
         if missing := entry_required - entry_keys:
             raise VectorError(f"input missing keys {sorted(missing)}")
-        if extra := entry_keys - entry_required - {"sequence", "conditions"}:
+        if extra := entry_keys - entry_required - entry_optional:
             raise VectorError(f"input unknown keys {sorted(extra)}")
         conditions = None
         if "conditions" in entry:
@@ -370,6 +380,7 @@ def _tx_from_json(obj):
                     amount=entry["amount"],
                     sequence=entry.get("sequence", 0xFFFFFFFF),
                     conditions=conditions,
+                    script_sig=bytes.fromhex(entry.get("script_sig", "")),
                 )
                 for entry, conditions in decoded_inputs
             ),
@@ -393,6 +404,7 @@ def run_validation_case(case):
                 "inputs": [{"txid": "<hex>", "index": <int>,
                             "script_pubkey": "<hex>", "amount": <int>,
                             "sequence": <int, optional, default 0xffffffff>,
+                            "script_sig": "<hex, optional, default empty>",
                             "conditions": "<hex node, optional>"}],
                 "outputs": [{"script_pubkey": "<hex>", "amount": <int>}]
             },
