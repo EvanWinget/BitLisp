@@ -27,6 +27,11 @@ ASSERT_LOCKTIME_HEIGHT = 0x20
 ASSERT_LOCKTIME_TIME = 0x21
 ASSERT_SEQUENCE_HEIGHT = 0x22
 ASSERT_SEQUENCE_TIME = 0x23
+ASSERT_MY_OUTPOINT = 0x30
+ASSERT_MY_TXID = 0x31
+ASSERT_MY_SCRIPTPUBKEY = 0x32
+ASSERT_MY_AMOUNT = 0x33
+ASSERT_MY_TAPROOT = 0x37
 ANNOUNCE = 0x40
 ASSERT_ANNOUNCEMENT = 0x41
 SEND_MESSAGE = 0x42
@@ -126,6 +131,62 @@ class AssertSequenceTime:
     units: int
 
     opcode = ASSERT_SEQUENCE_TIME
+
+
+@dataclass(frozen=True)
+class AssertMyOutpoint:
+    """Asserts the input's consumed outpoint, in wire serialization:
+    32 txid bytes then the 32-bit index little-endian."""
+
+    outpoint: bytes
+
+    opcode = ASSERT_MY_OUTPOINT
+
+
+@dataclass(frozen=True)
+class AssertMyTxid:
+    """Asserts the input's creating txid, the txid half of its
+    outpoint. A strict subset of AssertMyOutpoint: the index is
+    left unconstrained."""
+
+    txid: bytes
+
+    opcode = ASSERT_MY_TXID
+
+
+@dataclass(frozen=True)
+class AssertMyScriptPubKey:
+    """Asserts the spent output's scriptPubKey byte-exact."""
+
+    script_pubkey: bytes
+
+    opcode = ASSERT_MY_SCRIPTPUBKEY
+
+
+@dataclass(frozen=True)
+class AssertMyAmount:
+    """Asserts the spent output's amount numerically."""
+
+    amount: int
+
+    opcode = ASSERT_MY_AMOUNT
+
+
+@dataclass(frozen=True)
+class AssertMyTaproot:
+    """Asserts the spent output is the taproot output of these
+    components.
+
+    script_pubkey is computed from internal_key and merkle_root at
+    parse time, the same derivation CreateOutputTaproot claims
+    with, then compared byte-exact against the spent scriptPubKey.
+    """
+
+    internal_key: bytes
+    merkle_root: bytes
+    script_pubkey: bytes
+
+    opcode = ASSERT_MY_TAPROOT
 
 
 @dataclass(frozen=True)
@@ -237,13 +298,9 @@ def _parse_create_output(args):
     return CreateOutput(script_pubkey, amount)
 
 
-def _parse_create_output_taproot(args):
-    if len(args) != 3:
-        raise BitLispError(
-            "bad_condition_arity",
-            f"CREATE_OUTPUT_TAPROOT takes 3 arguments, got {len(args)}",
-        )
-    internal_key, merkle_root, amount_atom = args
+def _derive_taproot_spk(internal_key, merkle_root):
+    """The 34-byte taproot scriptPubKey of the two component atoms,
+    with every argument and derivation defect rejected."""
     if not is_atom(internal_key):
         raise BitLispError("bad_condition_arg", "internal key must be an atom")
     if len(internal_key) != 32:
@@ -258,15 +315,25 @@ def _parse_create_output_taproot(args):
             "bad_condition_arg",
             f"merkle root must be 0 or 32 bytes, got {len(merkle_root)}",
         )
-    amount = _parse_int(amount_atom, "CREATE_OUTPUT_TAPROOT amount")
-    if not 0 <= amount <= MAX_MONEY:
-        raise BitLispError("bad_condition_arg", f"amount out of range: {amount}")
     output_key = secp256k1.taproot_output_key(internal_key, merkle_root)
     if output_key is None:
         raise BitLispError(
             "bad_condition_arg", "internal key and merkle root derive no output key"
         )
-    script_pubkey = b"\x51\x20" + output_key
+    return b"\x51\x20" + output_key
+
+
+def _parse_create_output_taproot(args):
+    if len(args) != 3:
+        raise BitLispError(
+            "bad_condition_arity",
+            f"CREATE_OUTPUT_TAPROOT takes 3 arguments, got {len(args)}",
+        )
+    internal_key, merkle_root, amount_atom = args
+    amount = _parse_int(amount_atom, "CREATE_OUTPUT_TAPROOT amount")
+    if not 0 <= amount <= MAX_MONEY:
+        raise BitLispError("bad_condition_arg", f"amount out of range: {amount}")
+    script_pubkey = _derive_taproot_spk(internal_key, merkle_root)
     return CreateOutputTaproot(internal_key, merkle_root, amount, script_pubkey)
 
 
@@ -283,6 +350,66 @@ def _parse_time_assert(args, name, cls, low, high):
             f"{name} operand must be {low} to {high}, got {value}",
         )
     return cls(value)
+
+
+def _parse_self_assert_bytes(args, name, cls, size):
+    """One atom operand of exactly size bytes."""
+    if len(args) != 1:
+        raise BitLispError(
+            "bad_condition_arity", f"{name} takes 1 argument, got {len(args)}"
+        )
+    atom = args[0]
+    if not is_atom(atom):
+        raise BitLispError("bad_condition_arg", f"{name} operand must be an atom")
+    if len(atom) != size:
+        raise BitLispError(
+            "bad_condition_arg",
+            f"{name} operand must be {size} bytes, got {len(atom)}",
+        )
+    return cls(atom)
+
+
+def _parse_assert_my_scriptpubkey(args):
+    if len(args) != 1:
+        raise BitLispError(
+            "bad_condition_arity",
+            f"ASSERT_MY_SCRIPTPUBKEY takes 1 argument, got {len(args)}",
+        )
+    atom = args[0]
+    if not is_atom(atom):
+        raise BitLispError(
+            "bad_condition_arg", "ASSERT_MY_SCRIPTPUBKEY operand must be an atom"
+        )
+    if len(atom) > MAX_SCRIPT_PUBKEY_SIZE:
+        raise BitLispError(
+            "bad_condition_arg",
+            f"ASSERT_MY_SCRIPTPUBKEY operand must be at most "
+            f"{MAX_SCRIPT_PUBKEY_SIZE} bytes, got {len(atom)}",
+        )
+    return AssertMyScriptPubKey(atom)
+
+
+def _parse_assert_my_amount(args):
+    if len(args) != 1:
+        raise BitLispError(
+            "bad_condition_arity",
+            f"ASSERT_MY_AMOUNT takes 1 argument, got {len(args)}",
+        )
+    amount = _parse_int(args[0], "ASSERT_MY_AMOUNT operand")
+    if not 0 <= amount <= MAX_MONEY:
+        raise BitLispError("bad_condition_arg", f"amount out of range: {amount}")
+    return AssertMyAmount(amount)
+
+
+def _parse_assert_my_taproot(args):
+    if len(args) != 2:
+        raise BitLispError(
+            "bad_condition_arity",
+            f"ASSERT_MY_TAPROOT takes 2 arguments, got {len(args)}",
+        )
+    internal_key, merkle_root = args
+    script_pubkey = _derive_taproot_spk(internal_key, merkle_root)
+    return AssertMyTaproot(internal_key, merkle_root, script_pubkey)
 
 
 def _parse_payload_atom(atom, what):
@@ -474,6 +601,18 @@ def _parse_condition(node):
             0,
             SEQUENCE_VALUE_MAX,
         )
+    if opcode == ASSERT_MY_OUTPOINT:
+        return _parse_self_assert_bytes(
+            args, "ASSERT_MY_OUTPOINT", AssertMyOutpoint, OUTPOINT_SIZE
+        )
+    if opcode == ASSERT_MY_TXID:
+        return _parse_self_assert_bytes(args, "ASSERT_MY_TXID", AssertMyTxid, 32)
+    if opcode == ASSERT_MY_SCRIPTPUBKEY:
+        return _parse_assert_my_scriptpubkey(args)
+    if opcode == ASSERT_MY_AMOUNT:
+        return _parse_assert_my_amount(args)
+    if opcode == ASSERT_MY_TAPROOT:
+        return _parse_assert_my_taproot(args)
     if opcode == ANNOUNCE:
         return _parse_announce(args)
     if opcode == ASSERT_ANNOUNCEMENT:

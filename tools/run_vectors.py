@@ -142,6 +142,11 @@ def _condition_json(cond):
         AssertAnnouncement,
         AssertLocktimeHeight,
         AssertLocktimeTime,
+        AssertMyAmount,
+        AssertMyOutpoint,
+        AssertMyScriptPubKey,
+        AssertMyTaproot,
+        AssertMyTxid,
         AssertSequenceHeight,
         AssertSequenceTime,
         CreateOutput,
@@ -171,6 +176,21 @@ def _condition_json(cond):
             "internal_key": cond.internal_key.hex(),
             "merkle_root": cond.merkle_root.hex(),
             "amount": cond.amount,
+            "script_pubkey": cond.script_pubkey.hex(),
+        }
+    if isinstance(cond, AssertMyOutpoint):
+        return {"opcode": cond.opcode, "outpoint": cond.outpoint.hex()}
+    if isinstance(cond, AssertMyTxid):
+        return {"opcode": cond.opcode, "txid": cond.txid.hex()}
+    if isinstance(cond, AssertMyScriptPubKey):
+        return {"opcode": cond.opcode, "script_pubkey": cond.script_pubkey.hex()}
+    if isinstance(cond, AssertMyAmount):
+        return {"opcode": cond.opcode, "amount": cond.amount}
+    if isinstance(cond, AssertMyTaproot):
+        return {
+            "opcode": cond.opcode,
+            "internal_key": cond.internal_key.hex(),
+            "merkle_root": cond.merkle_root.hex(),
             "script_pubkey": cond.script_pubkey.hex(),
         }
     if isinstance(cond, Announce):
@@ -227,6 +247,13 @@ def run_conditions_case(case):
     entry's name ("height", "time", "blocks", "units") for the time
     asserts, and {"opcode", "cost", "args": [<hex node>]} for
     reserved conditions.
+
+    The self asserts pin {"opcode"} plus their operand under its
+    entry's name ("outpoint", "txid", "script_pubkey", "amount"),
+    amounts as integers, bytes as hex. ASSERT_MY_TAPROOT pins
+    {"opcode", "internal_key", "merkle_root", "script_pubkey"} with
+    script_pubkey the derived taproot script, exactly as
+    CREATE_OUTPUT_TAPROOT pins it.
 
     The message family pins specifiers as {"commitment", "fields"}
     with fields in operand order, amounts as integers, all other

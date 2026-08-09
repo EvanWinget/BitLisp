@@ -433,6 +433,19 @@ it enforceable, and lands with that rule:
   the read field across the relevant boundary causes rejection,
   with locktime moved across the type threshold, the sequence
   disable flag set, or version dropped below 2 (time asserts).
+- A self assert's outcome is unchanged by the transaction's
+  version, locktime, its input's sequence, and the presence of
+  unrelated inputs: the outcome is a function of the condition and
+  its input's own prevout data alone (self asserts).
+- Whenever an ASSERT_MY_OUTPOINT is satisfied, the ASSERT_MY_TXID
+  built from its operand's first 32 bytes is satisfied on the same
+  input (self asserts).
+- A lone self assert is satisfied exactly when its operand equals
+  the field it reads, failing otherwise with its field's error
+  (self asserts).
+- ASSERT_MY_TAPROOT and an ASSERT_MY_SCRIPTPUBKEY carrying its
+  derived scriptPubKey produce identical outcomes on every input
+  (self asserts).
 - Adding a balanced send and receive pair to a valid transaction
   keeps it valid, and adding either half alone invalidates it
   (rule 3).

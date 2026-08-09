@@ -1,10 +1,10 @@
 # BitLisp Conditions
 
 Status: in progress. Section 1, the CREATE_OUTPUT and
-CREATE_OUTPUT_TAPROOT entries, the time assert family, and the
-message family are normative. The remaining vocabulary v0 entries
-land across Phase 2, each with semantics, arguments, cost, and
-validation rule reference.
+CREATE_OUTPUT_TAPROOT entries, the time assert family, the self
+assert family, and the message family are normative. The remaining
+vocabulary v0 entries land across Phase 2, each with semantics,
+arguments, cost, and validation rule reference.
 
 A successful program evaluation yields a condition list. This document
 specifies the encoding of that list and the per-condition rules: each
@@ -70,15 +70,19 @@ block without a vocabulary entry are invalid, not reserved:
 | `0x21` | `ASSERT_LOCKTIME_TIME` |
 | `0x22` | `ASSERT_SEQUENCE_HEIGHT` |
 | `0x23` | `ASSERT_SEQUENCE_TIME` |
+| `0x30` | `ASSERT_MY_OUTPOINT` |
+| `0x31` | `ASSERT_MY_TXID` |
+| `0x32` | `ASSERT_MY_SCRIPTPUBKEY` |
+| `0x33` | `ASSERT_MY_AMOUNT` |
+| `0x37` | `ASSERT_MY_TAPROOT` |
 | `0x40` | `ANNOUNCE` |
 | `0x41` | `ASSERT_ANNOUNCEMENT` |
 | `0x42` | `SEND_MESSAGE` |
 | `0x43` | `RECEIVE_MESSAGE` |
 
 Planned entries, unassigned and invalid until their sections land:
-the secp `AGG_SIG` family with program-composed messages, the
-`ASSERT_MY_*` family, `RESERVE_FEE`, `ASSERT_OUTPUT_COUNT`, and
-`ASSERT_FEE_LE`.
+the secp `AGG_SIG` family with program-composed messages,
+`RESERVE_FEE`, `ASSERT_OUTPUT_COUNT`, and `ASSERT_FEE_LE`.
 
 Every planned entry lands only in a shape the composition
 guarantee in `spec/VALIDATION.md` permits. In their listed shapes,
@@ -277,6 +281,129 @@ argument, an atom.
 
 **Validation rule.** The assert clause of VALIDATION.md
 (claims and asserts, rule 2). Stage 4.
+
+### Self asserts (`0x30` to `0x33`, `0x37`)
+
+The five conditions of this family assert facts of the spending
+input's own prevout data: the outpoint it consumes, the creating
+txid, the spent scriptPubKey, and the amount. Every assert is an
+equality against that input's own data in the transaction view.
+Nothing in this family reads another input, an output slot, or a
+transaction-level field.
+
+This family is stage 2 work: each assert reads only the spent
+output's own data, which travels with the spend, so recombining
+spends into a different transaction never changes an outcome, and
+the composition guarantee stated in VALIDATION.md's claims and
+asserts preamble holds for this family with no discipline
+required. The operands commit to the
+same fields as the participant specifiers of VALIDATION.md rule 3
+and carry the recombination-stability classes stated there:
+amount and scriptPubKey are knowable when a program is written,
+the creating txid and the outpoint exist only once the creating
+transaction is final.
+
+Failure of an assert reading the outpoint is the error
+`unsatisfied_outpoint_assert`. Failure of an assert reading the
+spent scriptPubKey is the error `unsatisfied_scriptpubkey_assert`.
+Failure of an assert reading the amount is the error
+`unsatisfied_amount_assert`.
+
+### ASSERT_MY_OUTPOINT (`0x30`)
+
+`(0x30 outpoint)`
+
+**Semantics.** Claims nothing. Asserts that the outpoint the
+spending input consumes equals `outpoint` byte-exact
+(`unsatisfied_outpoint_assert`).
+
+**Arguments.** `outpoint` is an atom of exactly 36 bytes: the
+consumed outpoint's 32 txid bytes followed by its 32-bit index in
+little-endian byte order, the wire serialization
+(`bad_condition_arg`). Exactly one argument, an atom.
+
+**Cost.** Assigned when VALIDATION.md rule 5 lands.
+
+**Validation rule.** The assert clause of VALIDATION.md
+(claims and asserts, rule 2). Stage 2.
+
+### ASSERT_MY_TXID (`0x31`)
+
+`(0x31 txid)`
+
+**Semantics.** Claims nothing. Asserts that the spending input's
+creating txid, the txid half of the outpoint it consumes, equals
+`txid` byte-exact (`unsatisfied_outpoint_assert`). This asserts
+strictly less than ASSERT_MY_OUTPOINT: the output index is left
+unconstrained.
+
+**Arguments.** `txid` is an atom of exactly 32 bytes
+(`bad_condition_arg`). Exactly one argument, an atom.
+
+**Cost.** Assigned when VALIDATION.md rule 5 lands.
+
+**Validation rule.** The assert clause of VALIDATION.md
+(claims and asserts, rule 2). Stage 2.
+
+### ASSERT_MY_SCRIPTPUBKEY (`0x32`)
+
+`(0x32 scriptPubKey)`
+
+**Semantics.** Claims nothing. Asserts that the spent output's
+scriptPubKey equals `scriptPubKey` byte-exact
+(`unsatisfied_scriptpubkey_assert`).
+
+**Arguments.** `scriptPubKey` is an atom of 0 to 10,000 bytes
+(`bad_condition_arg`). A prevout may carry any script base
+consensus accepts, including the empty script, so the empty atom
+is a valid operand here even though CREATE_OUTPUT rejects it as
+claim content. Exactly one argument, an atom.
+
+**Cost.** Assigned when VALIDATION.md rule 5 lands.
+
+**Validation rule.** The assert clause of VALIDATION.md
+(claims and asserts, rule 2). Stage 2.
+
+### ASSERT_MY_AMOUNT (`0x33`)
+
+`(0x33 amount)`
+
+**Semantics.** Claims nothing. Asserts that the spent output's
+amount equals `amount` numerically
+(`unsatisfied_amount_assert`).
+
+**Arguments.** `amount` is a minimally encoded integer with
+0 <= amount <= 2,100,000,000,000,000 (MAX_MONEY, in satoshis)
+(`bad_condition_arg`). Exactly one argument, an atom.
+
+**Cost.** Assigned when VALIDATION.md rule 5 lands.
+
+**Validation rule.** The assert clause of VALIDATION.md
+(claims and asserts, rule 2). Stage 2.
+
+### ASSERT_MY_TAPROOT (`0x37`)
+
+`(0x37 internal_key merkle_root)`
+
+**Semantics.** Claims nothing. Derives `spk` from `internal_key`
+and `merkle_root` by the derivation stated in the
+CREATE_OUTPUT_TAPROOT entry, including its `bad_condition_arg`
+failures, then asserts that the spent output's scriptPubKey
+equals `spk` byte-exact (`unsatisfied_scriptpubkey_assert`).
+
+A satisfied assert proves the spent output is the taproot output
+of `internal_key` tweaked with `merkle_root`.
+
+**Arguments.** `internal_key` is an atom of exactly 32 bytes and
+must satisfy the point derivation (`bad_condition_arg`).
+`merkle_root` is an atom of exactly 0 or exactly 32 bytes
+(`bad_condition_arg`). The empty atom means the output commits to
+no script tree. Exactly two arguments, both atoms.
+
+**Cost.** Assigned when VALIDATION.md rule 5 lands.
+
+**Validation rule.** The assert clause of VALIDATION.md
+(claims and asserts, rule 2), after the derivation above. Stage 2.
 
 ### Message family (`0x40` to `0x43`)
 

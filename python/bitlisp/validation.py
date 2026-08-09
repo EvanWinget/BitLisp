@@ -14,6 +14,13 @@ fields base consensus enforces against the chain, so validation
 never reads the chain and a validated transaction never needs
 re-validation as the chain grows.
 
+The self asserts check under the same clause and read even less:
+each is an equality against the spending input's own prevout data,
+which travels with the spend, so no recombination of spends into a
+different transaction can change an outcome. The taproot assert's
+scriptPubKey is derived at parse, so here it compares like the
+plain script assert.
+
 Rule 3, message scoping: the addressed pair contributes signed
 weights to a per-transaction ledger keyed by (sender specifier,
 receiver specifier, message), and every key must net to zero.
@@ -35,6 +42,11 @@ from .conditions import (
     AssertAnnouncement,
     AssertLocktimeHeight,
     AssertLocktimeTime,
+    AssertMyAmount,
+    AssertMyOutpoint,
+    AssertMyScriptPubKey,
+    AssertMyTaproot,
+    AssertMyTxid,
     AssertSequenceHeight,
     AssertSequenceTime,
     CreateOutput,
@@ -152,6 +164,49 @@ def check_time_asserts(tx):
                 )
 
 
+def check_self_asserts(tx):
+    """The self assert family: each condition is an equality against
+    its own input's prevout data, checked as a conjunction."""
+    for tx_input in tx.inputs:
+        outpoint = tx_input.txid + tx_input.index.to_bytes(4, "little")
+        for cond in tx_input.conditions or ():
+            if isinstance(cond, AssertMyOutpoint):
+                if cond.outpoint != outpoint:
+                    raise BitLispError(
+                        "unsatisfied_outpoint_assert",
+                        f"ASSERT_MY_OUTPOINT demands {cond.outpoint.hex()}, "
+                        f"the input consumes {outpoint.hex()}",
+                    )
+            elif isinstance(cond, AssertMyTxid):
+                if cond.txid != tx_input.txid:
+                    raise BitLispError(
+                        "unsatisfied_outpoint_assert",
+                        f"ASSERT_MY_TXID demands {cond.txid.hex()}, "
+                        f"the creating txid is {tx_input.txid.hex()}",
+                    )
+            elif isinstance(cond, (AssertMyScriptPubKey, AssertMyTaproot)):
+                if cond.script_pubkey != tx_input.script_pubkey:
+                    name = (
+                        "ASSERT_MY_TAPROOT"
+                        if isinstance(cond, AssertMyTaproot)
+                        else "ASSERT_MY_SCRIPTPUBKEY"
+                    )
+                    raise BitLispError(
+                        "unsatisfied_scriptpubkey_assert",
+                        f"{name} demands "
+                        f"{cond.script_pubkey.hex() or '(empty)'}, the spent "
+                        f"scriptPubKey is "
+                        f"{tx_input.script_pubkey.hex() or '(empty)'}",
+                    )
+            elif isinstance(cond, AssertMyAmount):
+                if cond.amount != tx_input.amount:
+                    raise BitLispError(
+                        "unsatisfied_amount_assert",
+                        f"ASSERT_MY_AMOUNT demands {cond.amount}, "
+                        f"the spent amount is {tx_input.amount}",
+                    )
+
+
 def self_specifier(tx_input, commitment):
     """The input's own prevout data at a commitment value: what a
     SEND or RECEIVE says about its emitting input, and what an
@@ -234,7 +289,9 @@ def check_announcements(tx):
 
 
 def validate_transaction(tx):
-    """Every validation rule that has landed so far."""
+    """Every validation rule that has landed so far, stage 2 work
+    before stage 4."""
+    check_self_asserts(tx)
     check_output_claims(tx)
     check_time_asserts(tx)
     check_messages(tx)
