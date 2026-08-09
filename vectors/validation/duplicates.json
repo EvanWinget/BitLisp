@@ -502,6 +502,63 @@
    "expect": {
     "error": "unsatisfied_sig_assert"
    }
+  },
+  {
+   "name": "dup_seal_within_input",
+   "tx": {
+    "version": 2,
+    "locktime": 0,
+    "inputs": [
+     {
+      "txid": "1111111111111111111111111111111111111111111111111111111111111111",
+      "index": 0,
+      "script_pubkey": "5120aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "amount": 1000,
+      "conditions": "ffff60ffa0f6d57b95e36c5544ddd4143fdf6661ca5c8a992ab83cb6c289ada024afa41be980ffff60ffa0f6d57b95e36c5544ddd4143fdf6661ca5c8a992ab83cb6c289ada024afa41be98080"
+     }
+    ],
+    "outputs": [
+     {
+      "script_pubkey": "0014bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "amount": 400
+     }
+    ]
+   },
+   "expect": {
+    "valid": true
+   }
+  },
+  {
+   "name": "seal_copied_across_inputs",
+   "tx": {
+    "version": 2,
+    "locktime": 0,
+    "inputs": [
+     {
+      "txid": "1111111111111111111111111111111111111111111111111111111111111111",
+      "index": 0,
+      "script_pubkey": "5120aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "amount": 1000,
+      "conditions": "ffff60ffa0028fcad225edbbe7b29cc3fe937902d82bdf1b20dd0655c224d0c76889a7db7c8080"
+     },
+     {
+      "txid": "2222222222222222222222222222222222222222222222222222222222222222",
+      "index": 0,
+      "script_pubkey": "5120aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "amount": 500,
+      "conditions": "ffff60ffa0028fcad225edbbe7b29cc3fe937902d82bdf1b20dd0655c224d0c76889a7db7c8080"
+     }
+    ],
+    "outputs": [
+     {
+      "script_pubkey": "0014bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "amount": 400
+     }
+    ]
+   },
+   "expect": {
+    "valid": true
+   }
   }
  ]
 }

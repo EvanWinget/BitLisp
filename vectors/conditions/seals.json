@@ -1,0 +1,110 @@
+{
+ "schema": "bitlisp-vector-v0",
+ "suite": "conditions",
+ "spec": "CONDITIONS.md seals family, encoding and argument rules",
+ "cases": [
+  {
+   "name": "seal_parses",
+   "conditions": "ffff60ffa0aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa8080",
+   "expect": {
+    "parsed": [
+     {
+      "opcode": 96,
+      "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+     }
+    ]
+   }
+  },
+  {
+   "name": "seal_outputs_parses",
+   "conditions": "ffff61ffa0bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb8080",
+   "expect": {
+    "parsed": [
+     {
+      "opcode": 97,
+      "outputs_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+     }
+    ]
+   }
+  },
+  {
+   "name": "seal_pair_parses_in_one_list",
+   "conditions": "ffff60ffa0aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa80ffff61ffa0bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb8080",
+   "expect": {
+    "parsed": [
+     {
+      "opcode": 96,
+      "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+     },
+     {
+      "opcode": 97,
+      "outputs_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+     }
+    ]
+   }
+  },
+  {
+   "name": "seal_no_operand",
+   "conditions": "ffff608080",
+   "expect": {
+    "error": "bad_condition_arity"
+   }
+  },
+  {
+   "name": "seal_two_operands",
+   "conditions": "ffff60ffa0aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaffa0aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa8080",
+   "expect": {
+    "error": "bad_condition_arity"
+   }
+  },
+  {
+   "name": "seal_operand_31_bytes",
+   "conditions": "ffff60ff9faaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa8080",
+   "expect": {
+    "error": "bad_condition_arg"
+   }
+  },
+  {
+   "name": "seal_operand_33_bytes",
+   "conditions": "ffff60ffa1aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa8080",
+   "expect": {
+    "error": "bad_condition_arg"
+   }
+  },
+  {
+   "name": "seal_operand_empty",
+   "conditions": "ffff60ff808080",
+   "expect": {
+    "error": "bad_condition_arg"
+   }
+  },
+  {
+   "name": "seal_operand_pair",
+   "conditions": "ffff60ffffa0aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa808080",
+   "expect": {
+    "error": "bad_condition_arg"
+   }
+  },
+  {
+   "name": "seal_outputs_operand_31_bytes",
+   "conditions": "ffff61ff9fbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb8080",
+   "expect": {
+    "error": "bad_condition_arg"
+   }
+  },
+  {
+   "name": "seals_block_gap_invalid",
+   "conditions": "ffff62ffa0aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa8080",
+   "expect": {
+    "error": "bad_condition_opcode"
+   }
+  },
+  {
+   "name": "seals_block_top_invalid",
+   "conditions": "ffff6fffa0aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa8080",
+   "expect": {
+    "error": "bad_condition_opcode"
+   }
+  }
+ ]
+}
