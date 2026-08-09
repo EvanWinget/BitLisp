@@ -1,11 +1,11 @@
 # BitLisp Conditions
 
 Status: in progress. Section 1, the CREATE_OUTPUT and
-CREATE_OUTPUT_TAPROOT entries, the time assert family, the self
-assert family, the message family, and the RESERVE_FEE entry are
-normative. The remaining vocabulary v0 entries land across Phase 2,
-each with semantics, arguments, cost, and validation rule
-reference.
+CREATE_OUTPUT_TAPROOT entries, the signature assert family, the
+time assert family, the self assert family, the message family,
+and the RESERVE_FEE entry are normative. The remaining vocabulary
+v0 entries land across Phase 2, each with semantics, arguments,
+cost, and validation rule reference.
 
 A successful program evaluation yields a condition list. This document
 specifies the encoding of that list and the per-condition rules: each
@@ -54,7 +54,7 @@ block without a vocabulary entry are invalid, not reserved:
 | range | family |
 | --- | --- |
 | `0x01` to `0x0f` | output creation |
-| `0x10` to `0x1f` | signatures |
+| `0x10` to `0x1f` | signature asserts |
 | `0x20` to `0x2f` | time asserts |
 | `0x30` to `0x3f` | self asserts |
 | `0x40` to `0x4f` | messages |
@@ -67,6 +67,14 @@ block without a vocabulary entry are invalid, not reserved:
 | --- | --- |
 | `0x01` | `CREATE_OUTPUT` |
 | `0x02` | `CREATE_OUTPUT_TAPROOT` |
+| `0x10` | `ASSERT_SIG_MY_TXID` |
+| `0x11` | `ASSERT_SIG_MY_SCRIPTPUBKEY` |
+| `0x12` | `ASSERT_SIG_MY_AMOUNT` |
+| `0x13` | `ASSERT_SIG_MY_SCRIPTPUBKEY_AMOUNT` |
+| `0x14` | `ASSERT_SIG_MY_TXID_AMOUNT` |
+| `0x15` | `ASSERT_SIG_MY_TXID_SCRIPTPUBKEY` |
+| `0x16` | `ASSERT_SIG_RAW` |
+| `0x17` | `ASSERT_SIG_MY_OUTPOINT` |
 | `0x20` | `ASSERT_LOCKTIME_HEIGHT` |
 | `0x21` | `ASSERT_LOCKTIME_TIME` |
 | `0x22` | `ASSERT_SEQUENCE_HEIGHT` |
@@ -83,9 +91,9 @@ block without a vocabulary entry are invalid, not reserved:
 | `0x50` | `RESERVE_FEE` |
 
 Planned entries, unassigned and invalid until their sections land:
-the secp `AGG_SIG` family with program-composed messages. Every
-planned entry lands only in a shape the composition guarantee in
-`spec/VALIDATION.md` permits.
+the seal family, SEAL and SEAL_OUTPUTS, which lands together with
+the scoping of `spec/VALIDATION.md`'s composition guarantee that
+its semantics require.
 
 ### CREATE_OUTPUT (`0x01`)
 
@@ -156,6 +164,173 @@ Exactly three arguments, all atoms.
 **Cost.** Assigned when VALIDATION.md rule 5 lands.
 
 **Validation rule.** VALIDATION.md rule 1, after the derivation above.
+
+### Signature asserts (`0x10` to `0x17`)
+
+The eight conditions of this family assert that a BIP340 Schnorr
+signature over secp256k1 accompanies the spend. Each carries three
+operands, a public key, a message, and a signature, and is
+satisfied exactly when the signature verifies for the public key
+over the digest its entry defines. Verification is BIP340's
+Verify algorithm, the relation VM.md's `secp_verify` entry pins
+for a non-empty signature.
+Every condition of this family is an assert: it claims nothing,
+consumes nothing, and reads only its own operands and the carrying
+input's own prevout data in the transaction view.
+
+The digest of the variant with tag `tag` and binding data
+`binding` is
+
+`digest = tagged_hash(tag, binding || message)`
+
+where `tagged_hash` is as defined in the CREATE_OUTPUT_TAPROOT
+entry, `tag` is the ASCII bytes of the tag string, and `||` is
+byte concatenation. Every binding field is fixed-length and
+precedes the variable-length message, so equal digests imply
+equal binding fields and equal messages.
+
+| opcode | condition | tag | binding data |
+| --- | --- | --- | --- |
+| `0x10` | `ASSERT_SIG_MY_TXID` | `BitLisp/sig/my_txid` | `txid` |
+| `0x11` | `ASSERT_SIG_MY_SCRIPTPUBKEY` | `BitLisp/sig/my_scriptpubkey` | `spk_hash` |
+| `0x12` | `ASSERT_SIG_MY_AMOUNT` | `BitLisp/sig/my_amount` | `amount8` |
+| `0x13` | `ASSERT_SIG_MY_SCRIPTPUBKEY_AMOUNT` | `BitLisp/sig/my_scriptpubkey_amount` | `spk_hash \|\| amount8` |
+| `0x14` | `ASSERT_SIG_MY_TXID_AMOUNT` | `BitLisp/sig/my_txid_amount` | `txid \|\| amount8` |
+| `0x15` | `ASSERT_SIG_MY_TXID_SCRIPTPUBKEY` | `BitLisp/sig/my_txid_scriptpubkey` | `txid \|\| spk_hash` |
+| `0x16` | `ASSERT_SIG_RAW` | `BitLisp/sig/raw` | empty |
+| `0x17` | `ASSERT_SIG_MY_OUTPOINT` | `BitLisp/sig/my_outpoint` | `outpoint` |
+
+Binding fields, each read from the carrying input's own prevout
+data in the transaction view:
+
+- `txid` is the 32 txid bytes of the consumed outpoint, the
+  creating txid as the ASSERT_MY_TXID entry defines it.
+- `spk_hash` is the sha256 of the spent output's scriptPubKey,
+  32 bytes.
+- `amount8` is the spent output's amount as 8 bytes in
+  little-endian byte order.
+- `outpoint` is the consumed outpoint's 36 wire-serialization
+  bytes: the 32 txid bytes followed by the 32-bit index in
+  little-endian byte order.
+
+ASSERT_SIG_RAW's binding data is empty: its digest commits to the
+message alone, under its own tag.
+
+The binding fields commit to the same prevout data as the
+participant specifiers of VALIDATION.md rule 3 and carry the
+recombination-stability classes stated there: amount and
+scriptPubKey are knowable when a program is written, the creating
+txid and the outpoint exist only once the creating transaction is
+final.
+
+**Arguments, all eight entries.** `pubkey` is an atom of exactly
+32 bytes, an x-only public key. `message` is an atom of 0 to 1024
+bytes. `signature` is an atom of exactly 64 bytes. Any violation
+is `bad_condition_arg`. Exactly three arguments, in the order
+`pubkey`, `message`, `signature`, all atoms. Argument checks run
+in a fixed order, pinned by vectors: the argument count rejects
+first (`bad_condition_arity`), then each operand in the order
+above.
+
+Failure of verification is the error `unsatisfied_sig_assert`. A
+`pubkey` whose x coordinate lifts to no curve point fails
+verification with that error, as the `secp_verify` relation
+defines: it is not an operand shape defect.
+
+**Cost, all eight entries.** Assigned when VALIDATION.md rule 5
+lands.
+
+**Validation rule, all eight entries.** The assert clause of
+VALIDATION.md (claims and asserts, rule 2), checked under
+VALIDATION.md rule 8. Stage 5.
+
+### ASSERT_SIG_MY_TXID (`0x10`)
+
+`(0x10 pubkey message signature)`
+
+**Semantics.** Claims nothing. Asserts that `signature` is a
+valid signature by `pubkey` over the family digest at tag
+`BitLisp/sig/my_txid` with binding data the carrying input's
+creating txid (`unsatisfied_sig_assert`). Arguments, cost, and
+validation rule as the family preamble states.
+
+### ASSERT_SIG_MY_SCRIPTPUBKEY (`0x11`)
+
+`(0x11 pubkey message signature)`
+
+**Semantics.** Claims nothing. Asserts that `signature` is a
+valid signature by `pubkey` over the family digest at tag
+`BitLisp/sig/my_scriptpubkey` with binding data the sha256 of the
+spent output's scriptPubKey (`unsatisfied_sig_assert`).
+Arguments, cost, and validation rule as the family preamble
+states.
+
+### ASSERT_SIG_MY_AMOUNT (`0x12`)
+
+`(0x12 pubkey message signature)`
+
+**Semantics.** Claims nothing. Asserts that `signature` is a
+valid signature by `pubkey` over the family digest at tag
+`BitLisp/sig/my_amount` with binding data the spent output's
+amount as 8 little-endian bytes (`unsatisfied_sig_assert`).
+Arguments, cost, and validation rule as the family preamble
+states.
+
+### ASSERT_SIG_MY_SCRIPTPUBKEY_AMOUNT (`0x13`)
+
+`(0x13 pubkey message signature)`
+
+**Semantics.** Claims nothing. Asserts that `signature` is a
+valid signature by `pubkey` over the family digest at tag
+`BitLisp/sig/my_scriptpubkey_amount` with binding data `spk_hash`
+then `amount8` of the carrying input (`unsatisfied_sig_assert`).
+Arguments, cost, and validation rule as the family preamble
+states.
+
+### ASSERT_SIG_MY_TXID_AMOUNT (`0x14`)
+
+`(0x14 pubkey message signature)`
+
+**Semantics.** Claims nothing. Asserts that `signature` is a
+valid signature by `pubkey` over the family digest at tag
+`BitLisp/sig/my_txid_amount` with binding data `txid` then
+`amount8` of the carrying input (`unsatisfied_sig_assert`).
+Arguments, cost, and validation rule as the family preamble
+states.
+
+### ASSERT_SIG_MY_TXID_SCRIPTPUBKEY (`0x15`)
+
+`(0x15 pubkey message signature)`
+
+**Semantics.** Claims nothing. Asserts that `signature` is a
+valid signature by `pubkey` over the family digest at tag
+`BitLisp/sig/my_txid_scriptpubkey` with binding data `txid` then
+`spk_hash` of the carrying input (`unsatisfied_sig_assert`).
+Arguments, cost, and validation rule as the family preamble
+states.
+
+### ASSERT_SIG_RAW (`0x16`)
+
+`(0x16 pubkey message signature)`
+
+**Semantics.** Claims nothing. Asserts that `signature` is a
+valid signature by `pubkey` over the family digest at tag
+`BitLisp/sig/raw` with empty binding data
+(`unsatisfied_sig_assert`). The digest commits to no prevout
+data: the same satisfied triple satisfies this assert on any
+input of any transaction. Arguments, cost, and validation rule as
+the family preamble states.
+
+### ASSERT_SIG_MY_OUTPOINT (`0x17`)
+
+`(0x17 pubkey message signature)`
+
+**Semantics.** Claims nothing. Asserts that `signature` is a
+valid signature by `pubkey` over the family digest at tag
+`BitLisp/sig/my_outpoint` with binding data the consumed
+outpoint's 36 wire-serialization bytes
+(`unsatisfied_sig_assert`). Arguments, cost, and validation rule
+as the family preamble states.
 
 ### Time asserts (`0x20` to `0x23`)
 

@@ -1,8 +1,8 @@
 # BitLisp Condition Validation
 
 Status: in progress. The transaction view, the claims-and-asserts
-principle, the validation stages, and rules 1, 2, 3, 4, 6, and 7
-are normative. Rule 5 is designed in architecture sessions, lands
+principle, the validation stages, and rules 1, 2, 3, 4, 6, 7, and
+8 are normative. Rule 5 is designed in architecture sessions, lands
 here as prose first, and only then gets implemented. Ground rule 4:
 this layer gets invariants and adversarial vectors before any feature
 work.
@@ -121,9 +121,12 @@ safely batch and requires a recorded design decision.
 
 ## Validation stages
 
-Rules are organized into stages of strictly increasing context. A
-rule's stage states exactly what context can invalidate its work,
-and no check reads more context than its stage provides.
+Rules are organized into stages of strictly increasing context
+through stage 4. A rule's stage states exactly what context can
+invalidate its work, and no check reads more context than its
+stage provides. Stage 5 adds no context beyond stage 2: its
+checks read only the carrying input's own data and the
+condition's operands.
 
 1. Stateless per-spend work: the VM run and condition
    well-formedness.
@@ -136,8 +139,8 @@ and no check reads more context than its stage provides.
    facts of the assembled transaction's fields (version,
    locktime, and the spending inputs' sequences), and quantities
    derived from the assembled transaction (the fee).
-5. Batch signature verification over the collected
-   (public key, message) pairs.
+5. Signature verification over the collected
+   (public key, digest, signature) triples.
 
 ## Rules (in landing order)
 
@@ -435,6 +438,38 @@ This rule is stage 4 work: the fee reads every input's amount and
 every output slot's amount, so the outcome changes when spends
 are recombined into a different transaction.
 
+### 8. Signature asserts
+
+Each condition of the signature assert family of
+`spec/CONDITIONS.md` is an assert whose fact is: the `signature`
+operand is a valid BIP340 Schnorr signature by the `pubkey`
+operand over the digest the condition's entry defines. The digest
+reads the condition's operands and the carrying input's own
+prevout data, and nothing else. Violation is the error
+`unsatisfied_sig_assert`.
+
+These asserts follow rule 4's classification: every occurrence is
+checked individually, and identical occurrences within one input
+hold or fail together, because the fact reads only values every
+such occurrence shares.
+
+This rule is stage 5 work. Its facts read no assembled-transaction
+field, so recombining spends into a different transaction never
+changes an outcome, and the composition guarantee holds for this
+family with no discipline required.
+
+**Guidance for program authors (not consensus).** A signature
+assert commits the signer to the message and the binding data,
+and to nothing else. A program that authorizes its spend with a
+fixed or reusable message lets anyone who has seen one valid
+transaction re-emit that authorization around different effects.
+Sign a commitment to the intended conditions, such as the hash of
+a program whose output is the intended condition list, and bind
+at the precision the protocol needs. ASSERT_SIG_RAW binds
+nothing: a RAW triple, once public, satisfies the same assert in
+every transaction forever. It exists to import externally
+produced attestations, not to authorize spends.
+
 ## Invariants
 
 The `hypothesis` suite in `python/tests/` must enforce the following
@@ -518,3 +553,13 @@ it enforceable, and lands with that rule:
 - Metamorphic: on a valid transaction whose fee equals its
   summed reserve, appending an output slot of positive amount
   causes rejection (rule 7).
+- A signature assert's outcome is unchanged by the transaction's
+  version, locktime, sequences, outputs, and the presence of
+  unrelated inputs: the outcome is a function of the condition
+  and its carrying input's own prevout data alone (rule 8).
+- Metamorphic: on a valid transaction carrying a satisfied
+  signature assert, flipping any byte of its pubkey, message, or
+  signature operand causes rejection (rule 8).
+- Variant separation: a satisfied triple re-emitted at any other
+  family opcode, operands identical, causes rejection: the
+  per-variant tags never share a digest (rule 8).
