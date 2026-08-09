@@ -51,16 +51,23 @@ A transaction is:
 Two quantities are derived from these fields, the way rule 7
 derives the fee. The transaction's **txid** is the double-SHA256
 of its serialization without witness data, in Bitcoin's wire
-encoding: the version, the input count and each input's outpoint,
-`scriptSig`, and `sequence`, the output count and each slot's
-`amount` and `scriptPubKey`, then the locktime. The transaction's
-**outputs hash** is the single SHA256 of the concatenated wire
-serialization of every output slot in order, each slot's 8-byte
-little-endian `amount` then its length-prefixed `scriptPubKey`.
-This is the `sha_outputs` value of BIP 341, which base consensus
-computes for every taproot sighash. Witness data enters neither
-derivation, so a BitLisp input's program, solution, and signatures
-never change either value.
+encoding: the 4-byte little-endian version, the input count, each
+input's outpoint (32 txid bytes then the 4-byte little-endian
+index), length-prefixed `scriptSig`, and 4-byte little-endian
+`sequence`, the output count, each slot's 8-byte little-endian
+`amount` and length-prefixed `scriptPubKey`, then the 4-byte
+little-endian locktime. The counts and length prefixes use
+Bitcoin's compact-size encoding: one byte for values below 253,
+otherwise a prefix byte `0xfd`, `0xfe`, or `0xff` followed by the
+value in 2, 4, or 8 little-endian bytes respectively. The
+transaction's **outputs hash** is the single SHA256 of the
+concatenated wire serialization of every output slot in order,
+each slot's 8-byte little-endian `amount` then its
+length-prefixed `scriptPubKey`, with no count prefix. This is the
+`sha_outputs` value of BIP 341, which base consensus computes for
+every taproot sighash. Witness data enters neither derivation, so
+a BitLisp input's program, solution, and signatures never change
+either value.
 
 Validation is defined only over transactions that satisfy Bitcoin's
 base consensus rules. The reference transaction model enforces the
@@ -604,9 +611,10 @@ it enforceable, and lands with that rule:
   otherwise with the family's error (seals).
 - Metamorphic: on a valid transaction carrying a satisfied seal,
   flipping any byte of the operand causes rejection, and so does
-  any mutation of what the seal reads: for SEAL any non-witness
-  field, for SEAL_OUTPUTS any output slot's content or position
-  (seals).
+  any mutation that changes what the seal reads: for SEAL any
+  change to the non-witness serialization, for SEAL_OUTPUTS any
+  change to the serialized slot list, such as moving a slot past
+  a slot of differing content (seals).
 - A SEAL_OUTPUTS outcome is unchanged by the transaction's
   version, locktime, sequences, scriptSigs, and input list: the
   outcome is a function of the operand and the output slots alone
@@ -614,8 +622,9 @@ it enforceable, and lands with that rule:
 - Whenever a SEAL is satisfied, the SEAL_OUTPUTS carrying the
   transaction's outputs hash is satisfied on the same transaction:
   the txid commits to the outputs (seals).
-- Sealed merge: concatenating a transaction carrying any seal
-  condition with any other transaction is rejected, whatever the
-  operands: concatenation appends inputs and outputs, so it
-  changes every txid and every outputs hash (seals, the scoped
-  merge invariant above keeps the guarantee for everything else).
+- Sealed merge: concatenating a valid transaction carrying a
+  satisfied seal with any other transaction is rejected: the
+  satisfied operand equals the unmerged quantity, and
+  concatenation appends inputs and outputs, so it changes every
+  txid and every outputs hash (seals, the scoped merge invariant
+  above keeps the guarantee for everything else).

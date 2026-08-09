@@ -3,9 +3,10 @@
 Status: in progress. Section 1, the CREATE_OUTPUT and
 CREATE_OUTPUT_TAPROOT entries, the signature assert family, the
 time assert family, the self assert family, the message family,
-and the RESERVE_FEE entry are normative. The remaining vocabulary
-v0 entries land across Phase 2, each with semantics, arguments,
-cost, and validation rule reference.
+the RESERVE_FEE entry, and the seal family are normative. The
+vocabulary v0 table is complete: every entry carries its
+semantics, arguments, cost line, and validation rule reference,
+with costs assigned when VALIDATION.md rule 5 lands.
 
 A successful program evaluation yields a condition list. This document
 specifies the encoding of that list and the per-condition rules: each
