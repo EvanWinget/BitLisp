@@ -2,14 +2,15 @@
 
 Status: in progress. Section 1, the CREATE_OUTPUT and
 CREATE_OUTPUT_TAPROOT entries, the time assert family, the self
-assert family, and the message family are normative. The remaining
-vocabulary v0 entries land across Phase 2, each with semantics,
-arguments, cost, and validation rule reference.
+assert family, the message family, and the RESERVE_FEE entry are
+normative. The remaining vocabulary v0 entries land across Phase 2,
+each with semantics, arguments, cost, and validation rule
+reference.
 
 A successful program evaluation yields a condition list. This document
 specifies the encoding of that list and the per-condition rules: each
-condition's arguments, their domains, and the claims, asserts, or
-message records it produces. Everything that combines conditions
+condition's arguments, their domains, and the claims, asserts,
+message records, or fee reserves it produces. Everything that combines conditions
 across inputs, checking them against the containing transaction, is
 specified in [VALIDATION.md](VALIDATION.md).
 
@@ -57,7 +58,7 @@ block without a vocabulary entry are invalid, not reserved:
 | `0x20` to `0x2f` | time asserts |
 | `0x30` to `0x3f` | self asserts |
 | `0x40` to `0x4f` | messages |
-| `0x50` to `0x5f` | fees and universal asserts |
+| `0x50` to `0x5f` | fees |
 | `0x60` to `0x7f` | unallocated, invalid |
 
 ## 2. Vocabulary v0
@@ -79,17 +80,12 @@ block without a vocabulary entry are invalid, not reserved:
 | `0x41` | `ASSERT_ANNOUNCEMENT` |
 | `0x42` | `SEND_MESSAGE` |
 | `0x43` | `RECEIVE_MESSAGE` |
+| `0x50` | `RESERVE_FEE` |
 
 Planned entries, unassigned and invalid until their sections land:
-the secp `AGG_SIG` family with program-composed messages,
-`RESERVE_FEE`, `ASSERT_OUTPUT_COUNT`, and `ASSERT_FEE_LE`.
-
-Every planned entry lands only in a shape the composition
-guarantee in `spec/VALIDATION.md` permits. In their listed shapes,
-`ASSERT_OUTPUT_COUNT` (an exact count) and `ASSERT_FEE_LE` (an
-upper bound on a quantity that concatenation sums) are forbidden
-by that guarantee, so each lands re-shaped or not at all, decided
-at its design session.
+the secp `AGG_SIG` family with program-composed messages. Every
+planned entry lands only in a shape the composition guarantee in
+`spec/VALIDATION.md` permits.
 
 ### CREATE_OUTPUT (`0x01`)
 
@@ -537,4 +533,22 @@ count (`bad_condition_arity`).
 **Cost.** Assigned when VALIDATION.md rule 5 lands.
 
 **Validation rule.** VALIDATION.md rule 3 (the message ledger).
+Stage 4.
+
+### RESERVE_FEE (`0x50`)
+
+`(0x50 reserve)`
+
+**Semantics.** Claims nothing, asserts nothing. Produces a fee
+reserve of `reserve` satoshis. The transaction's fee must be at
+least the sum of every fee reserve of every BitLisp input
+(VALIDATION.md rule 7, `insufficient_fee`).
+
+**Arguments.** `reserve` is a minimally encoded integer with
+0 <= reserve <= 2,100,000,000,000,000 (MAX_MONEY, in satoshis)
+(`bad_condition_arg`). Exactly one argument, an atom.
+
+**Cost.** Assigned when VALIDATION.md rule 5 lands.
+
+**Validation rule.** VALIDATION.md rule 7 (the fee reserve).
 Stage 4.

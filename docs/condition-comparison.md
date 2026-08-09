@@ -6,7 +6,7 @@ compares the two validation layers. It is the condition-layer companion
 to [opcode-comparison.md](opcode-comparison.md). The BitLisp columns
 restate [spec/CONDITIONS.md](../spec/CONDITIONS.md) and
 [spec/VALIDATION.md](../spec/VALIDATION.md), which are the normative
-sources. Divergence ids (C1 to C4) and decision ids (D-CC2) refer to
+sources. Divergence ids (C1 to C15) and decision ids (D-CC2) refer to
 [condition-record.md](condition-record.md).
 
 There is no bllsh column. bllsh has no condition layer at all: its
@@ -96,18 +96,18 @@ delegate to.
 
 | Capability | Chia | BitLisp |
 | --- | --- | --- |
-| own identity | `ASSERT_MY_COIN_ID` 70 | open at the `ASSERT_MY_*` design |
-| own parent | `ASSERT_MY_PARENT_ID` 71 | open at the `ASSERT_MY_*` design |
-| own program | `ASSERT_MY_PUZZLEHASH` 72 | open at the `ASSERT_MY_*` design |
-| own amount | `ASSERT_MY_AMOUNT` 73 | open at the `ASSERT_MY_*` design |
-| own taproot components | absent | `ASSERT_MY_TAPROOT`, flagged as a candidate in D-CC2, open |
-| own birth time or height | `ASSERT_MY_BIRTH_SECONDS` 74, `ASSERT_MY_BIRTH_HEIGHT` 75 | not in the v0 plan, reads chain state outside the transaction view |
-| ephemerality | `ASSERT_EPHEMERAL` 76, the coin was created in the same block it is spent | not in the v0 plan, reads chain state outside the transaction view |
+| own identity | `ASSERT_MY_COIN_ID` 70 | `ASSERT_MY_OUTPOINT` `0x30`, normative (decision 20) |
+| own parent | `ASSERT_MY_PARENT_ID` 71 | `ASSERT_MY_TXID` `0x31`, normative, the txid half of the outpoint |
+| own program | `ASSERT_MY_PUZZLEHASH` 72 | `ASSERT_MY_SCRIPTPUBKEY` `0x32`, normative, raw script bytes |
+| own amount | `ASSERT_MY_AMOUNT` 73 | `ASSERT_MY_AMOUNT` `0x33`, normative |
+| own taproot components | absent | `ASSERT_MY_TAPROOT` `0x37`, normative, the D-CC2 mirror |
+| own birth time or height | `ASSERT_MY_BIRTH_SECONDS` 74, `ASSERT_MY_BIRTH_HEIGHT` 75 | declined, a chain read outside the transaction view (C13) |
+| ephemerality | `ASSERT_EPHEMERAL` 76, the coin was created in the same block it is spent | declined, structurally inexpressible within one transaction (C14) |
 
-The `ASSERT_MY_*` family is named in the planned list but its
-membership is an open design item, the natural entries differing
-because BitLisp's spend identity is an outpoint and a scriptPubKey
-rather than a parent, puzzle hash, and amount triple. The two birth
+The family landed 2026-08-08 (decision 20) with the natural
+entries re-addressed to Bitcoin's spend identity, an outpoint and
+a scriptPubKey rather than a parent, puzzle hash, and amount
+triple. The two birth
 asserts and `ASSERT_EPHEMERAL` compare against coin records that
 exist in Chia's coin-set model and have no counterpart in the
 VALIDATION.md transaction view, so porting any of them would first
@@ -140,21 +140,24 @@ time, while messages are addressed exact pairing. The v0 plan
 therefore carries an addressed pair and a broadcast pair side by
 side, both transaction-scoped.
 
-## Fees and universal asserts
+## Fees and transaction-wide quantities
 
 | Capability | Chia | BitLisp |
 | --- | --- | --- |
-| fee floor | `RESERVE_FEE` 52 | `RESERVE_FEE`, planned |
-| output count | absent | `ASSERT_OUTPUT_COUNT`, planned, novel |
-| fee ceiling | absent | `ASSERT_FEE_LE`, planned, novel |
+| fee floor | `RESERVE_FEE` 52 | `RESERVE_FEE` `0x50`, normative (rule 7, decision 21) |
+| fee ceiling | absent | declined (decision 21) |
+| output count | absent | declined, exact and floor forms (decision 21) |
+| input count | absent | declined, mirroring output count (decision 21) |
+| weight, fee rate | absent | declined, self-referential (decision 21) |
 
-The two universal asserts are BitLisp additions with no deployed
-reference anywhere. They are named by design obligation 4 in the
-evaluation doc (curated vocabulary, deliberately chosen universal
-asserts over the whole transaction), and their full rationale lands
-with their vocabulary entries. Like the validation rules, they get the
-novel-layer treatment, invariants and adversarial vectors rather
-than translated tests.
+The fee floor is the ported entry, matching Chia's deployed
+checked-sum semantics exactly. The once-planned universal asserts
+(`ASSERT_FEE_LE`, `ASSERT_OUTPUT_COUNT`) are recorded declines:
+the transaction-wide forms are forbidden by the composition
+guarantee, the per-input fee bound decomposes into landed
+vocabulary, and the composition-safe count floors had no
+identified user. Decision 21 in the condition record carries the
+full rationale and the reserved-tier reintroduction path.
 
 ## No-op and forward compatibility
 
@@ -184,27 +187,26 @@ specs of the same shape.
 | output identity | content-derived coin id (parent, puzzle hash, amount) | positional slot (scriptPubKey, amount) |
 | output creation | authoritative construction, collision rejected | injective claim on existing slots, equality-only, multiset counting (rule 1, normative) |
 | coexistence | every coin is a puzzle, no foreign outputs exist | mixed transactions with plain-taproot inputs and unmatched outputs (rule 2, normative) |
-| cross-spend interaction | block-scoped messages and concurrency asserts | transaction-scoped messages (rule 3, pending) |
-| dedup and multiplicity | deployed semantics, the planned cross-check source for translated tests | rule 4, pending |
+| cross-spend interaction | block-scoped messages and concurrency asserts | transaction-scoped messages (rule 3, normative) |
+| dedup and multiplicity | deployed semantics, the cross-check source for the translated rule 4 tests | rule 4, normative, sort-bound multiplicity with no collapse |
 | costing | deployed per-condition costs (`CREATE_COIN` 1,800,000, `AGG_SIG` 1,200,000, message 700, generic 200), CHIP-0049 revisions in review | rule 5, pending, CHIP-0049 is the recorded precedent with two pre-registered deliberate decisions |
 | unknown conditions | ignored tiers | invalid plus the priced reserved tier (rule 6, normative) |
 
 ## Observations
 
-- **Where Phase 2 stands.** Ten vocabulary entries are normative,
-  `CREATE_OUTPUT`, `CREATE_OUTPUT_TAPROOT`, the four time asserts,
-  and the message family (`SEND_MESSAGE`, `RECEIVE_MESSAGE`,
-  `ANNOUNCE`, `ASSERT_ANNOUNCEMENT`). Three planned entries are
-  named: `RESERVE_FEE`, `ASSERT_OUTPUT_COUNT`, and `ASSERT_FEE_LE`
-  (the last two constrained by the composition guarantee, which
-  forbids their listed shapes, condition-record decision 14). Two
-  families are planned with membership open, the secp AGG_SIG
-  family and `ASSERT_MY_*`. Of the six validation rules, 1, 2, 3,
-  and 6 are normative and 4 and 5 are pending.
+- **Where Phase 2 stands.** Sixteen vocabulary entries are
+  normative: `CREATE_OUTPUT`, `CREATE_OUTPUT_TAPROOT`, the four
+  time asserts, the five self asserts (decision 20), the message
+  family (`SEND_MESSAGE`, `RECEIVE_MESSAGE`, `ANNOUNCE`,
+  `ASSERT_ANNOUNCEMENT`), and `RESERVE_FEE` (decision 21). One
+  family is planned with membership open, the secp AGG_SIG
+  family. Of the seven validation rules, 1, 2, 3, 4, 6, and 7 are
+  normative and 5 is pending, deliberately last so costing prices
+  the complete vocabulary.
 - **Reference coverage is uneven by design.** The ported entries
   (timelocks, messages, `RESERVE_FEE`, the AGG_SIG and `ASSERT_MY_*`
   shapes) have deployed Chia semantics to translate tests from. The
-  novel surface, both universal asserts, the taproot derivation, and
+  novel surface, the taproot derivation and
   every validation rule, has no external reference and gets the
   ground-rule-4 treatment instead: invariants first, adversarial
   vectors, and the novel-layer register in condition-record.md.

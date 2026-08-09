@@ -153,6 +153,7 @@ def _condition_json(cond):
         CreateOutputTaproot,
         ReceiveMessage,
         Reserved,
+        ReserveFee,
         SendMessage,
     )
 
@@ -220,6 +221,8 @@ def _condition_json(cond):
             "receiver_commitment": cond.receiver_commitment,
             "message": cond.message.hex(),
         }
+    if isinstance(cond, ReserveFee):
+        return {"opcode": cond.opcode, "reserve": cond.reserve}
     if isinstance(cond, Reserved):
         return {
             "opcode": cond.opcode,
@@ -262,6 +265,9 @@ def run_conditions_case(case):
     SEND_MESSAGE is {"opcode", "sender_commitment", "receiver",
     "message"}, and RECEIVE_MESSAGE is {"opcode", "sender",
     "receiver_commitment", "message"}.
+
+    RESERVE_FEE pins {"opcode", "reserve"} with the reserve as an
+    integer.
     """
     from bitlisp import BitLispError, deserialize, parse_conditions
     from bitlisp.errors import CODES

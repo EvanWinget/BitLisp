@@ -36,6 +36,7 @@ ANNOUNCE = 0x40
 ASSERT_ANNOUNCEMENT = 0x41
 SEND_MESSAGE = 0x42
 RECEIVE_MESSAGE = 0x43
+RESERVE_FEE = 0x50
 _RESERVED_START = 0x80
 
 MAX_MESSAGE_SIZE = 1024
@@ -248,6 +249,17 @@ class ReceiveMessage:
     message: bytes
 
     opcode = RECEIVE_MESSAGE
+
+
+@dataclass(frozen=True)
+class ReserveFee:
+    """A fee reserve: a counted demand of reserve satoshis against
+    the transaction's fee. Occurrences sum, and the fee must reach
+    the total."""
+
+    reserve: int
+
+    opcode = RESERVE_FEE
 
 
 @dataclass(frozen=True)
@@ -536,6 +548,18 @@ def _parse_assert_announcement(args):
     return AssertAnnouncement(announcer, namespace, payload)
 
 
+def _parse_reserve_fee(args):
+    if len(args) != 1:
+        raise BitLispError(
+            "bad_condition_arity",
+            f"RESERVE_FEE takes 1 argument, got {len(args)}",
+        )
+    reserve = _parse_int(args[0], "RESERVE_FEE operand")
+    if not 0 <= reserve <= MAX_MONEY:
+        raise BitLispError("bad_condition_arg", f"reserve out of range: {reserve}")
+    return ReserveFee(reserve)
+
+
 def _parse_reserved(opcode, args):
     if not args:
         raise BitLispError(
@@ -621,6 +645,8 @@ def _parse_condition(node):
         return _parse_send_message(args)
     if opcode == RECEIVE_MESSAGE:
         return _parse_receive_message(args)
+    if opcode == RESERVE_FEE:
+        return _parse_reserve_fee(args)
     raise BitLispError("bad_condition_opcode", f"invalid opcode {opcode:#04x}")
 
 

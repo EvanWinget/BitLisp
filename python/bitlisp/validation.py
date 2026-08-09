@@ -52,6 +52,7 @@ from .conditions import (
     CreateOutput,
     CreateOutputTaproot,
     ReceiveMessage,
+    ReserveFee,
     SendMessage,
     Specifier,
 )
@@ -288,6 +289,26 @@ def check_announcements(tx):
                 )
 
 
+def check_fee_reserve(tx):
+    """Rule 7. The fee, inputs minus outputs, must be at least the
+    exact sum of every fee reserve of every BitLisp input. Reserves
+    are counted: occurrences sum, they never share. Python integers
+    make the sum exact, so a reserve stack no fee can reach fails
+    this comparison with no separate overflow path."""
+    total = sum(
+        cond.reserve
+        for tx_input in tx.inputs
+        for cond in tx_input.conditions or ()
+        if isinstance(cond, ReserveFee)
+    )
+    fee = sum(i.amount for i in tx.inputs) - sum(o.amount for o in tx.outputs)
+    if fee < total:
+        raise BitLispError(
+            "insufficient_fee",
+            f"reserves demand {total}, the fee is {fee}",
+        )
+
+
 def validate_transaction(tx):
     """Every validation rule that has landed so far, stage 2 work
     before stage 4."""
@@ -296,3 +317,4 @@ def validate_transaction(tx):
     check_time_asserts(tx)
     check_messages(tx)
     check_announcements(tx)
+    check_fee_reserve(tx)
