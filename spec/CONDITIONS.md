@@ -59,7 +59,8 @@ block without a vocabulary entry are invalid, not reserved:
 | `0x30` to `0x3f` | self asserts |
 | `0x40` to `0x4f` | messages |
 | `0x50` to `0x5f` | fees |
-| `0x60` to `0x7f` | unallocated, invalid |
+| `0x60` to `0x6f` | seals |
+| `0x70` to `0x7f` | unallocated, invalid |
 
 ## 2. Vocabulary v0
 
@@ -89,11 +90,8 @@ block without a vocabulary entry are invalid, not reserved:
 | `0x42` | `SEND_MESSAGE` |
 | `0x43` | `RECEIVE_MESSAGE` |
 | `0x50` | `RESERVE_FEE` |
-
-Planned entries, unassigned and invalid until their sections land:
-the seal family, SEAL and SEAL_OUTPUTS, which lands together with
-the scoping of `spec/VALIDATION.md`'s composition guarantee that
-its semantics require.
+| `0x60` | `SEAL` |
+| `0x61` | `SEAL_OUTPUTS` |
 
 ### CREATE_OUTPUT (`0x01`)
 
@@ -727,3 +725,95 @@ least the sum of every fee reserve of every BitLisp input
 
 **Validation rule.** VALIDATION.md rule 7 (the fee reserve).
 Stage 4.
+
+### Seals (`0x60` and `0x61`)
+
+The two conditions of this family assert facts of the assembled
+spending transaction itself: SEAL its txid, SEAL_OUTPUTS its
+outputs hash, both quantities as the transaction view of
+VALIDATION.md derives them. The txid excludes witness data, and a
+BitLisp input's program, solution, and seal operand all live in
+the witness, so the equality is well-defined and signatures added
+to satisfy the signature asserts never change what a seal reads.
+
+A seal exists to make a broadcast transaction immutable in the
+mempool. Every other condition constrains only what it names, so
+a spend whose input carries surplus value beyond its claims can
+be rebuilt in flight with a grafted output capturing the surplus,
+every original condition still holding. A satisfied seal makes
+any such rebuild fail: altering the transaction changes the
+quantity the seal reads.
+
+A transaction carrying any condition of this family is excluded
+from the composition guarantee of VALIDATION.md by that
+guarantee's own hypothesis: sealing is a declared demand for
+unbatchability, and concatenation changes every txid and every
+outputs hash.
+
+Both conditions are asserts under VALIDATION.md rule 4: identical
+occurrences hold or fail together wherever they appear, since the
+facts read are transaction-wide. Occurrences with differing
+operands are checked independently, and two SEAL conditions with
+differing operands can never both hold. Failure of either assert
+is the error `unsatisfied_seal_assert`.
+
+This family is stage 4 work: both quantities are derived from the
+assembled transaction, so recombining spends into a different
+transaction changes them by construction.
+
+**Guidance for program authors (not consensus).** A seal operand
+arrives in the solution, and the solution is witness data no rule
+protects from rewriting. A seal whose operand no signature
+commits to therefore seals nothing: whoever rebuilds the
+transaction substitutes the matching operand in the same motion.
+Compose the seal into a signed message, such as the hash of a
+delegated program that emits it. One binding signature anywhere
+in the transaction suffices, whichever input carries the seal,
+because the facts read are transaction-wide. A transaction
+spendable with no signature at all is re-solvable by anyone in
+full and has no immutability for any condition to provide. Choose
+the variant by posture: SEAL_OUTPUTS holds the outputs fixed and
+leaves the input side open, so a later-added input can only raise
+the fee, while SEAL forbids every alteration including that one.
+
+### SEAL (`0x60`)
+
+`(0x60 txid)`
+
+**Semantics.** Claims nothing. Asserts that the spending
+transaction's own txid equals `txid` byte-exact
+(`unsatisfied_seal_assert`). The operand names the containing
+transaction, where ASSERT_MY_TXID names the past one that created
+the spent output. A satisfied SEAL fixes every non-witness byte
+of the transaction: the version, every input's outpoint,
+scriptSig, and sequence, every output slot's content and order,
+and the locktime. SEAL asserts strictly more than SEAL_OUTPUTS:
+the txid commits to the outputs hash's preimage.
+
+**Arguments.** `txid` is an atom of exactly 32 bytes, the txid in
+the byte order outpoints carry (`bad_condition_arg`). Exactly one
+argument, an atom.
+
+**Cost.** Assigned when VALIDATION.md rule 5 lands.
+
+**Validation rule.** The assert clause of VALIDATION.md
+(claims and asserts, rule 2). Stage 4.
+
+### SEAL_OUTPUTS (`0x61`)
+
+`(0x61 outputs_hash)`
+
+**Semantics.** Claims nothing. Asserts that the spending
+transaction's outputs hash equals `outputs_hash` byte-exact
+(`unsatisfied_seal_assert`). A satisfied SEAL_OUTPUTS fixes every
+output slot's content and order and nothing else: the version,
+the locktime, and the input list, including which inputs exist,
+stay unconstrained.
+
+**Arguments.** `outputs_hash` is an atom of exactly 32 bytes
+(`bad_condition_arg`). Exactly one argument, an atom.
+
+**Cost.** Assigned when VALIDATION.md rule 5 lands.
+
+**Validation rule.** The assert clause of VALIDATION.md
+(claims and asserts, rule 2). Stage 4.
