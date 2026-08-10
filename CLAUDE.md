@@ -82,8 +82,9 @@ In practice this means:
    language.** The language is decided: C++ (decision by Evan,
    2026-07-29, recorded in `docs/execution-plan.md`). The remaining
    integration questions stay at the Phase 4 gate, and no Phase 0 to 3
-   artifact may assume the language. Phase 3 (the authoring language
-   and compiler, added 2026-07-30) is tooling, not consensus, and is
+   artifact may assume the language. Phase 3 (the execution front end,
+   authoring language, and compiler, added 2026-07-30 and restructured
+   into serial units 2026-08-09) is tooling, not consensus, and is
    covered by the same independence rule.
 
 ## Consensus mindset
