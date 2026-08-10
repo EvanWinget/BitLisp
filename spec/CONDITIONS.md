@@ -1,12 +1,9 @@
 # BitLisp Conditions
 
-Status: in progress. Section 1, the CREATE_OUTPUT and
-CREATE_OUTPUT_TAPROOT entries, the signature assert family, the
-time assert family, the self assert family, the message family,
-the RESERVE_FEE entry, and the seal family are normative. The
-vocabulary v0 table is complete: every entry carries its
-semantics, arguments, cost line, and validation rule reference,
-with costs assigned when VALIDATION.md rule 5 lands.
+Status: normative and complete for v0. Every entry carries its
+semantics, arguments, cost line, and validation rule reference.
+Costs are charged under the accounting and charge order of
+VALIDATION.md rule 5, with the constants in COSTS.md section 10.
 
 A successful program evaluation yields a condition list. This document
 specifies the encoding of that list and the per-condition rules: each
@@ -116,7 +113,8 @@ empty atom is rejected (`bad_condition_arg`). `amount` is a minimally
 encoded integer with 0 <= amount <= 2,100,000,000,000,000 (MAX_MONEY,
 in satoshis). Exactly two arguments, both atoms.
 
-**Cost.** Assigned when VALIDATION.md rule 5 lands.
+**Cost.** `CREATE_OUTPUT_COST` = 1,350,000 (COSTS.md section 10),
+charged after every argument check.
 
 **Validation rule.** VALIDATION.md rule 1.
 
@@ -160,7 +158,9 @@ script tree. `amount` is a minimally encoded integer with
 0 <= amount <= 2,100,000,000,000,000 (MAX_MONEY, in satoshis).
 Exactly three arguments, all atoms.
 
-**Cost.** Assigned when VALIDATION.md rule 5 lands.
+**Cost.** `CREATE_OUTPUT_COST + TAPROOT_TWEAK_COST` = 2,650,000
+(COSTS.md section 10), charged after every argument check and
+before the point derivation.
 
 **Validation rule.** VALIDATION.md rule 1, after the derivation above.
 
@@ -236,8 +236,9 @@ Failure of verification is the error `unsatisfied_sig_assert`. A
 verification with that error, as the `secp_verify` relation
 defines: it is not an operand shape defect.
 
-**Cost, all eight entries.** Assigned when VALIDATION.md rule 5
-lands.
+**Cost, all eight entries.** `CONDITION_SIG_ASSERT_COST` =
+1,300,000 (COSTS.md section 10), charged after every argument
+check. Verification runs in stage 5, after the charge.
 
 **Validation rule, all eight entries.** The assert clause of
 VALIDATION.md (claims and asserts, rule 2), checked under
@@ -382,7 +383,8 @@ which recombination preserves it.
 0 <= height < 500,000,000 (`bad_condition_arg`). Exactly one
 argument, an atom.
 
-**Cost.** Assigned when VALIDATION.md rule 5 lands.
+**Cost.** `CONDITION_GENERIC_COST` = 200 (COSTS.md section 10),
+charged after every argument check.
 
 **Validation rule.** The assert clause of VALIDATION.md
 (claims and asserts, rule 2). Stage 4.
@@ -402,7 +404,8 @@ argument, an atom.
 500,000,000 <= time <= 4,294,967,295 (`bad_condition_arg`).
 Exactly one argument, an atom.
 
-**Cost.** Assigned when VALIDATION.md rule 5 lands.
+**Cost.** `CONDITION_GENERIC_COST` = 200 (COSTS.md section 10),
+charged after every argument check.
 
 **Validation rule.** The assert clause of VALIDATION.md
 (claims and asserts, rule 2). Stage 4.
@@ -424,7 +427,8 @@ Exactly one argument, an atom.
 0 <= blocks <= 65,535 (`bad_condition_arg`). Exactly one
 argument, an atom.
 
-**Cost.** Assigned when VALIDATION.md rule 5 lands.
+**Cost.** `CONDITION_GENERIC_COST` = 200 (COSTS.md section 10),
+charged after every argument check.
 
 **Validation rule.** The assert clause of VALIDATION.md
 (claims and asserts, rule 2). Stage 4.
@@ -447,7 +451,8 @@ argument, an atom.
 0 <= units <= 65,535, counting 512-second units
 (`bad_condition_arg`). Exactly one argument, an atom.
 
-**Cost.** Assigned when VALIDATION.md rule 5 lands.
+**Cost.** `CONDITION_GENERIC_COST` = 200 (COSTS.md section 10),
+charged after every argument check.
 
 **Validation rule.** The assert clause of VALIDATION.md
 (claims and asserts, rule 2). Stage 4.
@@ -492,7 +497,8 @@ consumed outpoint's 32 txid bytes followed by its 32-bit index in
 little-endian byte order, the wire serialization
 (`bad_condition_arg`). Exactly one argument, an atom.
 
-**Cost.** Assigned when VALIDATION.md rule 5 lands.
+**Cost.** `CONDITION_GENERIC_COST` = 200 (COSTS.md section 10),
+charged after every argument check.
 
 **Validation rule.** The assert clause of VALIDATION.md
 (claims and asserts, rule 2). Stage 2.
@@ -510,7 +516,8 @@ unconstrained.
 **Arguments.** `txid` is an atom of exactly 32 bytes
 (`bad_condition_arg`). Exactly one argument, an atom.
 
-**Cost.** Assigned when VALIDATION.md rule 5 lands.
+**Cost.** `CONDITION_GENERIC_COST` = 200 (COSTS.md section 10),
+charged after every argument check.
 
 **Validation rule.** The assert clause of VALIDATION.md
 (claims and asserts, rule 2). Stage 2.
@@ -529,7 +536,8 @@ consensus accepts, including the empty script, so the empty atom
 is a valid operand here even though CREATE_OUTPUT rejects it as
 claim content. Exactly one argument, an atom.
 
-**Cost.** Assigned when VALIDATION.md rule 5 lands.
+**Cost.** `CONDITION_GENERIC_COST` = 200 (COSTS.md section 10),
+charged after every argument check.
 
 **Validation rule.** The assert clause of VALIDATION.md
 (claims and asserts, rule 2). Stage 2.
@@ -546,7 +554,8 @@ amount equals `amount` numerically
 0 <= amount <= 2,100,000,000,000,000 (MAX_MONEY, in satoshis)
 (`bad_condition_arg`). Exactly one argument, an atom.
 
-**Cost.** Assigned when VALIDATION.md rule 5 lands.
+**Cost.** `CONDITION_GENERIC_COST` = 200 (COSTS.md section 10),
+charged after every argument check.
 
 **Validation rule.** The assert clause of VALIDATION.md
 (claims and asserts, rule 2). Stage 2.
@@ -570,7 +579,9 @@ must satisfy the point derivation (`bad_condition_arg`).
 (`bad_condition_arg`). The empty atom means the output commits to
 no script tree. Exactly two arguments, both atoms.
 
-**Cost.** Assigned when VALIDATION.md rule 5 lands.
+**Cost.** `CONDITION_GENERIC_COST + TAPROOT_TWEAK_COST` =
+1,300,200 (COSTS.md section 10), charged after every argument
+check and before the point derivation.
 
 **Validation rule.** The assert clause of VALIDATION.md
 (claims and asserts, rule 2), after the derivation above. Stage 2.
@@ -630,7 +641,8 @@ it. An announcement no assert reads constrains nothing.
 **Arguments.** `namespace` and `payload` are atoms of 0 to 1024
 bytes (`bad_condition_arg`). Exactly two arguments, both atoms.
 
-**Cost.** Assigned when VALIDATION.md rule 5 lands.
+**Cost.** `CONDITION_MESSAGE_COST` = 700 (COSTS.md section 10),
+charged after every argument check.
 
 **Validation rule.** VALIDATION.md rule 3 (announcements). Stage 4.
 
@@ -653,7 +665,8 @@ specifier operands the table in VALIDATION.md rule 3 states for
 `mode`, in table order. Exactly 3 + n arguments, where n is the
 mode's operand count (`bad_condition_arity`).
 
-**Cost.** Assigned when VALIDATION.md rule 5 lands.
+**Cost.** `CONDITION_MESSAGE_COST` = 700 (COSTS.md section 10),
+charged after every argument check.
 
 **Validation rule.** VALIDATION.md rule 3 (announcements). Stage 4.
 
@@ -680,7 +693,8 @@ for the receiver half, in table order. Exactly 2 + n arguments,
 where n is the receiver half's operand count
 (`bad_condition_arity`).
 
-**Cost.** Assigned when VALIDATION.md rule 5 lands.
+**Cost.** `CONDITION_MESSAGE_COST` = 700 (COSTS.md section 10),
+charged after every argument check.
 
 **Validation rule.** VALIDATION.md rule 3 (the message ledger).
 Stage 4.
@@ -704,7 +718,8 @@ then the specifier operands for the sender half, in table order.
 Exactly 2 + n arguments, where n is the sender half's operand
 count (`bad_condition_arity`).
 
-**Cost.** Assigned when VALIDATION.md rule 5 lands.
+**Cost.** `CONDITION_MESSAGE_COST` = 700 (COSTS.md section 10),
+charged after every argument check.
 
 **Validation rule.** VALIDATION.md rule 3 (the message ledger).
 Stage 4.
@@ -722,7 +737,8 @@ least the sum of every fee reserve of every BitLisp input
 0 <= reserve <= 2,100,000,000,000,000 (MAX_MONEY, in satoshis)
 (`bad_condition_arg`). Exactly one argument, an atom.
 
-**Cost.** Assigned when VALIDATION.md rule 5 lands.
+**Cost.** `CONDITION_GENERIC_COST` = 200 (COSTS.md section 10),
+charged after every argument check.
 
 **Validation rule.** VALIDATION.md rule 7 (the fee reserve).
 Stage 4.
@@ -795,7 +811,8 @@ the txid commits to the outputs hash's preimage.
 the byte order outpoints carry (`bad_condition_arg`). Exactly one
 argument, an atom.
 
-**Cost.** Assigned when VALIDATION.md rule 5 lands.
+**Cost.** `CONDITION_GENERIC_COST` = 200 (COSTS.md section 10),
+charged after every argument check.
 
 **Validation rule.** The assert clause of VALIDATION.md
 (claims and asserts, rule 2). Stage 4.
@@ -814,7 +831,8 @@ stay unconstrained.
 **Arguments.** `outputs_hash` is an atom of exactly 32 bytes
 (`bad_condition_arg`). Exactly one argument, an atom.
 
-**Cost.** Assigned when VALIDATION.md rule 5 lands.
+**Cost.** `CONDITION_GENERIC_COST` = 200 (COSTS.md section 10),
+charged after every argument check.
 
 **Validation rule.** The assert clause of VALIDATION.md
 (claims and asserts, rule 2). Stage 4.
