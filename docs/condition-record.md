@@ -26,7 +26,7 @@ Section 4 registers the rules that have no external reference at all.
 | C9 | message addressing fields | parent coin id, puzzle hash, amount, coin id, all content-derived | creating txid, spent scriptPubKey as raw bytes, amount, outpoint, with script and amount content-derived, txid and outpoint location-derived. Amount domains follow the fields: u64 there, 0 to MAX_MONEY here | The validator holds prevout data only. The creating txid is the creator handle it possesses, the txid half of the outpoint. Raw script bytes follow C1's rationale. The outpoint is Bitcoin's coin identity. Chia's coin-parent reading ("output of whichever transaction spent coin P") is unverifiable from prevout data and is a recorded decline. Ratified 2026-08-07, decision 16. | `validation/messages.json` mode cases |
 | C10 | condition argument arity | consensus accepts trailing extra arguments, strict arity only under the mempool flag (STRICT_ARGS_COUNT) | strict arity everywhere | One validator, one behavior, reject the ambiguous case. Verified in chia_rs conditions.rs: check_nil runs only under the mempool flag. Already the landed behavior of every prior family, recorded as a divergence here because the message probes surfaced it. Ratified 2026-08-07, decision 16. | `conditions/messages.json` arity cases |
 | C11 | broadcast conditions | four announcement codes, announcer bound by coin id or puzzle hash, namespacing by payload prefix convention | two conditions, announcer precision chosen by the assert through the shared specifier grammar, namespace a first-class operand | Decision 10's safety rationale upheld against the match-by-default policy: the prefix convention produced inadvertently insecure spends, CHIP-0025's own stated motivation. Chia's two flavors survive as commitment values 7 and 2. Ratified 2026-08-07, decision 16. | `validation/announcements.json` |
-| C12 | per-spend coordination cap | 1,024 message, announcement, and concurrent-assert conditions per spend, enforced by today's deployed binary, removed under the hard fork 2 pricing flag | no cap in v0 | Deployed Chia's cap is the pre-pricing spam bound and CHIP-0049 replaces it with per-condition pricing. Rule 5 is the pre-registered home for the same cap-or-price decision here, so v0 records the gap rather than adopting a bound upstream is removing. Recorded 2026-08-07 with decision 16, final decision owed by rule 5. | none until rule 5 lands |
+| C12 | per-spend coordination cap | 1,024 message, announcement, and concurrent-assert conditions per spend, enforced by today's deployed binary, removed under the hard fork 2 pricing flag | no cap, condition count priced under rule 5 with the per-input budget as the only bound | Deployed Chia's cap is the pre-pricing spam bound and CHIP-0049 replaces it with per-condition pricing. Rule 5 closed the pre-registered cap-or-price decision on the price side: a cap is a cliff, the budget already implies a priced bound of budget over cheapest-condition conditions, and reversibility favors the decline, since adding a cap later is a tightening while removing one is not. Recorded 2026-08-07 with decision 16, closed 2026-08-09, decision 25. | `conditions/costs.json` boundary cases, the budget as the operative bound |
 | C13 | birth asserts | ASSERT_MY_BIRTH_HEIGHT and ASSERT_MY_BIRTH_SECONDS, two-phase: differing occurrences must-equal at parse, then exact equality against the coin record's confirmation height and timestamp at the node layer | declined | Checking them reads when the prevout confirmed, the chain read the decision 15 shape excludes, and no base-consensus field enforces exact birth (BIP 68 enforces minimum age, the monotone form the sequence asserts already carry). Usage research 2026-08-08: added by CHIP-0014 with no standalone stated motivation, and a GitHub-wide search found only definitional hits, no deployed first-party puzzle emits them. Their one systemic role in Chia, anchoring the relative-before windows, is played at base consensus by BIP 68 here. A chain-read assert stays addable through the reserved tier, the reverse migration cannot happen. Ratified 2026-08-08, decision 20. | `conditions/self-asserts.json` gap cases pin 0x34 and 0x35 invalid |
 | C14 | ephemeral assert | ASSERT_EPHEMERAL, the coin was created in the same block it is spent in, plus a companion rule forbidding relative timelocks and birth asserts on ephemeral spends | declined, structurally inexpressible | A Bitcoin transaction cannot spend its own outputs (an input would need the txid of a transaction whose txid depends on that input), and validation scope is one transaction, so the asserted fact is always false. The companion interlock is also moot: BIP 68 anchors relative locks at prevout confirmation at base consensus. Reintroduction trigger recorded: package-level validation, if it ever exists, makes the fact expressible again through the reserved tier. Ratified 2026-08-08, decision 20. | `conditions/self-asserts.json` gap cases pin 0x36 invalid |
 | C15 | RESERVE_FEE operand domain | any canonical uint below 2^64, an operand exceeding the achievable fee is well-formed and fails the fee comparison | 0 to MAX_MONEY, larger operands rejected at parse | The landed amount-operand convention (CREATE_OUTPUT, ASSERT_MY_AMOUNT). An operand above MAX_MONEY exceeds every possible fee, so the only observable difference is the error surface: `bad_condition_arg` at stage 1 instead of `insufficient_fee` at stage 4. Chia's checked-sum overflow error is likewise subsumed: with exact arithmetic the oversized sum simply fails the comparison. The hardened implementation must reproduce this with a wide or checked accumulator: a wrapping 64-bit sum would turn an unreachable demand satisfiable, the accept-invalid direction. Ratified 2026-08-09, decision 21. | `conditions/reserve-fee.json` domain cases |
@@ -35,6 +35,8 @@ Section 4 registers the rules that have no external reference at all.
 | C18 | raw-mode replay firewall | AGG_SIG_UNSAFE messages of 32 or more bytes may not end with any of the seven domain suffixes, a consensus rule in every regime | no firewall | The firewall patches the seam of suffix-at-the-end domain separation: a raw message could otherwise imitate a suffixed one. Under per-variant tagged hashes the raw digest and every bound digest live in disjoint domains by construction, so the rule has nothing to guard. A consensus rule deleted rather than ported. Ratified 2026-08-09, decision 23. | `validation/signature-asserts.json` raw cases |
 | C19 | duplicate signature conditions | counted: every occurrence is charged and pushed, and the aggregate signature must include a duplicated (pk, msg) pair exactly as many times as it occurs (probe P9: aggregated once fails, aggregated twice passes) | idempotent facts under rule 4's assert classification: identical triples in one input hold or fail together | Chia's counted semantics is BLS aggregate arithmetic, not design intent: the pairing equation happens to demand each pushed pair. A self-contained triple verifies or it does not, and occurrence count carries no meaning, which is rule 4's assert commitment. Cost stays per occurrence under rule 5's accounting, matching Chia's parse-time charging. Ratified 2026-08-09, decision 23. | `validation/duplicates.json` signature cases |
 | C20 | the seal family | no equivalent: coin identity is content-derived from parent, program hash, and amount, so a spend's authorization is indifferent to which aggregate bundle carries it and bundles need no seal | SEAL and SEAL_OUTPUTS, asserts pinning the spending transaction's own txid and its BIP 341 outputs hash | A pure addition, not a divergence of shared semantics. Bitcoin output identity is positional: the txid commits to the whole transaction, so an intercepted covenant spend can be rebuilt around a grafted output with every condition still holding, the surplus-capture gap rule 7's acceptance vector pins. The seal is the consensus answer to the aggregation qualification in section 4.4 of the evaluation doc. Ratified 2026-08-09, decision 24. | `validation/seals.json` |
+| C21 | per-spend base cost | 450,000 (SPEND_COST) charged for each coin spend under the hard fork 2 pricing flag, before any condition's own cost | no per-spend constant, conditions alone charge | A Bitcoin input's fixed overhead, prevout fetch and per-input iteration, is work base consensus performs and prices in weight for every input of every transaction, so a cost-unit constant would charge it twice. Declined with a falsifier pre-registered: the Phase 4 measurement pass isolates per-spend overhead Chia-style, n spends of k conditions against nk conditions in fewer spends, and a measured non-byte-proportional overhead introduces the constant then, a tightening that is cheap before publication. Ratified 2026-08-09, decision 25. | `conditions/costs.json` totals contain no per-list constant |
+| C22 | signature-condition cost | 1,200,000 (AGG_SIG_COST) per occurrence in every regime, pricing one BLS pairing toward the bundle aggregate | 1,300,000 (CONDITION_SIG_ASSERT_COST), equal to the VM's SECP_VERIFY_COST, PROVISIONAL | Both layers of BitLisp price the same BIP340 verification, so the condition constant ties to the operator constant rather than to Chia's BLS figure: one Phase 4 measurement settles both, and a program can never buy the same verification cheaper in one layer than the other. Chia's magnitude corroborates the range, their pairing being work of the same order. Ratified 2026-08-09, decision 25. | `conditions/costs.json` signature cases |
 
 ## 2. Reference provenance
 
@@ -331,6 +333,8 @@ Section 4 registers the rules that have no external reference at all.
 6. **RESERVED_COST_FLOOR stays at 500.** RATIFIED (decision by Evan,
    2026-07-29). The CHIP-0049 per-condition base cost stands as the
    provisional floor, revisited when rule 5's costing design lands.
+   Revisit closed 2026-08-09, decision 25: the floor holds at 500 on
+   the assignment-headroom rationale recorded there.
 7. **CREATE_COIN renamed to CREATE_OUTPUT.** RATIFIED (decision by
    Evan, 2026-07-31). The condition claims a transaction output
    slot and names no coin type. With a second output-creation
@@ -1332,6 +1336,118 @@ Section 4 registers the rules that have no external reference at all.
       at authoring, never baked into programs, always
       solution-supplied.
 
+25. **Validation rule 5: per-condition costing.** RATIFIED
+    (decisions by Evan, 2026-08-09, designed in the costing
+    architecture session, each sub-decision steelmanned with a
+    reversibility horizon before ratification, the Phase 2 closer
+    pre-registered by decision 21's sequencing). Eleven parts:
+    - One meter. Condition costs accrue on the same per-input
+      budget as evaluation cost, VM.md 3.3 semantics unchanged.
+      The two-meter steelman (isolating the novel layer, tapscript
+      sigop-budget precedent) lost to simplicity and to both
+      deployed precedents being effectively single-meter: two
+      budgets mean two boundaries, two error orderings, and a
+      split with no principled answer, while the Phase 4 weight
+      mapping can allocate headroom however it likes with one.
+    - Stage 1 charging, forced rather than chosen. A charge
+      reading cross-input or transaction-wide data could grow
+      under concatenation and burst a budget that fit before the
+      merge, so the composition guarantee, load-bearing for the
+      batching thesis, forces per-condition amounts that read
+      nothing outside the condition. Chia's parse-time charging
+      agrees (the rule 4 probe pass). The honest cost is recorded
+      at the flat-pricing part below: per-spend scope is also what
+      made any superlinear schedule evadable by input splitting.
+    - No free tier. The review-draft carve-out (first 100 free)
+      is a cliff inviting adversarial clustering at the boundary,
+      the deployed 0.46.0 wheel dropped it, and at 200 units
+      against real budgets the common case never notices. The
+      pre-registered free-tier decision closes on the no side
+      with the deployed precedent now agreeing.
+    - Price, not cap, closing C12. The budget already implies a
+      priced bound. Reversibility decided the residue: adding a
+      cap later is a tightening, removing one is not, so
+      declining is the recoverable direction.
+    - Magnitude adoption. Generic 200, coordination 700, output
+      claim 1,350,000, the deployed Chia figures, adopted as
+      PROVISIONAL values in the shared CLVM cost unit rather than
+      invented: they encode a production repricing pass with data
+      we cannot generate, and measuring the Python reference now
+      would measure the wrong artifact. The Phase 4 pass
+      re-prices every PROVISIONAL constant against the measured
+      implementation, per obligation 2's re-validation bar.
+    - The signature tie, divergence C22. CONDITION_SIG_ASSERT_COST
+      equals SECP_VERIFY_COST at 1,300,000: both price one BIP340
+      verification. The batch-discount steelman (stage 5
+      amortizes toward half cost, so the condition could price
+      cheaper) lost to worst-case pricing: a one-signature spend
+      gets no amortization. The tie is a default, and Phase 4 may
+      split the constants if measurement separates them.
+    - TAPROOT_TWEAK_COST at the verify magnitude, a deliberate
+      overprice. A lift and one fixed-base multiplication cost
+      less than a verification's two, but the honest value is
+      unmeasured and overpricing is the safe error direction. The
+      alternative half-magnitude anchor was rejected as false
+      precision: it deleted no uncertainty, only invented a
+      second unmeasured number.
+    - Flat CREATE_OUTPUT pricing, amending obligation 2. The
+      superlinear schedule the obligation promised was designed
+      in full (linear marginal, quadratic total, per-spend,
+      net-growth indexed at claims minus one) and then declined
+      by Evan on the shape argument: Bitcoin consensus prices
+      every resource linearly in weight and bounds worst cases
+      with caps, superlinearity appears in Bitcoin's history only
+      as a defect being engineered out (the quadratic sighash),
+      and deployed Chia's tuned answer to the same set-growth
+      externality is flat and high. Two findings from the
+      steelman pass made the reversal cheap: the per-spend scope
+      the composition guarantee forces had already reduced the
+      schedule's deterrent to per-input concentration, evadable
+      by splitting outputs across inputs, and match-by-default
+      (decision 16) makes flat the default posture anyway. The
+      deterrent that remains is exactly base consensus's idiom:
+      a high linear price with the per-input budget as the cap,
+      the budget itself weight-derived at Phase 4, making
+      outputs-per-witness-byte the operative rate limit. The
+      walk-back is honest, not silent: obligation 2's text is
+      amended in the evaluation doc with this decision cited, and
+      the Phase 4 set-growth model is pre-registered as the test
+      that can reintroduce a schedule, a tightening that stays
+      cheap until publication and confiscation-risky after
+      deployment, which is why the gate must settle it.
+    - RESERVED_COST_FLOOR holds at 500, closing decision 6's
+      revisit. The anchor that produced 500 evaporated (the
+      review-draft base cost never deployed), but the steelman
+      pass surfaced an affirmative reason to keep it: the floor
+      is the assignment headroom. Every reserved condition ever
+      declared carries at least the floor, so a future opcode
+      assignment with a cost-table entry up to 500 confiscates no
+      in-flight spend. Dropping the floor to the generic 200
+      would strand any future assignment pricier than generic.
+    - The CLVM reserved-shape triage, owed since the 2026-08-07
+      precedent entry, closes as a decline. The argument-sensitive
+      two-bit charging shape solves runtime-unknown arguments,
+      and condition operands are literal in the list at authoring
+      time: a declarer computes the true formula value for its
+      own instance and declares exactly that, so a per-instance
+      declared constant is fully as expressive. Nothing
+      recoverable is lost, and a future leaf version can add
+      formula pricing if a need appears.
+    - No per-spend constant, divergence C21, with the Phase 4
+      isolation probe pre-registered as the falsifier. Charge
+      order is pinned by vectors with its stakes stated: within a
+      condition every encoding check wins over cost_exceeded,
+      matching the VM families' convention, and across conditions
+      list order governs. The ordering is diagnostic rather than
+      consensus-visible for validity, because every ordering
+      rejects the same spends and a valid list's total is
+      order-independent. The one consensus-relevant piece is the
+      soundness rule: expensive work, the point derivations and
+      stage 5 verification, runs only after its charge, or an
+      unpaid-work denial of service exists, the same class as the
+      copy-on-slice and hash-before-charge rules the VM cost
+      table records.
+
 ## 4. Novel-layer register
 
 The validation rules have no external reference: no deployed system
@@ -1344,7 +1460,7 @@ for an oracle, per ground rule 4:
 | 2. Mixed-transaction rule | normative | `vectors/validation/mixed-transaction.json`: five acceptance vectors (mixed, plain-only, unclaimed slots, merge, surplus capture) and one rule 1 boundary rejection, plus the addition-monotonicity, merge, and plain-only invariants. The time assert family checks under this rule's assert clause: `vectors/validation/time-asserts.json` with BIP 65 and BIP 68 field semantics as the double reference, plus the operand-monotonicity and boundary-flip invariants. The self assert family checks under the same clause: `vectors/validation/self-asserts.json` with the probe corpus translated to prevout equality cases, the BIP341 tweak derivation shared with CREATE_OUTPUT_TAPROOT as the taproot assert's oracle, plus the outpoint-implies-txid and recombination-invariance invariants. The seal family checks under the same clause with no Chia reference at all (divergence C20): `vectors/validation/seals.json` with the grafted-output interception regression pair, the sealed-merge rejection case, and the fee-input-addition acceptance pinning what SEAL_OUTPUTS permits, the vendored Bitcoin Core framework as the serialization oracle for the txid and outputs-hash derivations, plus the operand byte-flip, sealed-merge, SEAL-implies-SEAL_OUTPUTS, and outputs-only-dependence invariants |
 | 3. Message scoping | normative | `vectors/validation/messages.json` and `vectors/validation/announcements.json`: the probe corpus translated from the chia_rs oracle (balance, multiplicity, mode-key, self-send, order cases) plus adversarial wrong-address and forgery cases, and the balanced-pair, announcement-monotonicity, and byte-flip invariants |
 | 4. Duplicates and multiplicity | normative | `vectors/validation/duplicates.json`: the strictest-wins oracle tests translated to identical and differing time asserts within one input, identical asserts across two and three inputs including the diverging final-sequence counterexample, ANNOUNCE duplication within an input and copies across inputs including the new-fact flip, duplicated announcement asserts at loose and script commitments, and duplicated reserved conditions on both sides of the cost floor, plus the identical-signature-triple and copied-triple-across-inputs cases from the signature assert unit, plus the in-place seal duplication and copied-seal-across-inputs cases from the seal unit, plus the in-place duplication-invariance invariant. The counted-sort boundaries stay pinned where they landed: duplicate claims in `vectors/validation/create-output.json`, duplicate message halves in `vectors/validation/messages.json`. Chia's remaining dedup tests are mempool spend-dedup machinery, declined in decision 19 |
-| 5. Per-condition costing | pending | CHIP-0049 precedent comparison plus cost-conservation properties |
+| 5. Per-condition costing | normative | `vectors/conditions/costs.json`: every cost tier pinned with exact-budget boundary pairs (the inclusive budget passing at equality, bursting one below), the charge-order cases (encoding defects win over cost_exceeded within a condition under a zero budget, an earlier condition's charge precedes a later condition's checks, derivation defects reported only when the charge is covered), reserved declared-cost accounting with the floor check winning over the budget, per-occurrence charging of identical conditions, and a mixed-family total, plus the cost-conservation, reorder-invariance, append-monotonicity, and inclusive-boundary invariants. No oracle: the deployed CHIP-0049 cost table anchors the magnitudes (section 2) and every PROVISIONAL constant is re-priced by the Phase 4 measurement pass |
 | 6. Reserved conditions | normative | encoding vectors in `vectors/conditions/`, every error path pinned |
 | 7. The fee reserve | normative | `vectors/validation/reserve-fee.json`: the probe corpus translated from the chia_rs oracle (within-spend and cross-input accumulation, boundary equality, one-short rejection, zero reserve, a reserve stack no fee can reach) plus the fee-theft grafted-output regression vector, the surplus-capture acceptance vector pinning what the reserve does not protect, the above-2^32 and off-boundary separating cases from the review's mutation pass, and the operand-monotonicity, split, and boundary invariants |
 | 8. Signature asserts | normative | `vectors/validation/signature-asserts.json`: satisfied and failing triples for every variant with signatures produced by the vendored Bitcoin Core framework signer (the recorded `secp_verify` signing oracle), the fixed-message rewrite regression pair pinning the decision 23 footgun, variant-separation cases pinning txid against outpoint, raw against bound in both directions, and each single-field variant against the two-field variant extending it (exhaustive pair separation lives in the hypothesis invariant), raw-mode replay acceptance pinning what RAW does not protect, plus the own-data-only, operand byte-flip, and variant-separation invariants. The BIP340 official vectors bind the verification relation itself through the shared `secp_verify` implementation |
