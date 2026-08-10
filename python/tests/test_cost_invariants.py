@@ -60,7 +60,7 @@ condition_lists = st.lists(st.sampled_from(MENU), max_size=6)
 @EXAMPLES
 @given(condition_lists)
 def test_total_is_the_sum_of_condition_costs(items):
-    cost, parsed = parse_conditions(clist(*items))
+    cost, parsed = parse_conditions(clist(*items), None)
     assert cost == sum(condition_cost(c) for c in parsed)
 
 
@@ -69,24 +69,24 @@ def test_total_is_the_sum_of_condition_costs(items):
 def test_total_is_invariant_under_reordering(items, seed):
     shuffled = items[:]
     random.Random(seed).shuffle(shuffled)
-    cost, _ = parse_conditions(clist(*items))
-    shuffled_cost, _ = parse_conditions(clist(*shuffled))
+    cost, _ = parse_conditions(clist(*items), None)
+    shuffled_cost, _ = parse_conditions(clist(*shuffled), None)
     assert cost == shuffled_cost
 
 
 @EXAMPLES
 @given(condition_lists, st.sampled_from(MENU))
 def test_appending_adds_exactly_the_appended_cost(items, extra):
-    cost, _ = parse_conditions(clist(*items))
-    appended_cost, appended = parse_conditions(clist(*items, extra))
+    cost, _ = parse_conditions(clist(*items), None)
+    appended_cost, appended = parse_conditions(clist(*items, extra), None)
     assert appended_cost == cost + condition_cost(appended[-1])
 
 
 @EXAMPLES
 @given(st.sampled_from(MENU), st.integers(1, 4))
 def test_every_occurrence_charges_individually(item, count):
-    single_cost, _ = parse_conditions(clist(item))
-    total, _ = parse_conditions(clist(*[item] * count))
+    single_cost, _ = parse_conditions(clist(item), None)
+    total, _ = parse_conditions(clist(*[item] * count), None)
     assert total == single_cost * count
 
 
@@ -94,7 +94,7 @@ def test_every_occurrence_charges_individually(item, count):
 @given(condition_lists)
 def test_budget_boundary_is_inclusive(items):
     node = clist(*items)
-    total, _ = parse_conditions(node)
+    total, _ = parse_conditions(node, None)
     exact_cost, _ = parse_conditions(node, max_cost=total)
     assert exact_cost == total
     if total > 0:

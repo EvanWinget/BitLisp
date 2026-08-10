@@ -373,7 +373,10 @@ def _tx_from_json(obj):
                 raise VectorError(
                     f"conditions field does not deserialize: {exc}"
                 ) from None
-            _, conditions = parse_conditions(node)
+            # Validation cases pin cross-input rules over
+            # already-parsed lists, so the parse runs unbudgeted:
+            # the conditions suite pins every charge in isolation.
+            _, conditions = parse_conditions(node, None)
         decoded_inputs.append((entry, conditions))
     for entry in obj["outputs"]:
         entry_keys = set(entry)

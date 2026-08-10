@@ -67,7 +67,7 @@ def test_cost_table_values_match_spec():
 
 
 def test_returned_cost_is_the_sum_of_condition_costs():
-    cost, parsed = parse_conditions(clist(CREATE, AMOUNT_ASSERT, AMOUNT_ASSERT))
+    cost, parsed = parse_conditions(clist(CREATE, AMOUNT_ASSERT, AMOUNT_ASSERT), None)
     assert cost == sum(condition_cost(c) for c in parsed) == 1_350_400
 
 
@@ -90,7 +90,7 @@ def test_initial_cost_threads_through_the_meter():
 
 
 def test_no_budget_means_no_check():
-    cost, _ = parse_conditions(clist(*[CREATE] * 100))
+    cost, _ = parse_conditions(clist(*[CREATE] * 100), None)
     assert cost == 135_000_000
 
 

@@ -507,10 +507,10 @@ def _parse_create_output_taproot(args, meter):
             f"CREATE_OUTPUT_TAPROOT takes 3 arguments, got {len(args)}",
         )
     internal_key, merkle_root, amount_atom = args
+    _check_taproot_components(internal_key, merkle_root)
     amount = _parse_int(amount_atom, "CREATE_OUTPUT_TAPROOT amount")
     if not 0 <= amount <= MAX_MONEY:
         raise BitLispError("bad_condition_arg", f"amount out of range: {amount}")
-    _check_taproot_components(internal_key, merkle_root)
     meter.charge(CONDITION_COSTS[CREATE_OUTPUT_TAPROOT])
     script_pubkey = _derive_taproot_spk(internal_key, merkle_root)
     return CreateOutputTaproot(internal_key, merkle_root, amount, script_pubkey)
@@ -862,16 +862,16 @@ def _parse_assigned(opcode, args):
     raise BitLispError("bad_condition_opcode", f"invalid opcode {opcode:#04x}")
 
 
-def parse_conditions(node, max_cost=None, cost=0):
+def parse_conditions(node, max_cost, cost=0):
     """Parses an evaluation result into (cost, tuple of conditions).
 
     Conditions charge in list order as they parse, each after its
     own encoding checks, against the inclusive budget max_cost.
     cost is the already-accrued total the same budget covers, the
     VM run's own cost in the consensus pipeline, and the returned
-    total includes it. A max_cost of None applies no budget, a
-    reference-tool convenience: the consensus interface always
-    supplies one.
+    total includes it. max_cost is required, like run's: the
+    consensus interface always supplies a budget, and a reference
+    tool that wants none must say so with an explicit None.
 
     Raises BitLispError on any encoding violation or on the first
     charge the budget cannot cover. Condition order is the emitted
