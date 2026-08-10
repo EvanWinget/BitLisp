@@ -22,7 +22,7 @@ Section 4 registers the rules that have no external reference at all.
 | C5 | timelock enforcement | condition operands compared directly against chain state, previous transaction block height and timestamp, relative locks anchored at coin creation | conditions constrain the transaction's own locktime, sequence, and version fields, base consensus enforces them against the chain (BIP 65, 68, 112, 113 semantics inherited, relative locks anchored at prevout confirmation) | The validator holds no clock and stage 3 stays empty in v0. Reversibility decided it: a chain read stays addable through the reserved tier, the reverse migration cannot happen. Ratified 2026-08-07, decision 15. | `validation/time-asserts.json` |
 | C6 | timelock operand range | arbitrary-size integer operands | typed domains inherited from the fields: heights below 500,000,000, times 500,000,000 to 2^32 - 1, relative values 16 bits with 512-second time units | The envelope is what base consensus enforces. Exceeding it would require chain reads, the declined shape. Out-of-domain operands are malformed at stage 1, so a mistyped operand fails loudly at parse. Ratified 2026-08-07, decision 15. | `conditions/time-asserts.json` domain cases |
 | C7 | before-style timelocks | `ASSERT_BEFORE_*` family, expiring spend authorization | declined, structurally inexpressible in the field shape | Base consensus has no valid-only-before rule to delegate to. Expiring validity is the reorg hazard Bitcoin has deliberately avoided. Final decision 2026-08-07, decision 15, closing the decision 9 flag. | none, the opcodes stay invalid per `conditions/encoding.json` tier cases |
-| C8 | message scope | messages balance across the validation unit, a whole block or spend bundle | messages balance within the single transaction | A Bitcoin transaction must be independently valid for relay and mempool admission, and the bundle model's recombination instability is the recorded public objection the layer avoids importing (evaluation doc section 11.4). Ratified 2026-08-07, decision 16. | `validation/messages.json` |
+| C8 | message scope | messages balance across the validation unit, a whole block or spend bundle | messages balance within the single transaction | A Bitcoin transaction must be independently valid for relay and mempool admission, and the bundle model's recombination instability is the recorded public objection the layer avoids importing (evaluation doc section 8.4). Ratified 2026-08-07, decision 16. | `validation/messages.json` |
 | C9 | message addressing fields | parent coin id, puzzle hash, amount, coin id, all content-derived | creating txid, spent scriptPubKey as raw bytes, amount, outpoint, with script and amount content-derived, txid and outpoint location-derived. Amount domains follow the fields: u64 there, 0 to MAX_MONEY here | The validator holds prevout data only. The creating txid is the creator handle it possesses, the txid half of the outpoint. Raw script bytes follow C1's rationale. The outpoint is Bitcoin's coin identity. Chia's coin-parent reading ("output of whichever transaction spent coin P") is unverifiable from prevout data and is a recorded decline. Ratified 2026-08-07, decision 16. | `validation/messages.json` mode cases |
 | C10 | condition argument arity | consensus accepts trailing extra arguments, strict arity only under the mempool flag (STRICT_ARGS_COUNT) | strict arity everywhere | One validator, one behavior, reject the ambiguous case. Verified in chia_rs conditions.rs: check_nil runs only under the mempool flag. Already the landed behavior of every prior family, recorded as a divergence here because the message probes surfaced it. Ratified 2026-08-07, decision 16. | `conditions/messages.json` arity cases |
 | C11 | broadcast conditions | four announcement codes, announcer bound by coin id or puzzle hash, namespacing by payload prefix convention | two conditions, announcer precision chosen by the assert through the shared specifier grammar, namespace a first-class operand | Decision 10's safety rationale upheld against the match-by-default policy: the prefix convention produced inadvertently insecure spends, CHIP-0025's own stated motivation. Chia's two flavors survive as commitment values 7 and 2. Ratified 2026-08-07, decision 16. | `validation/announcements.json` |
@@ -210,7 +210,7 @@ Section 4 registers the rules that have no external reference at all.
 - **Design-history evidence (2026-08-06).** A conversation with
   the deployed architecture's designer and a same-day study of the
   production puzzle corpus (CATs, singletons, offers), summarized
-  in section 11 of the evaluation doc. Per project policy the
+  in section 8 of the evaluation doc. Per project policy the
   correspondence itself stays out of the repo. This evidence base
   informs the decision 9 addendum and decisions 10 to 12 below.
 - **Reserved-opcode pricing precedent (recorded 2026-08-07).** The
@@ -421,7 +421,7 @@ Section 4 registers the rules that have no external reference at all.
 
    Addendum (2026-08-06). The design-history evidence generalized
    this decision into the schema-completeness principle now
-   recorded in section 7 of the evaluation doc: the vocabulary is
+   recorded in section 5 of the evaluation doc: the vocabulary is
    complete over Bitcoin's spend schema, never curated by predicted
    applications. Chia's iteration history is the evidence that
    use-case curation fails. Announcements had to be followed by
@@ -572,7 +572,7 @@ Section 4 registers the rules that have no external reference at all.
       designer's public statement of the property is the merge
       form ("the only way two transactions can conflict with each
       other is if they both try to spend the same coin",
-      bitcoin-dev, March 2022, evaluation doc section 11.4).
+      bitcoin-dev, March 2022, evaluation doc section 8.4).
       Pre-registered consequence: the planned ASSERT_FEE_LE and
       exact-form ASSERT_OUTPUT_COUNT are merge-poison, an
       aggregate upper bound vetoes strangers' decisions about
@@ -727,7 +727,7 @@ Section 4 registers the rules that have no external reference at all.
       survive reassembly of an unconfirmed creator. Location
       fields, txid and outpoint, are neither. The recorded public
       recombination objection (bitcoin-dev, March 2022, evaluation
-      doc section 11.4) is thereby answered in the spec: the mode
+      doc section 8.4) is thereby answered in the spec: the mode
       menu exists so a program written in advance can bind to
       content, and the classification tells authors which modes
       are safe to bake into long-lived programs.
@@ -1502,4 +1502,4 @@ valid spends into transactions their authors never assembled, is
 exercised by the merge invariants and the recombination vectors of
 those families, rather than translated tests, because no deployed
 system exercises that surface at scale (the aggregation reality
-check in section 11.2 of the evaluation doc).
+check in section 8.2 of the evaluation doc).
