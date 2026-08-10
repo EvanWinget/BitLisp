@@ -82,7 +82,8 @@ Section 4 registers the rules that have no external reference at all.
   carve-out and the 500 base in the earlier note describe a
   CHIP-0049 review draft, not deployed code. RESERVED_COST_FLOOR
   keeps its provisional 500 and its rule 5 revisit, which now
-  weighs this corrected baseline. The pre-fork 1,024 countdown
+  weighs this corrected baseline (revisit closed by decision 25,
+  the floor holds). The pre-fork 1,024 countdown
   turned out to cover the concurrent asserts and the message
   conditions as well as the announcements, and is skipped
   entirely under the fork flag.
@@ -228,7 +229,8 @@ Section 4 registers the rules that have no external reference at all.
   costing design next to the RESERVED_COST_FLOOR revisit: decide
   whether rule 6 adopts anything from the CLVM shape, in particular
   whether constant-only declarations underprice future conditions
-  whose validation work scales with argument size.
+  whose validation work scales with argument size (triage closed
+  by decision 25, both precedents weighed and declined).
 - **bllsh** (AJ Towns' introspection Lisp) was cloned into
   git-ignored `references/` on 2026-07-29 and read for the
   CREATE_COIN_TAPROOT evaluation, under the reading guardrails
@@ -843,13 +845,16 @@ Section 4 registers the rules that have no external reference at all.
     - The cost sentence says identity-independence and nothing
       stronger. A draft "no duplicate prices below a first
       occurrence" was cut because a count-based tier, still open
-      for rule 5, could legitimately price a late duplicate
-      differently, and a draft whitelist of permitted price
-      inputs was cut in review because it accidentally excluded
-      per-opcode counts, the natural form of rule 5's announced
-      superlinear CREATE_OUTPUT pricing. Identity-independence
-      alone is the anti-spam property, and the spec states it as
-      the sole pricing constraint.
+      for rule 5 at this decision's date, could legitimately
+      price a late duplicate differently, and a draft whitelist
+      of permitted price inputs was cut in review because it
+      accidentally excluded per-opcode counts, the natural form
+      of rule 5's then-announced superlinear CREATE_OUTPUT
+      pricing. Identity-independence alone is the anti-spam
+      property, and the spec states it as the sole pricing
+      constraint. (Closed by decision 25: rule 5 landed flat
+      per-opcode constants, no count tier and no schedule, so the
+      preserved latitude went unused.)
     - Chia's mempool spend-dedup machinery (ELIGIBLE_FOR_DEDUP,
       and the fast-forward eligibility beside it) is a recorded
       decline. It merges identical spends across competing
@@ -1425,14 +1430,23 @@ Section 4 registers the rules that have no external reference at all.
       in-flight spend. Dropping the floor to the generic 200
       would strand any future assignment pricier than generic.
     - The CLVM reserved-shape triage, owed since the 2026-08-07
-      precedent entry, closes as a decline. The argument-sensitive
-      two-bit charging shape solves runtime-unknown arguments,
-      and condition operands are literal in the list at authoring
-      time: a declarer computes the true formula value for its
-      own instance and declares exactly that, so a per-instance
-      declared constant is fully as expressive. Nothing
-      recoverable is lost, and a future leaf version can add
-      formula pricing if a need appears.
+      precedent entry, closes as a decline, and both recorded
+      precedents were weighed separately as the rule 4 pass
+      required. The clvm_rs argument-sensitive two-bit charging
+      shape solves runtime-unknown arguments, and condition
+      operands are literal in the list at authoring time: a
+      declarer computes the true formula value for its own
+      instance and declares exactly that, so a per-instance
+      declared constant is fully as expressive. The chia_rs
+      256-entry low-byte table is a fixed self-pricing schedule
+      for unknown opcodes, declined on two grounds: it
+      pre-assigns prices to semantics nobody has designed, where
+      a declaration prices the actual future assignment under
+      rule 6's dominance requirement, and our opcodes are one
+      byte with the reserved range undivided, so there is no
+      low byte to key a schedule on. Nothing recoverable is
+      lost, and a future leaf version can add formula pricing if
+      a need appears.
     - No per-spend constant, divergence C21, with the Phase 4
       isolation probe pre-registered as the falsifier. Charge
       order is pinned by vectors with its stakes stated: within a
@@ -1446,7 +1460,17 @@ Section 4 registers the rules that have no external reference at all.
       stage 5 verification, runs only after its charge, or an
       unpaid-work denial of service exists, the same class as the
       copy-on-slice and hash-before-charge rules the VM cost
-      table records.
+      table records. One embodiment gap is recorded openly: the
+      reference pipeline that threads a single meter from the VM
+      run through condition parsing and on to validation is the
+      SPEC.md validation-pipeline section, still a stub, so rule
+      5's burst-stops-later-stages ordering is pinned today only
+      at the parse layer (the conditions vector suite runs
+      budgeted, the transaction suite runs unbudgeted by design).
+      The end-to-end pin lands with the pipeline and the weight
+      mapping, and until then parse_conditions requires its
+      budget argument explicitly, mirroring run, so no future
+      caller can forget the budget silently.
 
 ## 4. Novel-layer register
 
@@ -1460,7 +1484,7 @@ for an oracle, per ground rule 4:
 | 2. Mixed-transaction rule | normative | `vectors/validation/mixed-transaction.json`: five acceptance vectors (mixed, plain-only, unclaimed slots, merge, surplus capture) and one rule 1 boundary rejection, plus the addition-monotonicity, merge, and plain-only invariants. The time assert family checks under this rule's assert clause: `vectors/validation/time-asserts.json` with BIP 65 and BIP 68 field semantics as the double reference, plus the operand-monotonicity and boundary-flip invariants. The self assert family checks under the same clause: `vectors/validation/self-asserts.json` with the probe corpus translated to prevout equality cases, the BIP341 tweak derivation shared with CREATE_OUTPUT_TAPROOT as the taproot assert's oracle, plus the outpoint-implies-txid and recombination-invariance invariants. The seal family checks under the same clause with no Chia reference at all (divergence C20): `vectors/validation/seals.json` with the grafted-output interception regression pair, the sealed-merge rejection case, and the fee-input-addition acceptance pinning what SEAL_OUTPUTS permits, the vendored Bitcoin Core framework as the serialization oracle for the txid and outputs-hash derivations, plus the operand byte-flip, sealed-merge, SEAL-implies-SEAL_OUTPUTS, and outputs-only-dependence invariants |
 | 3. Message scoping | normative | `vectors/validation/messages.json` and `vectors/validation/announcements.json`: the probe corpus translated from the chia_rs oracle (balance, multiplicity, mode-key, self-send, order cases) plus adversarial wrong-address and forgery cases, and the balanced-pair, announcement-monotonicity, and byte-flip invariants |
 | 4. Duplicates and multiplicity | normative | `vectors/validation/duplicates.json`: the strictest-wins oracle tests translated to identical and differing time asserts within one input, identical asserts across two and three inputs including the diverging final-sequence counterexample, ANNOUNCE duplication within an input and copies across inputs including the new-fact flip, duplicated announcement asserts at loose and script commitments, and duplicated reserved conditions on both sides of the cost floor, plus the identical-signature-triple and copied-triple-across-inputs cases from the signature assert unit, plus the in-place seal duplication and copied-seal-across-inputs cases from the seal unit, plus the in-place duplication-invariance invariant. The counted-sort boundaries stay pinned where they landed: duplicate claims in `vectors/validation/create-output.json`, duplicate message halves in `vectors/validation/messages.json`. Chia's remaining dedup tests are mempool spend-dedup machinery, declined in decision 19 |
-| 5. Per-condition costing | normative | `vectors/conditions/costs.json`: every cost tier pinned with exact-budget boundary pairs (the inclusive budget passing at equality, bursting one below), the charge-order cases (encoding defects win over cost_exceeded within a condition under a zero budget, an earlier condition's charge precedes a later condition's checks, derivation defects reported only when the charge is covered), reserved declared-cost accounting with the floor check winning over the budget, per-occurrence charging of identical conditions, and a mixed-family total, plus the cost-conservation, reorder-invariance, append-monotonicity, and inclusive-boundary invariants. No oracle: the deployed CHIP-0049 cost table anchors the magnitudes (section 2) and every PROVISIONAL constant is re-priced by the Phase 4 measurement pass |
+| 5. Per-condition costing | normative | `vectors/conditions/costs.json`: every assigned opcode pinned individually at its cost line plus the all-opcodes sum with its boundary twin, exact-budget boundary pairs for every tier (the inclusive budget passing at equality, bursting one below), the charge-order cases (encoding defects win over cost_exceeded within a condition under a zero budget, an earlier condition's charge precedes a later condition's checks and the tail's shape check, width defects of both derivation entries win under a zero budget, derivation defects of both entries reported only when the charge is covered), reserved declared-cost accounting with the floor check winning over the budget, per-occurrence charging of identical conditions, the mixed-family total, and the COSTS.md worked example, plus the cost-conservation, reorder-invariance, append-additivity, per-occurrence, and inclusive-boundary invariants. No oracle: the deployed CHIP-0049 cost table anchors the magnitudes (section 2) and every constant, all PROVISIONAL, is re-priced by the Phase 4 measurement pass |
 | 6. Reserved conditions | normative | encoding vectors in `vectors/conditions/`, every error path pinned |
 | 7. The fee reserve | normative | `vectors/validation/reserve-fee.json`: the probe corpus translated from the chia_rs oracle (within-spend and cross-input accumulation, boundary equality, one-short rejection, zero reserve, a reserve stack no fee can reach) plus the fee-theft grafted-output regression vector, the surplus-capture acceptance vector pinning what the reserve does not protect, the above-2^32 and off-boundary separating cases from the review's mutation pass, and the operand-monotonicity, split, and boundary invariants |
 | 8. Signature asserts | normative | `vectors/validation/signature-asserts.json`: satisfied and failing triples for every variant with signatures produced by the vendored Bitcoin Core framework signer (the recorded `secp_verify` signing oracle), the fixed-message rewrite regression pair pinning the decision 23 footgun, variant-separation cases pinning txid against outpoint, raw against bound in both directions, and each single-field variant against the two-field variant extending it (exhaustive pair separation lives in the hypothesis invariant), raw-mode replay acceptance pinning what RAW does not protect, plus the own-data-only, operand byte-flip, and variant-separation invariants. The BIP340 official vectors bind the verification relation itself through the shared `secp_verify` implementation |

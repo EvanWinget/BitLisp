@@ -6,7 +6,7 @@ compares the two validation layers. It is the condition-layer companion
 to [opcode-comparison.md](opcode-comparison.md). The BitLisp columns
 restate [spec/CONDITIONS.md](../spec/CONDITIONS.md) and
 [spec/VALIDATION.md](../spec/VALIDATION.md), which are the normative
-sources. Divergence ids (C1 to C20) and decision ids (D-CC2) refer to
+sources. Divergence ids (C1 to C22) and decision ids (D-CC2) refer to
 [condition-record.md](condition-record.md).
 
 There is no bllsh column. bllsh has no condition layer at all: its
@@ -205,7 +205,7 @@ specs of the same shape.
 | coexistence | every coin is a puzzle, no foreign outputs exist | mixed transactions with plain-taproot inputs and unmatched outputs (rule 2, normative) |
 | cross-spend interaction | block-scoped messages and concurrency asserts | transaction-scoped messages (rule 3, normative) |
 | dedup and multiplicity | deployed semantics, the cross-check source for the translated rule 4 tests | rule 4, normative, sort-bound multiplicity with no collapse |
-| costing | deployed per-condition costs (`CREATE_COIN` 1,800,000, `AGG_SIG` 1,200,000, message 700, generic 200), CHIP-0049 revisions in review | rule 5, pending, CHIP-0049 is the recorded precedent with two pre-registered deliberate decisions |
+| costing | deployed per-condition costs under the hard fork 2 flag (`CREATE_COIN` 1,350,000, `AGG_SIG` 1,200,000, message 700, generic 200, spend 450,000) | rule 5, normative, flat per-opcode constants on the shared per-input budget: generic 200, message 700, signature 1,300,000 tied to `secp_verify` (C22), output claim 1,350,000, no per-spend constant (C21), every constant PROVISIONAL pending Phase 4 (decision 25) |
 | unknown conditions | ignored tiers | invalid plus the priced reserved tier (rule 6, normative) |
 
 ## Observations
@@ -216,9 +216,9 @@ specs of the same shape.
   23), the four time asserts, the five self asserts (decision
   20), the message family (`SEND_MESSAGE`, `RECEIVE_MESSAGE`,
   `ANNOUNCE`, `ASSERT_ANNOUNCEMENT`), `RESERVE_FEE` (decision
-  21), and the seal pair (decision 24). Of the eight validation
-  rules, 1, 2, 3, 4, 6, 7, and 8 are normative and 5 is pending,
-  deliberately last so costing prices the complete vocabulary.
+  21), and the seal pair (decision 24). All eight validation
+  rules are normative, rule 5 landing last by design so costing
+  priced the complete vocabulary in one pass (decision 25).
 - **Reference coverage is uneven by design.** The ported entries
   (timelocks, messages, `RESERVE_FEE`, the AGG_SIG and `ASSERT_MY_*`
   shapes) have deployed Chia semantics to translate tests from. The
