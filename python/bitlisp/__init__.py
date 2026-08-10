@@ -20,6 +20,7 @@ from .conditions import (
     Reserved,
     SendMessage,
     Specifier,
+    condition_cost,
     parse_conditions,
 )
 from .errors import CODES, BitLispError
@@ -53,6 +54,7 @@ __all__ = [
     "TxInput",
     "TxOutput",
     "atom_to_int",
+    "condition_cost",
     "deserialize",
     "int_to_atom",
     "is_atom",

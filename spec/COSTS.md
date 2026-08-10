@@ -1,10 +1,14 @@
 # BitLisp Cost Model
 
-Status: Phase 1 complete (2026-07-29). This table is normative for
-the evaluator core and the complete v0 operator table. It inherits
-the CLVM cost table for the operator intersection, verified against
-the pinned oracles by the diff harness. The weight mapping is filled
-with Phase 4 measurements.
+Status: sections 1 to 8 normative since the Phase 1 close
+(2026-07-29), section 10 normative since the rule 5 landing
+(2026-08-09). The operator table inherits the CLVM cost table for
+the operator intersection, verified against the pinned oracles by
+the diff harness. The condition costs of section 10 have no
+oracle: they are pinned by vectors under VALIDATION.md rule 5.
+The weight mapping is filled with Phase 4 measurements, and every
+constant marked PROVISIONAL is re-priced by the same Phase 4
+measurement pass.
 
 ## 1. General rules
 
@@ -317,9 +321,79 @@ four bytes for
 
 TODO (Phase 4): mapping from VM cost units to Bitcoin transaction
 weight, derived from benchmark data on the measured artifacts,
-including the per-byte cost of the serialized program itself.
+including the per-byte cost of the serialized program itself. One
+constraint is already normative: the per-byte cost on serialized
+witness bytes must be at least `SHA256_COST_PER_BYTE = 2`, the
+floor the flat condition costs of section 10 rely on for
+witness-carried operands.
 
 ## 10. Condition costs
 
-TODO (Phase 2): per-condition base costs and the superlinear
-`CREATE_OUTPUT` schedule.
+Condition costs accrue on the same per-input budget as evaluation
+cost, under the accounting and charge order of VALIDATION.md rule
+5: for each condition in list order, every encoding check first,
+then the condition's whole cost as one checked charge, then, for
+the two derivation entries, the point derivation. The budget is
+inclusive and bursting it raises `cost_exceeded`, the VM budget
+semantics unchanged.
+
+Every condition cost is a flat per-opcode constant. Per-byte terms
+are deliberately absent: every operand byte of a condition list
+was already priced before this table sees it, at
+`MALLOC_COST_PER_BYTE = 10` when evaluation built the atom or by
+the weight mapping's per-byte charge on the serialized witness
+when the solution carried it, which section 9 requires to be at
+least the 2 per byte the sha256 table entry charges for hashing.
+Byte-linear validation work on operands, compares and ledger keys
+included, is therefore bounded by work already paid, and a
+per-byte term here would charge those bytes twice.
+
+Every constant in this table is PROVISIONAL: the Phase 4
+measurement pass re-prices all five against the measured
+implementation.
+
+| Constant | Value | Charged for |
+| --- | --- | --- |
+| `CONDITION_GENERIC_COST` | 200 (PROVISIONAL) | Each time assert, each self assert except ASSERT_MY_TAPROOT, each RESERVE_FEE, each SEAL and SEAL_OUTPUTS |
+| `CONDITION_MESSAGE_COST` | 700 (PROVISIONAL) | Each ANNOUNCE, ASSERT_ANNOUNCEMENT, SEND_MESSAGE, and RECEIVE_MESSAGE |
+| `CONDITION_SIG_ASSERT_COST` | 1,300,000 (PROVISIONAL) | Each signature assert |
+| `TAPROOT_TWEAK_COST` | 1,300,000 (PROVISIONAL) | The point derivation, once per CREATE_OUTPUT_TAPROOT and ASSERT_MY_TAPROOT |
+| `CREATE_OUTPUT_COST` | 1,350,000 (PROVISIONAL) | Each output claim |
+
+The derivation entries charge sums: CREATE_OUTPUT_TAPROOT charges
+`CREATE_OUTPUT_COST + TAPROOT_TWEAK_COST = 2,650,000` and
+ASSERT_MY_TAPROOT charges
+`CONDITION_GENERIC_COST + TAPROOT_TWEAK_COST = 1,300,200`, each as
+one charge before its derivation runs. A reserved condition
+charges exactly its declared cost, floor 500 (VALIDATION.md rule
+6). There is no per-spend constant: this table charges conditions
+only, and any fixed per-input overhead belongs to the weight
+mapping (section 9).
+
+`CONDITION_SIG_ASSERT_COST` equals `SECP_VERIFY_COST` (section 8)
+deliberately: both price one BIP340 verification, so one Phase 4
+measurement settles both, and a program can never buy the same
+verification cheaper in one layer than the other. The charge lands
+at parse while the verification itself runs in validation stage 5,
+so the work is always paid before it is performed.
+`TAPROOT_TWEAK_COST` adopts the same magnitude as a deliberate
+overprice: a point lift and one fixed-base multiplication cost
+less than a verification. The generic, message, and output-claim
+constants adopt the deployed Chia magnitudes, and the output
+claim's shape is flat: a linear per-output price with the
+per-input budget as the bound (provenance and rationale in
+[docs/condition-record.md](../docs/condition-record.md)).
+
+The seal conditions charge `CONDITION_GENERIC_COST` per
+occurrence for their 32-byte compare. The txid and outputs-hash
+derivations they read are transaction-level work, linear in the
+transaction's own serialization, and are priced by the weight
+mapping's per-byte charge on the transaction rather than by any
+per-occurrence term here.
+
+Worked examples, pinned by vectors: a condition list holding one
+CREATE_OUTPUT and one ASSERT_MY_AMOUNT charges
+`1,350,000 + 200 = 1,350,200`, which parses under a budget of
+exactly 1,350,200 and raises `cost_exceeded` under 1,350,199. The
+empty condition list charges nothing and parses under a zero
+budget.

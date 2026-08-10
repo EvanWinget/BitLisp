@@ -3,7 +3,7 @@
 A CLVM-derived predicate VM plus a condition and validation layer for Bitcoin,
 committed under a new taproot leaf version. The design case and the four
 design obligations live in `docs/bitcoin-script-successor-evaluation.md`
-(section 7). The phased plan lives in `docs/execution-plan.md`.
+(section 5). The phased plan lives in `docs/execution-plan.md`.
 
 ## Branch workflow
 

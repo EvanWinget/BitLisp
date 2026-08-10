@@ -9,11 +9,24 @@ declared cost and no enforced semantics, the forward-compatibility
 hatch a later soft fork can tighten into real conditions. Everything
 else is invalid, so a typo near a real opcode fails loudly instead of
 becoming an accidental no-op.
+
+Parsing is also where cost charges: each condition charges its flat
+cost in list order after its own encoding checks, on the same
+per-input budget the VM run accrued against, so a spend that cannot
+pay for its conditions dies here before any validation rule does
+work on them.
 """
 
 from dataclasses import dataclass
 
 from . import secp256k1
+from .costs import (
+    CONDITION_GENERIC_COST,
+    CONDITION_MESSAGE_COST,
+    CONDITION_SIG_ASSERT_COST,
+    CREATE_OUTPUT_COST,
+    TAPROOT_TWEAK_COST,
+)
 from .errors import BitLispError
 from .sexp import NIL, atom_to_int, int_to_atom, is_atom, is_pair
 
@@ -127,6 +140,34 @@ SPECIFIER_OPERANDS = {
 LOCKTIME_THRESHOLD = 500_000_000
 LOCKTIME_MAX = 0xFFFFFFFF
 SEQUENCE_VALUE_MAX = 0xFFFF
+
+# Each assigned opcode's flat cost, charged once per occurrence as
+# the condition parses, after its encoding checks. The two taproot
+# entries sum their claim or assert constant with the tweak
+# constant and charge it as one amount before their point
+# derivation runs. Reserved opcodes are absent on purpose: a
+# reserved condition charges exactly its declared cost.
+CONDITION_COSTS = {
+    CREATE_OUTPUT: CREATE_OUTPUT_COST,
+    CREATE_OUTPUT_TAPROOT: CREATE_OUTPUT_COST + TAPROOT_TWEAK_COST,
+    **{opcode: CONDITION_SIG_ASSERT_COST for opcode in SIG_BINDINGS},
+    ASSERT_LOCKTIME_HEIGHT: CONDITION_GENERIC_COST,
+    ASSERT_LOCKTIME_TIME: CONDITION_GENERIC_COST,
+    ASSERT_SEQUENCE_HEIGHT: CONDITION_GENERIC_COST,
+    ASSERT_SEQUENCE_TIME: CONDITION_GENERIC_COST,
+    ASSERT_MY_OUTPOINT: CONDITION_GENERIC_COST,
+    ASSERT_MY_TXID: CONDITION_GENERIC_COST,
+    ASSERT_MY_SCRIPTPUBKEY: CONDITION_GENERIC_COST,
+    ASSERT_MY_AMOUNT: CONDITION_GENERIC_COST,
+    ASSERT_MY_TAPROOT: CONDITION_GENERIC_COST + TAPROOT_TWEAK_COST,
+    ANNOUNCE: CONDITION_MESSAGE_COST,
+    ASSERT_ANNOUNCEMENT: CONDITION_MESSAGE_COST,
+    SEND_MESSAGE: CONDITION_MESSAGE_COST,
+    RECEIVE_MESSAGE: CONDITION_MESSAGE_COST,
+    RESERVE_FEE: CONDITION_GENERIC_COST,
+    SEAL: CONDITION_GENERIC_COST,
+    SEAL_OUTPUTS: CONDITION_GENERIC_COST,
+}
 
 
 @dataclass(frozen=True)
@@ -371,6 +412,22 @@ class Reserved:
     args: tuple
 
 
+class _Meter:
+    """Accrued cost against an optional inclusive budget.
+
+    A max_cost of None applies no budget, a reference-tool
+    convenience: the consensus interface always supplies one."""
+
+    def __init__(self, max_cost, cost):
+        self.max_cost = max_cost
+        self.cost = cost
+
+    def charge(self, amount):
+        self.cost += amount
+        if self.max_cost is not None and self.cost > self.max_cost:
+            raise BitLispError("cost_exceeded", "cost exceeded")
+
+
 def _iter_conditions(node, what):
     """Yields the elements of a proper list, else bad_condition_list."""
     while node != NIL:
@@ -409,9 +466,10 @@ def _parse_create_output(args):
     return CreateOutput(script_pubkey, amount)
 
 
-def _derive_taproot_spk(internal_key, merkle_root):
-    """The 34-byte taproot scriptPubKey of the two component atoms,
-    with every argument and derivation defect rejected."""
+def _check_taproot_components(internal_key, merkle_root):
+    """The width checks of the two taproot component atoms. Cheap
+    work only, run before the condition's charge: the point work
+    lives in _derive_taproot_spk, run after it."""
     if not is_atom(internal_key):
         raise BitLispError("bad_condition_arg", "internal key must be an atom")
     if len(internal_key) != 32:
@@ -426,6 +484,14 @@ def _derive_taproot_spk(internal_key, merkle_root):
             "bad_condition_arg",
             f"merkle root must be 0 or 32 bytes, got {len(merkle_root)}",
         )
+
+
+def _derive_taproot_spk(internal_key, merkle_root):
+    """The 34-byte taproot scriptPubKey of two width-checked
+    component atoms. Point work: the caller has already charged the
+    condition's cost, so a budget too small for the charge never
+    reaches this derivation and a derivation defect is reported
+    only when the charge is covered."""
     output_key = secp256k1.taproot_output_key(internal_key, merkle_root)
     if output_key is None:
         raise BitLispError(
@@ -434,16 +500,18 @@ def _derive_taproot_spk(internal_key, merkle_root):
     return b"\x51\x20" + output_key
 
 
-def _parse_create_output_taproot(args):
+def _parse_create_output_taproot(args, meter):
     if len(args) != 3:
         raise BitLispError(
             "bad_condition_arity",
             f"CREATE_OUTPUT_TAPROOT takes 3 arguments, got {len(args)}",
         )
     internal_key, merkle_root, amount_atom = args
+    _check_taproot_components(internal_key, merkle_root)
     amount = _parse_int(amount_atom, "CREATE_OUTPUT_TAPROOT amount")
     if not 0 <= amount <= MAX_MONEY:
         raise BitLispError("bad_condition_arg", f"amount out of range: {amount}")
+    meter.charge(CONDITION_COSTS[CREATE_OUTPUT_TAPROOT])
     script_pubkey = _derive_taproot_spk(internal_key, merkle_root)
     return CreateOutputTaproot(internal_key, merkle_root, amount, script_pubkey)
 
@@ -512,13 +580,15 @@ def _parse_assert_my_amount(args):
     return AssertMyAmount(amount)
 
 
-def _parse_assert_my_taproot(args):
+def _parse_assert_my_taproot(args, meter):
     if len(args) != 2:
         raise BitLispError(
             "bad_condition_arity",
             f"ASSERT_MY_TAPROOT takes 2 arguments, got {len(args)}",
         )
     internal_key, merkle_root = args
+    _check_taproot_components(internal_key, merkle_root)
+    meter.charge(CONDITION_COSTS[ASSERT_MY_TAPROOT])
     script_pubkey = _derive_taproot_spk(internal_key, merkle_root)
     return AssertMyTaproot(internal_key, merkle_root, script_pubkey)
 
@@ -701,7 +771,7 @@ def _parse_reserved(opcode, args):
     return Reserved(opcode, cost, tuple(args[1:]))
 
 
-def _parse_condition(node):
+def _parse_condition(node, meter):
     if not is_pair(node):
         raise BitLispError("bad_condition_list", "condition is not a list")
     items = list(_iter_conditions(node, "condition"))
@@ -713,11 +783,24 @@ def _parse_condition(node):
     opcode = opcode_atom[0]
     args = items[1:]
     if opcode >= _RESERVED_START:
-        return _parse_reserved(opcode, args)
+        condition = _parse_reserved(opcode, args)
+        meter.charge(condition.cost)
+        return condition
+    if opcode == CREATE_OUTPUT_TAPROOT:
+        return _parse_create_output_taproot(args, meter)
+    if opcode == ASSERT_MY_TAPROOT:
+        return _parse_assert_my_taproot(args, meter)
+    condition = _parse_assigned(opcode, args)
+    meter.charge(CONDITION_COSTS[opcode])
+    return condition
+
+
+def _parse_assigned(opcode, args):
+    """Parses an assigned non-derivation opcode: every check runs
+    here, and the caller charges the opcode's flat cost after the
+    whole parse, so each encoding defect wins over cost_exceeded."""
     if opcode == CREATE_OUTPUT:
         return _parse_create_output(args)
-    if opcode == CREATE_OUTPUT_TAPROOT:
-        return _parse_create_output_taproot(args)
     if opcode in SIG_BINDINGS:
         return _parse_assert_sig(opcode, args)
     if opcode == ASSERT_LOCKTIME_HEIGHT:
@@ -762,8 +845,6 @@ def _parse_condition(node):
         return _parse_assert_my_scriptpubkey(args)
     if opcode == ASSERT_MY_AMOUNT:
         return _parse_assert_my_amount(args)
-    if opcode == ASSERT_MY_TAPROOT:
-        return _parse_assert_my_taproot(args)
     if opcode == ANNOUNCE:
         return _parse_announce(args)
     if opcode == ASSERT_ANNOUNCEMENT:
@@ -781,13 +862,32 @@ def _parse_condition(node):
     raise BitLispError("bad_condition_opcode", f"invalid opcode {opcode:#04x}")
 
 
-def parse_conditions(node):
-    """Parses an evaluation result into a tuple of conditions.
+def parse_conditions(node, max_cost, cost=0):
+    """Parses an evaluation result into (cost, tuple of conditions).
 
-    Raises BitLispError on any encoding violation. Order is the
-    emitted order.
+    Conditions charge in list order as they parse, each after its
+    own encoding checks, against the inclusive budget max_cost.
+    cost is the already-accrued total the same budget covers, the
+    VM run's own cost in the consensus pipeline, and the returned
+    total includes it. max_cost is required, like run's: the
+    consensus interface always supplies a budget, and a reference
+    tool that wants none must say so with an explicit None.
+
+    Raises BitLispError on any encoding violation or on the first
+    charge the budget cannot cover. Condition order is the emitted
+    order.
     """
-    return tuple(
-        _parse_condition(element)
+    meter = _Meter(max_cost, cost)
+    conditions = tuple(
+        _parse_condition(element, meter)
         for element in _iter_conditions(node, "condition list")
     )
+    return meter.cost, conditions
+
+
+def condition_cost(condition):
+    """The flat cost a parsed condition charged: its opcode's table
+    entry, or the declared cost for a reserved condition."""
+    if isinstance(condition, Reserved):
+        return condition.cost
+    return CONDITION_COSTS[condition.opcode]

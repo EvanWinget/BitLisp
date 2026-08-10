@@ -5,9 +5,8 @@
   BitLisp relate.
 - [execution-plan.md](execution-plan.md): the phased working plan.
 - [bitcoin-script-successor-evaluation.md](bitcoin-script-successor-evaluation.md):
-  the evaluation doc this repo executes against. The section 7 design
-  obligations and the section 8 confidence table are citable from spec
-  and CLAUDE.md.
+  the factual comparison this repo executes against. The section 5
+  design obligations are citable from spec and CLAUDE.md.
 - [vm-record.md](vm-record.md): the VM record behind spec/VM.md, the
   divergence table, the oracle provenance, and the design decision
   record. Cited by CLAUDE.md ground rule 3.

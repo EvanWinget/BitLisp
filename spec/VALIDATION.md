@@ -1,11 +1,9 @@
 # BitLisp Condition Validation
 
-Status: in progress. The transaction view, the claims-and-asserts
-principle, the validation stages, and rules 1, 2, 3, 4, 6, 7, and
-8 are normative. Rule 5 is designed in architecture sessions, lands
-here as prose first, and only then gets implemented. Ground rule 4:
-this layer gets invariants and adversarial vectors before any feature
-work.
+Status: the transaction view, the claims-and-asserts principle,
+the validation stages, and rules 1 through 8 are normative. Ground
+rule 4: this layer gets invariants and adversarial vectors before
+any feature work.
 
 This document specifies how a validated spend's condition list is checked
 against the containing Bitcoin transaction. The per-condition rules,
@@ -84,7 +82,8 @@ A condition constrains the transaction through claims, asserts,
 message records, and fee reserves, and in no other way. Each
 vocabulary entry in `spec/CONDITIONS.md` states which of these it
 produces. An entry may produce none: rule 6's reserved conditions
-constrain nothing.
+constrain nothing. Every condition, whatever it produces, charges
+its cost against its input's budget under rule 5.
 
 - A **claim** requires a resource of the transaction and consumes
   it. The output claims of rule 1 are the only claim kind defined
@@ -162,8 +161,8 @@ stage provides. Stage 5 adds no context beyond stage 2: its
 checks read only the carrying input's own data and the
 condition's operands.
 
-1. Stateless per-spend work: the VM run and condition
-   well-formedness.
+1. Stateless per-spend work: the VM run, condition
+   well-formedness, and condition costing.
 2. Facts of the spent output's own data: outpoint, spent
    scriptPubKey, amount.
 3. Chain-context facts: height and median time past. Deliberately
@@ -234,6 +233,7 @@ document.
 A transaction is valid under this document if and only if every
 condition of every BitLisp input is well-formed (the encoding
 rules of `spec/CONDITIONS.md` and rule 6, the stage 1 checks),
+every input's charges are covered by its budget (rule 5),
 every claim is assigned a satisfier, every assert holds, the
 message ledger of rule 3 balances, and the fee covers rule 7's
 reserve. No other property of the transaction's inputs and output
@@ -416,8 +416,82 @@ produces.
 
 ### 5. Per-condition costing
 
-TODO. Including the superlinear `CREATE_OUTPUT` pricing stub (design
-obligation 2). Tuning is data-driven in Phase 4.
+Every condition of a BitLisp input charges a cost against the same
+budget its input's program evaluation drew on. One budget per input
+covers the evaluation and its condition list. The budget semantics
+are those of VM.md section 3.3: cost accrues as charges land, every
+charge is checked inclusively, and the first charge the budget
+cannot cover raises `cost_exceeded`. In the consensus interface the
+budget arrives with the spend, and its provenance is the weight
+mapping's question (COSTS.md section 9). No rule in this document
+grants, extends, or shares a budget: budgets are per input, and no
+other input's spending affects them.
+
+Every charge is stage 1 work, and the scope is structural. The
+amount charged is a function of the condition alone: the value
+its cost line in `spec/CONDITIONS.md` states, or, for rule 6's
+reserved tier, the declared cost. It never reads another
+condition, another input, an output slot, or an
+assembled-transaction quantity. The
+composition guarantee forces this scope: a charge that read
+cross-input or transaction-wide data could grow under
+concatenation and burst a budget that fit before the merge, so
+two valid transactions would not compose. There is no free tier:
+the first condition charges like every other. There is no count
+cap: the budget is the only bound on how many conditions an input
+carries, so condition count is priced, never capped.
+
+Conditions charge in list order, the emitted order, and the list
+is consumed element by element: the shape of the tail after
+condition k, proper or improper, is examined only after condition
+k parses and charges. For each condition, every check of the
+condition's own encoding precedes its charge: the condition's own
+list-shape check, the opcode tier check, then the arity and
+argument checks its vocabulary entry states, in the order the
+entry states them. The condition's whole cost then lands as one
+checked charge. The two derivation entries,
+CREATE_OUTPUT_TAPROOT and ASSERT_MY_TAPROOT, run their point
+derivation after the charge: their width checks are argument
+checks and precede it, and their derivation failures follow it,
+so a derivation defect is reported only when the budget covers
+the charge. A reserved condition charges exactly its declared
+cost, after the declared cost's own checks including rule 6's
+floor.
+
+Consequences, each pinned by vectors:
+
+- Within one condition, every encoding defect wins over
+  `cost_exceeded`: a malformed condition is rejected with its own
+  error even under a zero budget.
+- Across conditions, an earlier condition's charge precedes a
+  later condition's checks and the tail's list-shape check: when
+  the budget dies at condition k, no defect of condition k+1 and
+  no improperness of the tail after condition k is ever reported.
+- A point-derivation defect is reported only when the budget
+  covers the derivation entry's charge, and `cost_exceeded`
+  otherwise.
+- The empty condition list charges nothing and satisfies any
+  budget, including zero.
+- Every occurrence charges individually, under rule 4's
+  accounting sentence: identical conditions charge identically
+  and separately, and a condition's charge never depends on what
+  else the list contains.
+
+Charging completes during the stage 1 parse, before any later
+stage runs. A spend whose charges burst its budget therefore
+performs no claim matching (rule 1), no ledger or announcement
+work (rule 3), no fee summation (rule 7), no seal derivation and
+no other assert evaluation (rule 2's assert clause), and no
+signature verification (rule 8): later-stage work runs only on
+inputs that have already paid for their conditions. An
+implementation must preserve this order. Deferring charges past
+later-stage work performs unpaid work under a small budget, the
+same validation denial-of-service class as the soundness rules of
+COSTS.md sections 5 and 8.
+
+The per-entry cost values are stated in each vocabulary entry's
+cost line in `spec/CONDITIONS.md`, and the constants, with their
+provisional status, in COSTS.md section 10.
 
 ### 6. Reserved conditions
 
@@ -430,9 +504,10 @@ The declared cost must be an atom carrying a minimally encoded
 non-negative integer (`bad_condition_arg`) with
 cost >= RESERVED_COST_FLOOR, where RESERVED_COST_FLOOR is 500
 (`reserved_cost_too_low`). The declared cost counts against the
-spend's cost total under the accounting rule 5 defines, and vectors
-pin the charge when that rule lands. Arguments after the cost are
-unconstrained: any count, any shapes, including pairs.
+spend's cost total under rule 5's accounting: it is charged after
+the declared cost's own checks, floor included, and vectors pin
+the charge. Arguments after the cost are unconstrained: any
+count, any shapes, including pairs.
 
 No semantics are enforced. A reserved condition constrains nothing
 about the transaction.
@@ -547,6 +622,13 @@ it enforceable, and lands with that rule:
   transaction (composition guarantee).
 - A transaction with no BitLisp inputs validates regardless of its
   shape (rule 2).
+- An input's total condition cost equals the sum of its
+  conditions' cost lines, is invariant under condition-list
+  reordering, and never decreases when a condition is appended
+  (rule 5).
+- A well-formed condition list parses under a budget exactly when
+  its total cost is at most the budget, the boundary passing: the
+  budget is inclusive (rule 5).
 - Increasing any time assert's operand never turns an invalid
   transaction valid, and decreasing it never turns a valid
   transaction invalid: asserts are monotone in their operand
@@ -578,10 +660,12 @@ it enforceable, and lands with that rule:
   namespace, or a committed specifier field of the only balancing
   pair causes rejection (rule 3).
 - Duplicating any assert, ANNOUNCE, or reserved condition within
-  its input's condition list never changes the outcome: valid
-  stays valid, invalid stays invalid (rule 4, over the costless
-  v0: rule 5's budget re-scopes this to outcomes below the cost
-  ceiling when it lands). Copying a condition to a different
+  its input's condition list never changes the outcome of a spend
+  whose budget covers the duplicate's charge: valid stays valid,
+  invalid stays invalid. The duplicate still charges its own cost
+  under rule 5, so near the budget boundary the duplication can
+  only turn the outcome into `cost_exceeded`, never into a new
+  acceptance (rules 4 and 5). Copying a condition to a different
   input is not duplication in this sense: the copy reads its own
   input's fields and creates its own facts.
 - Increasing a fee reserve's operand never turns an invalid
@@ -589,7 +673,10 @@ it enforceable, and lands with that rule:
   transaction invalid (rule 7).
 - Replacing a fee reserve with two whose operands sum to it,
   within one input or split across two BitLisp inputs, never
-  changes the outcome (rule 7).
+  changes the outcome of a spend whose budget covers the second
+  reserve's charge: the split adds one condition and rule 5
+  charges it, so near the budget boundary the split can only turn
+  the outcome into `cost_exceeded` (rules 5 and 7).
 - Metamorphic: on a valid transaction whose fee equals its
   summed reserve, raising any reserve operand by one causes
   rejection (rule 7).

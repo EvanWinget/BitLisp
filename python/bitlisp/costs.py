@@ -76,3 +76,29 @@ STRLEN_COST_PER_BYTE = 1
 CONCAT_BASE_COST = 142
 CONCAT_COST_PER_ARG = 135
 CONCAT_COST_PER_BYTE = 3
+
+# Condition costs, charged as a condition list parses, on the same
+# per-input budget the VM run accrues against. Every constant is
+# flat: operand bytes are already priced upstream, at
+# MALLOC_COST_PER_BYTE when evaluation builds an atom or by the
+# serialized witness's per-byte weight when the solution carries
+# one, so a per-byte term here would charge the same bytes twice.
+# Every condition constant is PROVISIONAL: the magnitudes adopt the
+# deployed Chia condition-cost table where a deployed precedent
+# exists, and the Phase 4 measurement pass re-prices all five.
+CONDITION_GENERIC_COST = 200
+CONDITION_MESSAGE_COST = 700
+# Equals SECP_VERIFY_COST deliberately. Both constants price one
+# BIP340 verification, so one Phase 4 measurement settles the price
+# in both layers and a program can never buy the same verification
+# cheaper as a condition than as an operator.
+CONDITION_SIG_ASSERT_COST = SECP_VERIFY_COST
+# The point derivation the two taproot condition entries perform, a
+# lift and one fixed-base multiplication. That is less work than a
+# verification's two multiplications, so the verify magnitude is a
+# deliberate overprice pending the Phase 4 measurement.
+TAPROOT_TWEAK_COST = 1_300_000
+# Each output claim. Adopts the deployed Chia coin-creation
+# magnitude. Deliberately flat: a high linear price with the
+# per-input budget as the cap.
+CREATE_OUTPUT_COST = 1_350_000
