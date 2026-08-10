@@ -253,9 +253,16 @@ def run_conditions_case(case):
         {
             "name": "<unique within the file>",
             "conditions": "<hex, strict canonical serialization>",
+            "max_cost": <int, optional, default unlimited>,
             "expect": {"parsed": [<condition JSON>]}
+                      or {"parsed": [...], "cost": <int>}
                       or {"error": "<bitlisp error code>"}
         }
+
+    max_cost is the inclusive per-input budget of the parse, with
+    the accrued total starting at zero: these cases pin the
+    condition layer's own charges in isolation. Cases that pin
+    costs state the expected total in expect.cost.
 
     Condition JSON is {"opcode", "script_pubkey", "amount"} for
     CREATE_OUTPUT, {"opcode", "internal_key", "merkle_root", "amount",
@@ -297,11 +304,15 @@ def run_conditions_case(case):
     keys = set(case)
     if missing := required - keys:
         raise VectorError(f"missing keys {sorted(missing)}")
-    if extra := keys - required:
+    if extra := keys - required - {"max_cost"}:
         raise VectorError(f"unknown keys {sorted(extra)}")
     expect = case["expect"]
-    if not isinstance(expect, dict) or set(expect) not in ({"parsed"}, {"error"}):
-        raise VectorError("expect must be exactly {parsed} or {error}")
+    if not isinstance(expect, dict) or set(expect) not in (
+        {"parsed"},
+        {"parsed", "cost"},
+        {"error"},
+    ):
+        raise VectorError("expect must be exactly {parsed}, {parsed, cost}, or {error}")
     if "error" in expect and expect["error"] not in CODES:
         raise VectorError(f"unknown expected error code {expect['error']!r}")
     try:
@@ -309,8 +320,10 @@ def run_conditions_case(case):
     except BitLispError as exc:
         raise VectorError(f"conditions field does not deserialize: {exc}") from None
     try:
-        parsed = parse_conditions(node)
+        cost, parsed = parse_conditions(node, case.get("max_cost"))
         outcome = {"parsed": [_condition_json(c) for c in parsed]}
+        if "cost" in expect:
+            outcome["cost"] = cost
     except BitLispError as exc:
         outcome = {"error": exc.code}
     if outcome != expect:
@@ -360,7 +373,7 @@ def _tx_from_json(obj):
                 raise VectorError(
                     f"conditions field does not deserialize: {exc}"
                 ) from None
-            conditions = parse_conditions(node)
+            _, conditions = parse_conditions(node)
         decoded_inputs.append((entry, conditions))
     for entry in obj["outputs"]:
         entry_keys = set(entry)
