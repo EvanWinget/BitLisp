@@ -1,18 +1,3 @@
-# A Script Layer for Nine Billion
-## The Contract-Layer Comparison Behind BitLisp
-
-*Working outline, July 26, 2026. Internal draft ahead of a hostile-review essay. All numbers marked (est.) are envelope estimates pending measured artifacts.*
-
-*Revised August 6, 2026 after an email exchange on the architecture (roadmap item 5): aggregation qualification in section 4.4, consolidation benchmark in section 3.4, obligation 2 rewording and track-record precision in section 7, confidence update in section 8, steelmen in section 10.*
-
-*Revised August 7, 2026 after a conversation with the deployed architecture's designer and a production puzzle-corpus study (both 2026-08-06, recorded in section 11): design principles in section 7, aggregation reality check in section 4.4, ossification argument in section 10.2, confidence update in section 8, roadmap item 6.*
-
-*Revised August 9, 2026 at the rule 5 costing decision: obligation 2's superlinear clause amended to flat high pricing with a pre-registered Phase 4 revisit, decision 25 in `docs/condition-record.md`.*
-
-*Revised August 9, 2026 (decision by Evan): reframed as a factual comparison. The recommendation framing, the scoring rubric and its totals, the stable-conclusions list, the confidence table, and every adoption-likelihood judgment are removed, and the surviving sections are renumbered (the earlier revision notes above cite the old numbering, and the full prior text is in git history). What the architecture is worth is for measured artifacts (Phase 4) and hostile review (Phase 5) to establish, not for this document to assert.*
-
----
-
 ## 1. Scope
 
 This document records the comparison behind BitLisp: the scaling arithmetic that motivates a contract-layer question at all, the candidate architectures and their mechanical properties, the design obligations BitLisp carries, and the evidence gathered from the deployed condition architecture and from the public record. It states facts of the comparison and records both sides' strongest arguments. It does not score candidates, rank them, or estimate adoption. BitLisp builds the conditions architecture of section 5 as a specification with measured artifacts so that review can judge it on evidence.
