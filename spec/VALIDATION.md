@@ -82,7 +82,8 @@ A condition constrains the transaction through claims, asserts,
 message records, and fee reserves, and in no other way. Each
 vocabulary entry in `spec/CONDITIONS.md` states which of these it
 produces. An entry may produce none: rule 6's reserved conditions
-constrain nothing.
+constrain nothing. Every condition, whatever it produces, charges
+its cost against its input's budget under rule 5.
 
 - A **claim** requires a resource of the transaction and consumes
   it. The output claims of rule 1 are the only claim kind defined
@@ -160,8 +161,8 @@ stage provides. Stage 5 adds no context beyond stage 2: its
 checks read only the carrying input's own data and the
 condition's operands.
 
-1. Stateless per-spend work: the VM run and condition
-   well-formedness.
+1. Stateless per-spend work: the VM run, condition
+   well-formedness, and condition costing.
 2. Facts of the spent output's own data: outpoint, spent
    scriptPubKey, amount.
 3. Chain-context facts: height and median time past. Deliberately
@@ -232,6 +233,7 @@ document.
 A transaction is valid under this document if and only if every
 condition of every BitLisp input is well-formed (the encoding
 rules of `spec/CONDITIONS.md` and rule 6, the stage 1 checks),
+every input's charges are covered by its budget (rule 5),
 every claim is assigned a satisfier, every assert holds, the
 message ledger of rule 3 balances, and the fee covers rule 7's
 reserve. No other property of the transaction's inputs and output
@@ -426,10 +428,11 @@ grants, extends, or shares a budget: budgets are per input, and no
 other input's spending affects them.
 
 Every charge is stage 1 work, and the scope is structural. The
-amount charged is a function of the condition alone, as its cost
-line in `spec/CONDITIONS.md` states, plus the declared cost for
-rule 6's reserved tier. It never reads another condition, another
-input, an output slot, or an assembled-transaction quantity. The
+amount charged is a function of the condition alone: the value
+its cost line in `spec/CONDITIONS.md` states, or, for rule 6's
+reserved tier, the declared cost. It never reads another
+condition, another input, an output slot, or an
+assembled-transaction quantity. The
 composition guarantee forces this scope: a charge that read
 cross-input or transaction-wide data could grow under
 concatenation and burst a budget that fit before the merge, so
@@ -438,12 +441,15 @@ the first condition charges like every other. There is no count
 cap: the budget is the only bound on how many conditions an input
 carries, so condition count is priced, never capped.
 
-Conditions charge in list order, the emitted order. For each
-condition, every check of the condition's own encoding precedes
-its charge: the list-shape check, the opcode tier check, the
-arity check, and every argument check its vocabulary entry
-states, in the entry's stated order. The condition's whole cost
-then lands as one checked charge. The two derivation entries,
+Conditions charge in list order, the emitted order, and the list
+is consumed element by element: the shape of the tail after
+condition k, proper or improper, is examined only after condition
+k parses and charges. For each condition, every check of the
+condition's own encoding precedes its charge: the condition's own
+list-shape check, the opcode tier check, then the arity and
+argument checks its vocabulary entry states, in the order the
+entry states them. The condition's whole cost then lands as one
+checked charge. The two derivation entries,
 CREATE_OUTPUT_TAPROOT and ASSERT_MY_TAPROOT, run their point
 derivation after the charge: their width checks are argument
 checks and precede it, and their derivation failures follow it,
@@ -458,8 +464,9 @@ Consequences, each pinned by vectors:
   `cost_exceeded`: a malformed condition is rejected with its own
   error even under a zero budget.
 - Across conditions, an earlier condition's charge precedes a
-  later condition's checks: when the budget dies at condition k,
-  no defect of condition k+1 is ever reported.
+  later condition's checks and the tail's list-shape check: when
+  the budget dies at condition k, no defect of condition k+1 and
+  no improperness of the tail after condition k is ever reported.
 - A point-derivation defect is reported only when the budget
   covers the derivation entry's charge, and `cost_exceeded`
   otherwise.
@@ -472,9 +479,11 @@ Consequences, each pinned by vectors:
 
 Charging completes during the stage 1 parse, before any later
 stage runs. A spend whose charges burst its budget therefore
-performs no claim matching, no ledger work, no seal derivation,
-and no signature verification: every expensive check of rules 1,
-3, 7, and 8 runs only on inputs that have already paid for it. An
+performs no claim matching (rule 1), no ledger or announcement
+work (rule 3), no fee summation (rule 7), no seal derivation and
+no other assert evaluation (rule 2's assert clause), and no
+signature verification (rule 8): later-stage work runs only on
+inputs that have already paid for their conditions. An
 implementation must preserve this order. Deferring charges past
 later-stage work performs unpaid work under a small budget, the
 same validation denial-of-service class as the soundness rules of
@@ -617,9 +626,9 @@ it enforceable, and lands with that rule:
   conditions' cost lines, is invariant under condition-list
   reordering, and never decreases when a condition is appended
   (rule 5).
-- A condition list parses under a budget exactly when its total
-  cost is at most the budget, the boundary passing: the budget is
-  inclusive (rule 5).
+- A well-formed condition list parses under a budget exactly when
+  its total cost is at most the budget, the boundary passing: the
+  budget is inclusive (rule 5).
 - Increasing any time assert's operand never turns an invalid
   transaction valid, and decreasing it never turns a valid
   transaction invalid: asserts are monotone in their operand

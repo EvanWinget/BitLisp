@@ -321,7 +321,11 @@ four bytes for
 
 TODO (Phase 4): mapping from VM cost units to Bitcoin transaction
 weight, derived from benchmark data on the measured artifacts,
-including the per-byte cost of the serialized program itself.
+including the per-byte cost of the serialized program itself. One
+constraint is already normative: the per-byte cost on serialized
+witness bytes must be at least `SHA256_COST_PER_BYTE = 2`, the
+floor the flat condition costs of section 10 rely on for
+witness-carried operands.
 
 ## 10. Condition costs
 
@@ -338,19 +342,23 @@ are deliberately absent: every operand byte of a condition list
 was already priced before this table sees it, at
 `MALLOC_COST_PER_BYTE = 10` when evaluation built the atom or by
 the weight mapping's per-byte charge on the serialized witness
-when the solution carried it, both above the 2 per byte the
-sha256 table entry charges for hashing. Byte-linear validation
-work on operands, compares and ledger keys included, is therefore
-bounded by work already paid, and a per-byte term here would
-charge those bytes twice.
+when the solution carried it, which section 9 requires to be at
+least the 2 per byte the sha256 table entry charges for hashing.
+Byte-linear validation work on operands, compares and ledger keys
+included, is therefore bounded by work already paid, and a
+per-byte term here would charge those bytes twice.
+
+Every constant in this table is PROVISIONAL: the Phase 4
+measurement pass re-prices all five against the measured
+implementation.
 
 | Constant | Value | Charged for |
 | --- | --- | --- |
-| `CONDITION_GENERIC_COST` | 200 | Each time assert, each self assert except ASSERT_MY_TAPROOT, each RESERVE_FEE, each SEAL and SEAL_OUTPUTS |
-| `CONDITION_MESSAGE_COST` | 700 | Each ANNOUNCE, ASSERT_ANNOUNCEMENT, SEND_MESSAGE, and RECEIVE_MESSAGE |
-| `CONDITION_SIG_ASSERT_COST` | 1,300,000 | Each signature assert (PROVISIONAL) |
-| `TAPROOT_TWEAK_COST` | 1,300,000 | The point derivation, once per CREATE_OUTPUT_TAPROOT and ASSERT_MY_TAPROOT (PROVISIONAL) |
-| `CREATE_OUTPUT_COST` | 1,350,000 | Each output claim (PROVISIONAL) |
+| `CONDITION_GENERIC_COST` | 200 (PROVISIONAL) | Each time assert, each self assert except ASSERT_MY_TAPROOT, each RESERVE_FEE, each SEAL and SEAL_OUTPUTS |
+| `CONDITION_MESSAGE_COST` | 700 (PROVISIONAL) | Each ANNOUNCE, ASSERT_ANNOUNCEMENT, SEND_MESSAGE, and RECEIVE_MESSAGE |
+| `CONDITION_SIG_ASSERT_COST` | 1,300,000 (PROVISIONAL) | Each signature assert |
+| `TAPROOT_TWEAK_COST` | 1,300,000 (PROVISIONAL) | The point derivation, once per CREATE_OUTPUT_TAPROOT and ASSERT_MY_TAPROOT |
+| `CREATE_OUTPUT_COST` | 1,350,000 (PROVISIONAL) | Each output claim |
 
 The derivation entries charge sums: CREATE_OUTPUT_TAPROOT charges
 `CREATE_OUTPUT_COST + TAPROOT_TWEAK_COST = 2,650,000` and
@@ -370,15 +378,11 @@ at parse while the verification itself runs in validation stage 5,
 so the work is always paid before it is performed.
 `TAPROOT_TWEAK_COST` adopts the same magnitude as a deliberate
 overprice: a point lift and one fixed-base multiplication cost
-less than a verification, and pricing high is the safe error
-direction pending the Phase 4 measurement.
-`CREATE_OUTPUT_COST` adopts the magnitude of the deployed Chia
-cost table's coin-creation price, tuned there with production
-data against the same state-growth externality (provenance in
-[docs/condition-record.md](../docs/condition-record.md)). The
-shape is flat on purpose: base consensus prices resources
-linearly in weight and bounds them with caps, and this table
-follows that idiom, with the per-input budget as the cap.
+less than a verification. The generic, message, and output-claim
+constants adopt the deployed Chia magnitudes, and the output
+claim's shape is flat: a linear per-output price with the
+per-input budget as the bound (provenance and rationale in
+[docs/condition-record.md](../docs/condition-record.md)).
 
 The seal conditions charge `CONDITION_GENERIC_COST` per
 occurrence for their 32-byte compare. The txid and outputs-hash
