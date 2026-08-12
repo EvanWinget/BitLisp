@@ -19,4 +19,8 @@
 - [condition-comparison.md](condition-comparison.md): informative
   side-by-side of Chia's deployed condition vocabulary and BitLisp's
   v0 vocabulary, plus the validation-layer architecture comparison.
+- [lang/syntax.md](lang/syntax.md): the text s-expression syntax
+  read and written by the Phase 3 front end, with the printer normal
+  form and the round-trip guarantee. The language reference grows in
+  `lang/` alongside it.
 - Essay drafts land here in Phase 5.

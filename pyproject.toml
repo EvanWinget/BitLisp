@@ -31,7 +31,7 @@ oracles = [
 
 [tool.setuptools]
 package-dir = {"" = "python"}
-packages = ["bitlisp"]
+packages = ["bitlisp", "bitlisp_tools"]
 
 [tool.pytest.ini_options]
 testpaths = ["python/tests"]
