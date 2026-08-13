@@ -16,7 +16,8 @@ and the test suites `python/tests/test_secp256k1.py`,
 
 - Source repository: https://github.com/bitcoin/bitcoin
 - Release tag: v31.1 (commit 9be056a8a72b624dae9623b2f7bded92c2a21c91)
-- License: MIT
+- License: MIT, the file headers reference the accompanying `COPYING`,
+  carried here so the notice travels with the snapshot
 - Import date: 2026-07-28
 
 Vendored verbatim:
