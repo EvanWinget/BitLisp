@@ -24,7 +24,7 @@
   ```
   bitlisp/
     CLAUDE.md              # working rules for Claude Code (below)
-    LICENSE                # MIT (decision by Evan, 2026-08-13, switched from the original Apache-2.0 to match Bitcoin Core, vendored material keeps its upstream licenses)
+    LICENSE                # MIT
     spec/
       SPEC.md              # architecture: leaf version, commitment, witness structure
       VM.md                # evaluator semantics + divergence-from-CLVM table
