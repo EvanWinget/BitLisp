@@ -14,6 +14,12 @@ of a vendored directory tree) recording:
 - upstream license
 - import date and importing commit
 
+Vendored content stays under its upstream license. Each vendored set
+carries the upstream license text in a `LICENSE` file beside the data:
+Apache-2.0 for the Chia clvm vectors, BSD-2-Clause for the BIP 340
+vectors, BSD-3-Clause for the BIP 341 vectors. The repository's own
+MIT license does not apply here.
+
 Files here keep their original upstream format and are exempt from the
 `bitlisp-vector-v0` envelope and from repository lint. The clvm and
 bip340 sets were imported in Phase 1 alongside the intersection diff

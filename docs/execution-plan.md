@@ -24,7 +24,7 @@
   ```
   bitlisp/
     CLAUDE.md              # working rules for Claude Code (below)
-    LICENSE                # Apache-2.0 (matches chia_rs/clvm_rs; simplifies vector reuse)
+    LICENSE                # MIT
     spec/
       SPEC.md              # architecture: leaf version, commitment, witness structure
       VM.md                # evaluator semantics + divergence-from-CLVM table

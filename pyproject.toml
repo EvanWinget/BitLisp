@@ -7,7 +7,7 @@ name = "bitlisp"
 version = "0.0.1"
 description = "Executable specification for a CLVM-derived Bitcoin predicate VM and condition validation layer"
 readme = "README.md"
-license = "Apache-2.0"
+license = "MIT"
 requires-python = ">=3.14"
 
 # Runtime dependencies stay empty on purpose. The reference

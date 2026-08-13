@@ -41,5 +41,7 @@ Working rules for agent sessions are in [CLAUDE.md](CLAUDE.md).
 
 ## License
 
-Apache-2.0. This matches upstream `clvm_rs`/`chia_rs` and simplifies
-test-vector reuse.
+MIT, matching Bitcoin Core and the wider Bitcoin ecosystem. Vendored
+third-party material under `vectors/upstream/` and
+`tools/oracle/bitcoincore/` stays under its upstream licenses, with
+each license text carried beside the vendored files.
