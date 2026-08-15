@@ -123,8 +123,29 @@ position and its bytes match a table opcode. Operator position means
 the head of a printed list: the first child of a pair that is not
 itself the rest of another pair. Later list elements and dotted
 tails are data, so `(q 1 2)` prints with a plain `1` even though
-`0x01` is quote's opcode, and `(q . q)` prints as `(q . 1)`. In data
-position an atom prints in this order:
+`0x01` is quote's opcode, and `(q . q)` prints as `(q . 1)`.
+
+The cons structure of `(q 1 2)` makes the rule concrete. The tree
+is three pairs ending in nil, and only the head of the first pair
+sits in operator position:
+
+```
+        pair
+       /    \
+    0x01     pair          operator position, prints as q
+            /    \
+         0x01     pair     data, prints as 1
+                 /    \
+              0x02     ()  data, prints as 2, and nil closes the list
+```
+
+The second and third pairs are each the rest of the pair above
+them, so their heads are list elements, data under the definition
+above. The two `0x01` atoms in one tree print differently, `q` at
+the head and `1` in the body, and both spellings assemble back to
+the same byte.
+
+In data position an atom prints in this order:
 
 1. Nil prints `()`.
 2. An atom of three or more bytes that are all printable ASCII
