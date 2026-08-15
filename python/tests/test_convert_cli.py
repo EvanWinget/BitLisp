@@ -161,14 +161,17 @@ def test_console_scripts_resolve():
     assert entry.load() is cli.disasm_main
 
 
-def test_asm_broken_pipe_keeps_exit_zero():
+def test_asm_broken_pipe_keeps_exit_zero(tmp_path):
     # Output larger than the pipe buffer, and a reader that hangs up
-    # without reading. The producer must exit 0 with a silent stderr.
-    program = "0x" + "ab" * 100_000
+    # without reading. The producer must exit 0 with a silent
+    # stderr. The program travels as a file because an atom this
+    # large would burst the argv size limit on some platforms.
+    path = tmp_path / "big.bl"
+    path.write_text("0x" + "ab" * 100_000)
     env = dict(os.environ, PYTHONPATH=str(REPO_ROOT / "python"))
     code = "import sys; from bitlisp_tools.cli import asm_main; sys.exit(asm_main())"
     process = subprocess.Popen(
-        [sys.executable, "-c", code, program],
+        [sys.executable, "-c", code, str(path)],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         env=env,
