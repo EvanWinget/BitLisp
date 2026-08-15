@@ -92,7 +92,14 @@ def _atom_from_token(token, offset):
         return atom
     body = token[1:] if token.startswith("-") else token
     if body and set(body) <= _DIGITS:
-        return int_to_atom(int(token))
+        try:
+            return int_to_atom(int(token))
+        except ValueError:
+            # CPython caps decimal string conversion at a digit
+            # limit. The reader stays total, ParseError and never
+            # the interpreter's limit error, and hex spells an atom
+            # of any size.
+            raise ParseError("decimal atom past the digit limit", offset) from None
     raise ParseError(f"unknown symbol {token!r}", offset)
 
 

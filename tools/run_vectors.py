@@ -330,85 +330,6 @@ def run_conditions_case(case):
         raise VectorError(f"expected {expect}, got {outcome}")
 
 
-def _tx_from_json(obj):
-    """Builds the transaction model from a validation case's tx object.
-
-    Parses each input's optional serialized condition list. A
-    BitLispError from condition parsing is a case outcome (the spend
-    is invalid), so it propagates to the caller. Everything else
-    wrong with the tx object is a malformed vector: unknown or
-    missing keys, a conditions field that does not deserialize (the
-    validation stage receives already-materialized evaluation results,
-    so a serialization failure is not a possible outcome here), and
-    ValueError from any model constructor."""
-    from bitlisp import (
-        BitLispError,
-        Transaction,
-        TxInput,
-        TxOutput,
-        deserialize,
-        parse_conditions,
-    )
-
-    required = {"version", "locktime", "inputs", "outputs"}
-    keys = set(obj)
-    if missing := required - keys:
-        raise VectorError(f"tx missing keys {sorted(missing)}")
-    if extra := keys - required:
-        raise VectorError(f"tx unknown keys {sorted(extra)}")
-    decoded_inputs = []
-    for entry in obj["inputs"]:
-        entry_required = {"txid", "index", "script_pubkey", "amount"}
-        entry_optional = {"sequence", "conditions", "script_sig"}
-        entry_keys = set(entry)
-        if missing := entry_required - entry_keys:
-            raise VectorError(f"input missing keys {sorted(missing)}")
-        if extra := entry_keys - entry_required - entry_optional:
-            raise VectorError(f"input unknown keys {sorted(extra)}")
-        conditions = None
-        if "conditions" in entry:
-            try:
-                node = deserialize(bytes.fromhex(entry["conditions"]))
-            except BitLispError as exc:
-                raise VectorError(
-                    f"conditions field does not deserialize: {exc}"
-                ) from None
-            # Validation cases pin cross-input rules over
-            # already-parsed lists, so the parse runs unbudgeted:
-            # the conditions suite pins every charge in isolation.
-            _, conditions = parse_conditions(node, None)
-        decoded_inputs.append((entry, conditions))
-    for entry in obj["outputs"]:
-        entry_keys = set(entry)
-        if missing := {"script_pubkey", "amount"} - entry_keys:
-            raise VectorError(f"output missing keys {sorted(missing)}")
-        if extra := entry_keys - {"script_pubkey", "amount"}:
-            raise VectorError(f"output unknown keys {sorted(extra)}")
-    try:
-        return Transaction(
-            version=obj["version"],
-            locktime=obj["locktime"],
-            inputs=tuple(
-                TxInput(
-                    txid=bytes.fromhex(entry["txid"]),
-                    index=entry["index"],
-                    script_pubkey=bytes.fromhex(entry["script_pubkey"]),
-                    amount=entry["amount"],
-                    sequence=entry.get("sequence", 0xFFFFFFFF),
-                    conditions=conditions,
-                    script_sig=bytes.fromhex(entry.get("script_sig", "")),
-                )
-                for entry, conditions in decoded_inputs
-            ),
-            outputs=tuple(
-                TxOutput(bytes.fromhex(o["script_pubkey"]), o["amount"])
-                for o in obj["outputs"]
-            ),
-        )
-    except ValueError as exc:
-        raise VectorError(f"tx violates the model's base rules: {exc}") from None
-
-
 def run_validation_case(case):
     """One validation case: validate a transaction's condition lists.
 
@@ -434,6 +355,13 @@ def run_validation_case(case):
     from bitlisp import BitLispError, validate_transaction
     from bitlisp.errors import CODES
 
+    # The tx model builder lives with the single-spend runner, one
+    # statement of the corpus tx shape for both consumers. Its
+    # ContextError marks a malformed tx object, mapped to
+    # VectorError here, while a BitLispError from a carried
+    # condition list is a case outcome and propagates.
+    from bitlisp_tools.runner import ContextError, load_context
+
     required = {"name", "tx", "expect"}
     keys = set(case)
     if missing := required - keys:
@@ -448,9 +376,11 @@ def run_validation_case(case):
     if "error" in expect and expect["error"] not in CODES:
         raise VectorError(f"unknown expected error code {expect['error']!r}")
     try:
-        tx = _tx_from_json(case["tx"])
+        tx = load_context(case["tx"])
         validate_transaction(tx)
         outcome = {"valid": True}
+    except ContextError as exc:
+        raise VectorError(str(exc)) from None
     except BitLispError as exc:
         outcome = {"error": exc.code}
     if outcome != expect:

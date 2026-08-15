@@ -29,6 +29,9 @@ oracles = [
     "chia-rs==0.46.0",
 ]
 
+[project.scripts]
+bitlisp-run = "bitlisp_tools.cli:main"
+
 [tool.setuptools]
 package-dir = {"" = "python"}
 packages = ["bitlisp", "bitlisp_tools"]

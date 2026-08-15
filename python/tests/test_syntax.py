@@ -59,6 +59,16 @@ def test_reader_total_surrogates(text):
     assert isinstance(node, bytes | tuple)
 
 
+def test_decimal_past_digit_limit():
+    # CPython caps decimal string conversion at a digit limit, and
+    # the reader turns that cap into ParseError instead of leaking
+    # ValueError. Hex has no cap, so any magnitude stays writable.
+    for text in ("1" * 5000, "-" + "1" * 5000):
+        with pytest.raises(ParseError):
+            assemble(text)
+    assert len(assemble("0x" + "11" * 5000)) == 5000
+
+
 # The name table mirrors the consensus operator set exactly.
 
 
