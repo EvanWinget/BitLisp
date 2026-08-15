@@ -7,6 +7,13 @@ so a misspelled operator fails here instead of assembling into data
 that fails at runtime. Literal name bytes are written as a string or
 as hex.
 
+A caller may pass definition bindings, a dict from bare names to
+nodes. A binding is consulted only where the resolver would
+otherwise reject an unknown symbol, after string, hex, operator
+name, and decimal all decline, so a binding can never change the
+meaning of text that already parses. The bound node splices in
+wherever the name sits, head position and dotted tails included.
+
 Parsing is iterative with an explicit frame stack: tree depth must
 not be limited by the Python recursion limit.
 """
@@ -70,8 +77,10 @@ def tokenize(text):
     return tokens
 
 
-def _atom_from_token(token, offset):
-    """The atom a non-paren token denotes: string, hex, name, or decimal."""
+def _known_token(token, offset):
+    """The atom a non-paren token denotes, or None for an unknown
+    symbol: string, hex, operator name, or decimal, malformed
+    spellings of those raising ParseError."""
     if token[0] in "\"'":
         try:
             return token[1:-1].encode()
@@ -100,21 +109,54 @@ def _atom_from_token(token, offset):
             # the interpreter's limit error, and hex spells an atom
             # of any size.
             raise ParseError("decimal atom past the digit limit", offset) from None
+    return None
+
+
+def _node_from_token(token, offset, names):
+    """The node a non-paren token denotes, bindings consulted last."""
+    node = _known_token(token, offset)
+    if node is not None:
+        return node
+    if names:
+        bound = names.get(token)
+        if bound is not None:
+            return bound
     raise ParseError(f"unknown symbol {token!r}", offset)
 
 
-def assemble(text):
-    """The node for exactly one text s-expression, ParseError on failure.
+def definable(text):
+    """True when text is exactly one bare token the resolver rejects
+    as an unknown symbol, the shape a definition name must have.
+    Structural tokens, strings, operator names, decimals, malformed
+    hex or decimal spellings, and text the tokenizer would trim (a
+    comment, a quote character, surrounding whitespace) are not
+    definable, so every accepted name can be written back and read."""
+    try:
+        tokens = tokenize(text)
+    except ParseError:
+        return False
+    if len(tokens) != 1:
+        return False
+    token, offset = tokens[0]
+    if token != text or token in ("(", ")", "."):
+        return False
+    try:
+        return _known_token(token, offset) is None
+    except ParseError:
+        return False
+
+
+def _parse(tokens, names, single):
+    """The node list for a token stream.
 
     Each stack frame is one open list: its elements so far, the node
     after the dot if one has been seen, whether the dot has been seen,
     and the offset of the opening paren for the missing-paren error.
     """
-    result = None
-    have_result = False
+    results = []
     stack = []
-    for token, offset in tokenize(text):
-        if have_result and not stack:
+    for token, offset in tokens:
+        if single and results and not stack:
             raise ParseError("trailing tokens", offset)
         if token == "(":
             stack.append([[], None, False, offset])
@@ -139,7 +181,7 @@ def assemble(text):
             for item in reversed(items):
                 node = (item, node)
         else:
-            node = _atom_from_token(token, offset)
+            node = _node_from_token(token, offset, names)
         if stack:
             frame = stack[-1]
             if not frame[2]:
@@ -149,10 +191,20 @@ def assemble(text):
             else:
                 raise ParseError("element after dotted tail", offset)
         else:
-            result = node
-            have_result = True
+            results.append(node)
     if stack:
         raise ParseError("missing )", stack[-1][3])
-    if not have_result:
+    return results
+
+
+def assemble(text, names=None):
+    """The node for exactly one text s-expression, ParseError on failure."""
+    nodes = _parse(tokenize(text), names, single=True)
+    if not nodes:
         raise ParseError("empty input", len(text))
-    return result
+    return nodes[0]
+
+
+def assemble_many(text, names=None):
+    """The node list for zero or more text s-expressions."""
+    return _parse(tokenize(text), names, single=False)

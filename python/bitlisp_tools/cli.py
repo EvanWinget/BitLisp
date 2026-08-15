@@ -1,4 +1,30 @@
-"""Run one BitLisp spend and report the verdict.
+"""The one-shot command surface: bitlisp-run, bitlisp-asm, bitlisp-disasm.
+
+Each command is a thin main over the tools library. bitlisp-run runs
+one spend and reports the verdict. bitlisp-asm assembles a text
+s-expression to serialized bytecode hex. bitlisp-disasm renders
+serialized hex back as text.
+"""
+
+import argparse
+import contextlib
+import json
+import os
+import sys
+
+from bitlisp import BitLispError, deserialize, serialize
+
+from .printer import disassemble
+from .reader import ParseError, assemble
+from .runner import (
+    DEFAULT_MAX_COST,
+    ContextError,
+    load_context,
+    render_condition,
+    run_spend,
+)
+
+_RUN_DOC = """Run one BitLisp spend and report the verdict.
 
 Takes a program, an optional solution, and a transaction context,
 runs evaluation, condition parsing, and full validation as one
@@ -38,21 +64,36 @@ Usage:
     bitlisp-run --hex ff01<hex> 80 tx.json
 """
 
-import argparse
-import json
-import os
-import sys
+_ASM_DOC = """Assemble a text s-expression to serialized bytecode hex.
 
-from bitlisp import BitLispError, deserialize
+The argument names a file when one exists at that path and reads as
+literal text otherwise. With no argument the text is read from
+stdin. Prints one line of lowercase hex.
 
-from .reader import ParseError, assemble
-from .runner import (
-    DEFAULT_MAX_COST,
-    ContextError,
-    load_context,
-    render_condition,
-    run_spend,
-)
+Exit status 0 on success, 2 when the text does not parse or the
+file does not open.
+
+Usage:
+    bitlisp-asm "(+ (q . 2) (q . 3))"
+    bitlisp-asm puzzle.bl
+    echo "(q . 1)" | bitlisp-asm
+"""
+
+_DISASM_DOC = """Render serialized bytecode hex as a text s-expression.
+
+The argument names a file when one exists at that path and reads as
+literal hex otherwise. With no argument the hex is read from stdin.
+Deserialization is strict, accepting only the unique canonical
+encoding, and the error line carries the consensus error code when
+it rejects the bytes.
+
+Exit status 0 on success, 2 when the hex does not decode or the
+file does not open.
+
+Usage:
+    bitlisp-disasm ff10ffff0102ffff010380
+    echo ff10ffff0102ffff010380 | bitlisp-disasm
+"""
 
 
 def _path_or_code(arg):
@@ -72,10 +113,21 @@ def _node(source, as_hex):
     return deserialize(bytes.fromhex(source)) if as_hex else assemble(source)
 
 
+@contextlib.contextmanager
+def _pipe_shield():
+    """On a broken pipe, points stdout at devnull so the interpreter's
+    exit flush cannot raise a second time. A downstream reader that
+    stops listening does not change the exit status."""
+    try:
+        yield
+    except BrokenPipeError:
+        os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(
         prog="bitlisp-run",
-        description=__doc__,
+        description=_RUN_DOC,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("program", help="file path, or the literal program")
@@ -126,15 +178,70 @@ def main(argv=None):
     except (ContextError, ParseError, OSError, RecursionError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
-    try:
+    with _pipe_shield():
         for condition in conditions:
             print(render_condition(condition))
         print(f"valid: {len(conditions)} condition(s), cost {cost} of {args.max_cost}")
-    except BrokenPipeError:
-        # A downstream reader that stops listening does not change
-        # the verdict. Point stdout at devnull so the interpreter's
-        # exit flush cannot raise a second time.
-        os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
+    return 0
+
+
+def asm_main(argv=None):
+    parser = argparse.ArgumentParser(
+        prog="bitlisp-asm",
+        description=_ASM_DOC,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "program",
+        nargs="?",
+        help="file path, or the literal text (default stdin)",
+    )
+    args = parser.parse_args(argv)
+    try:
+        if args.program is None:
+            text = sys.stdin.read()
+        else:
+            text = _path_or_code(args.program)
+        line = serialize(assemble(text)).hex()
+    except BitLispError as exc:
+        print(f"error: {exc.code}: {exc}", file=sys.stderr)
+        return 2
+    except (ParseError, OSError, ValueError) as exc:
+        # ValueError covers a UnicodeDecodeError from reading a
+        # non-UTF-8 file or stream.
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    with _pipe_shield():
+        print(line)
+    return 0
+
+
+def disasm_main(argv=None):
+    parser = argparse.ArgumentParser(
+        prog="bitlisp-disasm",
+        description=_DISASM_DOC,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "bytecode",
+        nargs="?",
+        help="file path, or the literal hex (default stdin)",
+    )
+    args = parser.parse_args(argv)
+    try:
+        if args.bytecode is None:
+            text = sys.stdin.read()
+        else:
+            text = _path_or_code(args.bytecode)
+        line = disassemble(deserialize(bytes.fromhex(text.strip())))
+    except BitLispError as exc:
+        print(f"error: {exc.code}: {exc}", file=sys.stderr)
+        return 2
+    except (OSError, ValueError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    with _pipe_shield():
+        print(line)
     return 0
 
 
