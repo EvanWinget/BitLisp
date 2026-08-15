@@ -200,9 +200,3 @@
 - **Session hygiene:** one spec section or operator family per Claude Code session; every session ends with vectors committed and CI green; start each session by pointing Claude Code at CLAUDE.md + the relevant spec section, not the chat history.
 - **Recurring checkpoint (with Fable 5):** divergence-report review, invariant-failure triage, upstream release triage (adopt/take/decline), spec drift audit (does the code do anything VALIDATION.md doesn't say?), plan re-sequencing if a phase's done-criteria slipped.
 - **Risk watch-list, standing:** correlated blind spots (same author both sides of the diff harness — mitigate via invariants now, external implementers post-Phase 5); witness numbers failing the gate (Phase 4 finding, publish regardless); scope creep into vocabulary before validation rules are hardened (ground rule 4); language v0 scope creep delaying hostile review (mitigation: the hard scope boundary and the Chialisp stopgap fallback in Phase 3). Two additions 2026-08-06: the witness-byte cost of computed-over-context claims (the Phase 4 guess-and-assert measurement settles it), and the identity and recombination classification (decision 12), the one part of the condition layer with no upstream fixed point, where hostile review is the test.
-
-## Immediate next actions
-
-1. Create the repo + CLAUDE.md + CI skeleton (Phase 0) — one Claude Code session.
-2. Evaluator core + first operator family with clvm diff harness — second session.
-3. In parallel here (Fable 5): draft `VALIDATION.md` rule 1 (injective matching) so it's ready the moment Phase 1 closes.
