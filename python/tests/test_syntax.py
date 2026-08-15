@@ -19,6 +19,8 @@ from bitlisp_tools import (  # noqa: E402
     NAME_TO_ATOM,
     ParseError,
     assemble,
+    assemble_many,
+    definable,
     disassemble,
 )
 
@@ -332,3 +334,123 @@ def test_corpus_reserialization():
         node = deserialize(raw)
         assert assemble(disassemble(node)) == node
         assert serialize(assemble(disassemble(node))) == raw
+
+
+# Definition bindings: consulted only where the resolver would
+# reject an unknown symbol, so a binding can never change the
+# meaning of text that already parses.
+
+
+def test_names_element_position():
+    assert assemble("(+ fee (q . 3))", {"fee": b"\x02"}) == assemble("(+ 2 (q . 3))")
+
+
+def test_names_head_position():
+    assert assemble("(plus (q . 1))", {"plus": b"\x10"}) == assemble("(+ (q . 1))")
+
+
+def test_names_dotted_tail():
+    assert assemble("(q . fee)", {"fee": b"\x02"}) == assemble("(q . 2)")
+
+
+def test_names_pair_binding():
+    pay = assemble("(q . 7)")
+    assert assemble("(a pay ())", {"pay": pay}) == assemble("(a (q . 7) ())")
+
+
+@given(nodes)
+def test_names_splice_any_node(node):
+    assert assemble("bound", {"bound": node}) == node
+
+
+@pytest.mark.parametrize(
+    ("text", "shadowed"),
+    [
+        ("(q . 1)", "q"),
+        ("(+ 12 ())", "12"),
+        ("0xff", "0xff"),
+        ('"hi"', '"hi"'),
+        ("-5", "-5"),
+    ],
+)
+def test_names_never_shadow(text, shadowed):
+    assert assemble(text, {shadowed: b"\x77"}) == assemble(text)
+
+
+def test_names_unbound_symbol_keeps_offset():
+    with pytest.raises(ParseError) as excinfo:
+        assemble("(+ fee 1)", {"other": b"\x02"})
+    assert excinfo.value.offset == 3
+    assert "unknown symbol 'fee'" in str(excinfo.value)
+
+
+def test_names_trailing_tokens_keeps_offset():
+    with pytest.raises(ParseError) as excinfo:
+        assemble("(q) (q)", {"fee": b"\x02"})
+    assert excinfo.value.offset == 4
+
+
+# assemble_many: the node list for a whole line.
+
+
+def test_assemble_many_empty():
+    assert assemble_many("") == []
+    assert assemble_many(" ; only a comment") == []
+
+
+def test_assemble_many_counts():
+    assert assemble_many("(q . 1)") == [assemble("(q . 1)")]
+    assert assemble_many("(q . 1) (q . 2)") == [
+        assemble("(q . 1)"),
+        assemble("(q . 2)"),
+    ]
+
+
+def test_assemble_many_names():
+    assert assemble_many("fee fee", {"fee": b"\x02"}) == [b"\x02", b"\x02"]
+
+
+@pytest.mark.parametrize(
+    ("text", "message"),
+    [
+        ("(q", "missing )"),
+        (")", "unexpected )"),
+        (". x", "dot outside a pair"),
+        ("(q . 1) nope", "unknown symbol"),
+    ],
+)
+def test_assemble_many_rejects(text, message):
+    with pytest.raises(ParseError) as excinfo:
+        assemble_many(text)
+    assert message in str(excinfo.value)
+
+
+# definable: exactly the tokens the resolver would reject as
+# unknown symbols.
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("fee", True),
+        ("my-name", True),
+        ("pay2", True),
+        ("q", False),
+        ("+", False),
+        ("sha256tree", False),
+        ("12", False),
+        ("-5", False),
+        ("0xff", False),
+        ("0xzz", False),
+        ('"hi"', False),
+        ("(a)", False),
+        ("(", False),
+        (")", False),
+        (".", False),
+        ("", False),
+        ("a b", False),
+        ("9" * 5000, False),
+    ],
+)
+def test_definable(text, expected):
+    assert definable(text) is expected
