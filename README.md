@@ -12,7 +12,10 @@ validation rules are normative and implemented, pinned by the
 vector corpus, with the VM diffed against both oracle wheels with
 zero unexplained divergence and every condition-layer cost
 constant provisional pending the Phase 4 measurements. Phase 3
-(the authoring language and compiler) is next. Nothing here is
+(the execution front end, authoring language, and compiler) is
+underway: the front end shipped as of 2026-08-15 (assembler,
+disassembler, single-spend runner, and a REPL with a stepping
+debugger), and the language core is next. Nothing here is
 consensus-ready. The phased plan is in
 [docs/execution-plan.md](docs/execution-plan.md).
 
@@ -22,6 +25,7 @@ consensus-ready. The phased plan is in
 | --- | --- |
 | `spec/` | The specification. `SPEC.md` (architecture), `VM.md` (evaluator), `CONDITIONS.md` (condition vocabulary), `VALIDATION.md` (condition validation rules), `COSTS.md` (cost model) |
 | `python/bitlisp/` | Python reference implementation, the executable spec artifact |
+| `python/bitlisp_tools/` | Authoring-side front end: assembler, disassembler, single-spend runner, and the REPL with its stepping debugger. Tooling, not consensus |
 | `vectors/` | Test vector corpus: `vm/`, `conditions/`, `validation/`, plus `upstream/` for vendored Chia vectors |
 | `tools/` | Vector runner, corpus generators, measurement tooling |
 | `ci/` | Lint tooling with pinned versions |
@@ -36,6 +40,26 @@ python3 -m venv .venv
 .venv/bin/python tools/run_vectors.py
 ci/lint/lint.sh
 ```
+
+## Using the tools
+
+The editable install adds four console scripts:
+
+```
+.venv/bin/bitlisp [tx.json]                            # REPL with stepping debugger
+.venv/bin/bitlisp-run <program> [solution] <tx.json>   # single-spend runner
+.venv/bin/bitlisp-asm [text]                           # text to serialized bytecode hex
+.venv/bin/bitlisp-disasm [hex]                         # serialized bytecode hex to text
+```
+
+`bitlisp-run` reports the verdict, the emitted conditions, and the
+cost for one spend, exiting 0 on a valid spend, 1 on an invalid
+one, and 2 on input that could not be used. The converters read
+stdin when no argument is given and compose in pipes. The REPL
+loads the same transaction context, keeps a constants scratch
+space, and drives the debugger with `step`, `next`, `cont`, and
+`trace`. The text syntax is specified in
+[docs/lang/syntax.md](docs/lang/syntax.md).
 
 Working rules for agent sessions are in [CLAUDE.md](CLAUDE.md).
 
