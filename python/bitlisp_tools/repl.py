@@ -43,6 +43,7 @@ import cmd
 import functools
 import json
 import os
+import re
 import sys
 
 from bitlisp import BitLispError, deserialize, run, serialize
@@ -62,6 +63,8 @@ from .stepper import APPLY_OP, EVAL, DebugMachine
 
 _HISTORY_LENGTH = 2000
 
+_NAME_SPLIT = re.compile(r"[ \t\r\n]+")
+
 
 def _survives(method):
     """Command errors print and return to the prompt, never exit.
@@ -79,6 +82,15 @@ def _survives(method):
             print(f"invalid: {exc.code}: {exc}")
         except (ContextError, ParseError, OSError, RecursionError, ValueError) as exc:
             print(f"error: {exc}")
+        except KeyboardInterrupt:
+            # An interrupt cancels the command. A stepping command
+            # interrupted mid-task leaves its machine poisoned,
+            # finished with neither result nor error, so that
+            # session is unusable and goes.
+            print("interrupted")
+            if self.session is not None and self.session.finished:
+                self.session = None
+                print("debug session discarded")
 
     return wrapper
 
@@ -154,12 +166,24 @@ class BitLispShell(cmd.Cmd):
     @_survives
     def do_asm(self, arg):
         """asm <sexpr>: serialized bytecode hex for the text."""
-        print(serialize(assemble(arg, self.names)).hex())
+        try:
+            line = serialize(assemble(arg, self.names)).hex()
+        except BitLispError as exc:
+            # A converter issues no spend verdict, so its rejection
+            # is unusable input, the same prefix bitlisp-asm prints.
+            print(f"error: {exc.code}: {exc}")
+            return
+        print(line)
 
     @_survives
     def do_disasm(self, arg):
         """disasm <hex>: text for the serialized bytecode hex."""
-        print(self._node_text(deserialize(bytes.fromhex(arg.strip()))))
+        try:
+            node = deserialize(bytes.fromhex(arg.strip()))
+        except BitLispError as exc:
+            print(f"error: {exc.code}: {exc}")
+            return
+        print(self._node_text(node))
 
     # Transaction context.
 
@@ -218,7 +242,11 @@ class BitLispShell(cmd.Cmd):
         """def <name> <sexpr>: bind a name to a parsed node. The
         body assembles under the current bindings, so a definition
         snapshots what its dependencies mean now."""
-        parts = arg.split(None, 1)
+        # The name splits from the body at the reader's whitespace,
+        # the four ASCII characters only. Python's default split
+        # would also cut at unicode whitespace, which the tokenizer
+        # deliberately treats as part of a bare token.
+        parts = _NAME_SPLIT.split(arg.strip(" \t\r\n"), maxsplit=1)
         if len(parts) != 2:
             print("error: def takes a name and one expression")
             return
@@ -348,12 +376,13 @@ class BitLispShell(cmd.Cmd):
 
     @_survives
     def do_source(self, arg):
-        """source <path>: run commands from a file, one per line."""
+        """source <path>: run commands from a file, one per line.
+        An exit in the file ends the session, as it would piped."""
         with open(arg.strip()) as handle:
             lines = handle.read().splitlines()
         for line in lines:
-            if line.strip():
-                self.onecmd(line)
+            if line.strip() and self.onecmd(line):
+                return True
 
     def do_exit(self, arg):
         """exit: leave the REPL."""
@@ -413,7 +442,7 @@ def main(argv=None):
     parser.add_argument(
         "--input",
         type=int,
-        default=0,
+        default=None,
         metavar="N",
         help="index of the transaction input being spent",
     )
@@ -437,10 +466,16 @@ def main(argv=None):
         except (ContextError, OSError, RecursionError, ValueError) as exc:
             print(f"error: {exc}", file=sys.stderr)
             return 2
-        if not 0 <= args.input < len(shell.context.inputs):
-            print(f"error: input {args.input} out of range", file=sys.stderr)
+        index = args.input if args.input is not None else 0
+        if not 0 <= index < len(shell.context.inputs):
+            print(f"error: input {index} out of range", file=sys.stderr)
             return 2
-        shell.input_index = args.input
+        shell.input_index = index
+    elif args.input is not None:
+        # Loading a context later resets the selection to 0, so a
+        # flag accepted here would be silently discarded.
+        print("error: --input needs a transaction context", file=sys.stderr)
+        return 2
 
     interactive = sys.stdin.isatty()
     if not interactive:
@@ -457,6 +492,11 @@ def main(argv=None):
                 # Cancel the line, keep the session.
                 print("^C")
                 intro = None
+            except UnicodeDecodeError as exc:
+                # One undecodable byte in piped input would
+                # otherwise kill the run with a traceback.
+                print(f"error: input is not valid UTF-8: {exc}", file=sys.stderr)
+                return 2
     finally:
         _save_history(history_path)
     return 0

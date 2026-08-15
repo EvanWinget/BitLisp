@@ -79,6 +79,13 @@ class DebugMachine:
         except BitLispError as exc:
             self.error = exc
             self._done = True
+        except BaseException:
+            # An interrupt inside a task can leave the stacks half
+            # mutated, a state the consensus machine never exposes.
+            # The machine finishes with neither result nor error,
+            # poisoned, so no caller can keep stepping it.
+            self._done = True
+            raise
 
     def step_over(self):
         """Executes the pending task and everything it pushes.
