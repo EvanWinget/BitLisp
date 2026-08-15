@@ -125,10 +125,12 @@ def _node_from_token(token, offset, names):
 
 
 def definable(text):
-    """True when text is one bare token the resolver rejects as an
-    unknown symbol, the shape a definition name must have. Structural
-    tokens, strings, operator names, decimals, and malformed hex or
-    decimal spellings are not definable."""
+    """True when text is exactly one bare token the resolver rejects
+    as an unknown symbol, the shape a definition name must have.
+    Structural tokens, strings, operator names, decimals, malformed
+    hex or decimal spellings, and text the tokenizer would trim (a
+    comment, a quote character, surrounding whitespace) are not
+    definable, so every accepted name can be written back and read."""
     try:
         tokens = tokenize(text)
     except ParseError:
@@ -136,7 +138,7 @@ def definable(text):
     if len(tokens) != 1:
         return False
     token, offset = tokens[0]
-    if token in ("(", ")", "."):
+    if token != text or token in ("(", ")", "."):
         return False
     try:
         return _known_token(token, offset) is None

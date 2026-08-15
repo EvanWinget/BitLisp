@@ -206,7 +206,9 @@ def asm_main(argv=None):
     except BitLispError as exc:
         print(f"error: {exc.code}: {exc}", file=sys.stderr)
         return 2
-    except (ParseError, OSError) as exc:
+    except (ParseError, OSError, ValueError) as exc:
+        # ValueError covers a UnicodeDecodeError from reading a
+        # non-UTF-8 file or stream.
         print(f"error: {exc}", file=sys.stderr)
         return 2
     with _pipe_shield():
