@@ -93,6 +93,22 @@ def test_asm_empty_input_exit_two(capsys, monkeypatch):
     assert capsys.readouterr().err.startswith("error: empty input")
 
 
+def test_asm_non_utf8_file_exit_two(tmp_path, capsys):
+    # Raw bytecode piped or saved by mistake instead of text must
+    # exit 2 with an error line, never a traceback.
+    path = tmp_path / "raw.bin"
+    path.write_bytes(b"\xff\xfe(q . 1)")
+    assert cli.asm_main([str(path)]) == 2
+    assert capsys.readouterr().err.startswith("error: ")
+
+
+def test_asm_non_utf8_stdin_exit_two(capsys, monkeypatch):
+    stream = io.TextIOWrapper(io.BytesIO(b"\xff\xfe(q . 1)"), encoding="utf-8")
+    monkeypatch.setattr(sys, "stdin", stream)
+    assert cli.asm_main([]) == 2
+    assert capsys.readouterr().err.startswith("error: ")
+
+
 def test_disasm_non_hex_exit_two(capsys):
     assert cli.disasm_main(["zz"]) == 2
     assert capsys.readouterr().err.startswith("error: ")

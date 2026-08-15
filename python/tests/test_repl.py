@@ -125,6 +125,36 @@ def test_undef(shell, capsys):
     assert "unknown symbol 'fee'" in capsys.readouterr().out
 
 
+def test_asm_uses_definitions(shell, capsys):
+    shell.onecmd("def fee 500")
+    shell.onecmd("asm (q . fee)")
+    assert capsys.readouterr().out == "ff018201f4\n"
+
+
+def test_disasm_rejection_prints_error(shell, capsys):
+    # A converter issues no spend verdict, so its rejection prints
+    # with the error prefix, matching bitlisp-disasm.
+    shell.onecmd("disasm c00161")
+    assert capsys.readouterr().out == (
+        "error: bad_encoding: non-minimal length encoding\n"
+    )
+
+
+def test_def_unicode_space_name(shell, capsys):
+    # Unicode whitespace is part of a bare token to the reader, so
+    # a name carrying a no-break space binds whole and reads back.
+    shell.onecmd("def x\u00a0y (q . 1)")
+    shell.onecmd("eval x\u00a0y")
+    assert capsys.readouterr().out == f"1\ncost: 20 of {BUDGET}\n"
+
+
+def test_def_rejects_comment_carrying_name(shell, capsys):
+    shell.onecmd("def foo;c (q . 1)")
+    assert "is not definable" in capsys.readouterr().out
+    shell.onecmd("defs")
+    assert capsys.readouterr().out == ""
+
+
 # Transaction context.
 
 
@@ -150,6 +180,52 @@ def test_input_selection(shell, ctx_file, capsys):
     assert capsys.readouterr().out == "error: input 5 out of range\n"
     shell.onecmd("input 0")
     assert capsys.readouterr().out == ""
+
+
+def test_input_selection_reaches_spend(shell, tmp_path, capsys):
+    # Two inputs with different amounts, and a program asserting
+    # the selected input's own amount, so validating the wrong
+    # input cannot pass. ASSERT_MY_AMOUNT is opcode 51.
+    obj = {
+        "version": 2,
+        "locktime": 0,
+        "inputs": [
+            {
+                "txid": "11" * 32,
+                "index": 0,
+                "script_pubkey": SPK_TAPROOT,
+                "amount": 1000,
+            },
+            {
+                "txid": "22" * 32,
+                "index": 0,
+                "script_pubkey": SPK_TAPROOT,
+                "amount": 700,
+            },
+        ],
+        "outputs": [{"script_pubkey": SPK_P2WPKH, "amount": 600}],
+    }
+    path = tmp_path / "two.json"
+    path.write_text(json.dumps(obj))
+    shell.onecmd(f"tx {path}")
+    capsys.readouterr()
+    shell.onecmd("spend (q (51 700))")
+    assert capsys.readouterr().out.startswith("invalid: ")
+    shell.onecmd("input 1")
+    capsys.readouterr()
+    shell.onecmd("spend (q (51 700))")
+    out = capsys.readouterr().out
+    assert "valid: 1 condition(s)" in out
+
+
+def test_spend_with_solution(shell, ctx_file, capsys):
+    # Program 1 is the path to the whole environment, so the
+    # solution itself becomes the condition list.
+    shell.onecmd(f"tx {ctx_file}")
+    capsys.readouterr()
+    shell.onecmd(f"spend 1 ((1 0x{SPK_P2WPKH} 600) (80 400))")
+    out = capsys.readouterr().out
+    assert "valid: 2 condition(s)" in out
 
 
 def test_spend_valid(shell, ctx_file, capsys):
@@ -285,6 +361,52 @@ def test_debug_uses_maxcost(shell, capsys):
     assert out.startswith("invalid: cost_exceeded: cost exceeded\n")
 
 
+def test_debug_with_solution(shell, capsys):
+    shell.onecmd("debug 1 (q . 7)")
+    capsys.readouterr()
+    shell.onecmd("cont")
+    out = capsys.readouterr().out
+    assert out.startswith("result: (q . 7)\n")
+
+
+def test_interrupt_discards_broken_session(shell, capsys, monkeypatch):
+    # An interrupt mid-task poisons the machine, and the shell must
+    # drop that session instead of stepping it into a wrong result.
+    from bitlisp.operators import OPERATORS
+
+    def boom(args, charge):
+        raise KeyboardInterrupt
+
+    shell.onecmd("debug (+ (q . 1) (q . 2))")
+    capsys.readouterr()
+    monkeypatch.setitem(OPERATORS, b"\x10", boom)
+    shell.onecmd("cont")
+    out = capsys.readouterr().out
+    assert "interrupted" in out
+    assert "debug session discarded" in out
+    assert shell.session is None
+    shell.onecmd("step")
+    assert capsys.readouterr().out == "no debug session, use debug <program>\n"
+
+
+def test_interrupt_keeps_paused_session(shell, capsys, monkeypatch):
+    # An interrupt during an unrelated command must not touch a
+    # paused session.
+    from bitlisp.operators import OPERATORS
+
+    def boom(args, charge):
+        raise KeyboardInterrupt
+
+    shell.onecmd("debug (q . 1)")
+    capsys.readouterr()
+    monkeypatch.setitem(OPERATORS, b"\x10", boom)
+    shell.onecmd("eval (+ (q . 1) (q . 2))")
+    out = capsys.readouterr().out
+    assert "interrupted" in out
+    assert "discarded" not in out
+    assert shell.session is not None
+
+
 def test_no_session_guards_print_one_line(shell, capsys):
     for command in ("step", "next", "cont", "trace", "abort"):
         shell.onecmd(command)
@@ -325,6 +447,15 @@ def test_source_missing_file(shell, capsys):
     assert capsys.readouterr().out.startswith("error: ")
 
 
+def test_source_honors_exit(shell, tmp_path, capsys):
+    # An exit in a sourced file ends the session, as it would in
+    # the same script piped, so no line after it runs.
+    path = tmp_path / "stopper.bl"
+    path.write_text("def fee (q . 5)\nexit\neval fee\n(x)\n")
+    assert shell.onecmd(f"source {path}") is True
+    assert capsys.readouterr().out == ""
+
+
 # The command registration and the piped end to end.
 
 
@@ -358,6 +489,11 @@ def test_main_input_out_of_range_exits_two(tmp_path, capsys):
     assert capsys.readouterr().err == "error: input 3 out of range\n"
 
 
+def test_main_input_without_context_exits_two(capsys):
+    assert repl.main(["--input", "2"]) == 2
+    assert capsys.readouterr().err == ("error: --input needs a transaction context\n")
+
+
 def test_piped_session_end_to_end():
     env = dict(os.environ, PYTHONPATH=str(REPO_ROOT / "python"))
     script = "eval (+ (q . 2) (q . 3))\nexit\n"
@@ -372,3 +508,31 @@ def test_piped_session_end_to_end():
     assert completed.stdout == f"5\ncost: 796 of {BUDGET}\n"
     assert "bitlisp>" not in completed.stdout
     assert completed.stderr == ""
+
+
+def test_piped_max_cost_flag():
+    env = dict(os.environ, PYTHONPATH=str(REPO_ROOT / "python"))
+    completed = subprocess.run(
+        [sys.executable, "-m", "bitlisp_tools.repl", "--max-cost", "10"],
+        input="eval (+ (q . 2) (q . 3))\nexit\n",
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    assert completed.returncode == 0
+    assert completed.stdout == "invalid: cost_exceeded: cost exceeded\n"
+
+
+def test_piped_non_utf8_exits_two():
+    # One undecodable byte ends the run with an error line and
+    # exit 2, never a traceback.
+    env = dict(os.environ, PYTHONPATH=str(REPO_ROOT / "python"))
+    completed = subprocess.run(
+        [sys.executable, "-m", "bitlisp_tools.repl"],
+        input=b"\xff\xfe(q . 1)\n",
+        capture_output=True,
+        env=env,
+    )
+    assert completed.returncode == 2
+    assert completed.stderr.startswith(b"error: input is not valid UTF-8")
+    assert b"Traceback" not in completed.stderr

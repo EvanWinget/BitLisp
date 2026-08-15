@@ -173,6 +173,32 @@ def test_step_over_top_level_runs_to_completion():
     assert machine.result == b"\x05"
 
 
+def test_step_over_error_mid_subtree():
+    # The error fires two tasks below the stepped-over depth, so
+    # step_over's loop must notice the machine finished rather than
+    # keep stepping a finished machine.
+    machine = DebugMachine(assemble("(+ (q . 1) (+ (q . 1) (x)))"), NIL, BUDGET)
+    machine.step()
+    machine.step_over()
+    assert machine.finished
+    assert machine.error.code == "user_raise"
+
+
+def test_step_over_apply_subtree():
+    # The stepped-over subtree contains a program application,
+    # which re-enters evaluation through an APPLY_PROGRAM task.
+    machine = DebugMachine(
+        assemble("(+ (q . 1) (a (q + (q . 2) (q . 3)) ()))"), NIL, BUDGET
+    )
+    machine.step()
+    machine.step_over()
+    assert len(machine.tasks) == 2
+    assert machine.values == [b"\x05"]
+    assert not machine.finished
+    machine.run()
+    assert machine.result == b"\x06"
+
+
 # Error terminal states: the machine finishes with the error held
 # and the stacks frozen, nothing propagates.
 
@@ -204,6 +230,57 @@ def test_cost_exceeded_mid_debug():
         steps += 1
     assert machine.error.code == "cost_exceeded"
     assert steps >= 1
+
+
+# The frozen post-error state, pinned exactly. The post-mortem
+# display shows these stacks, so their content at the raise point
+# must match what machine.run had: charge adds before it checks,
+# and the apply argument slice comes off the value stack before
+# the reserved operator raises.
+
+
+def test_error_pin_cost_exceeded():
+    program = deserialize(bytes.fromhex(ADD_HEX))
+    quote_two = (b"\x01", b"\x02")
+    machine = DebugMachine(program, NIL, 10)
+    machine.step()
+    assert machine.cost == 1
+    machine.step()
+    assert machine.finished
+    assert machine.error.code == "cost_exceeded"
+    # The quote charge lands before the budget check, so the frozen
+    # cost reads over budget, and the quoted value never pushed.
+    assert machine.cost == 21
+    assert machine.tasks == [(APPLY_OP, b"\x10", 2), (EVAL, quote_two, NIL)]
+    assert machine.values == []
+
+
+def test_error_pin_reserved_operator():
+    machine = DebugMachine(assemble("(() (q . 1))"), NIL, BUDGET)
+    machine.run()
+    assert machine.error.code == "reserved_operator"
+    # The argument slice comes off the value stack before the
+    # reserved raise, so the frozen value stack is empty.
+    assert machine.cost == 21
+    assert machine.tasks == []
+    assert machine.values == []
+
+
+def test_interrupt_poisons_machine(monkeypatch):
+    # An interrupt inside a task can leave the stacks half mutated,
+    # so the machine must refuse to keep stepping afterwards.
+    def boom(args, charge):
+        raise KeyboardInterrupt
+
+    monkeypatch.setitem(OPERATORS, b"\x10", boom)
+    machine = DebugMachine(assemble("(+ (q . 1) (q . 2))"), NIL, BUDGET)
+    with pytest.raises(KeyboardInterrupt):
+        machine.run()
+    assert machine.finished
+    assert machine.result is None
+    assert machine.error is None
+    with pytest.raises(RuntimeError):
+        machine.step()
 
 
 def test_unknown_operator_uncharged():
