@@ -525,8 +525,15 @@ def test_piped_max_cost_flag():
 
 def test_piped_non_utf8_exits_two():
     # One undecodable byte ends the run with an error line and
-    # exit 2, never a traceback.
-    env = dict(os.environ, PYTHONPATH=str(REPO_ROOT / "python"))
+    # exit 2, never a traceback. Strict decoding is forced because
+    # platforms whose stdin decodes with surrogateescape never
+    # raise here: their bad bytes become lone surrogates, which the
+    # reader's totality already rejects line by line.
+    env = dict(
+        os.environ,
+        PYTHONPATH=str(REPO_ROOT / "python"),
+        PYTHONIOENCODING="utf-8:strict",
+    )
     completed = subprocess.run(
         [sys.executable, "-m", "bitlisp_tools.repl"],
         input=b"\xff\xfe(q . 1)\n",
