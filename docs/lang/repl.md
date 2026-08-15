@@ -16,9 +16,12 @@ bitlisp [tx.json] [--input N] [--max-cost N]
 The optional positional loads a transaction context at startup, the
 same JSON shape `bitlisp-run` takes, and the flags mirror that
 command's vocabulary. A context that fails to load exits 2 before
-the first prompt. With piped stdin the prompt and banner disappear,
-so a scripted session reads clean, and the same scripts run inside
-a session through `source`.
+the first prompt, and `--input` without the context positional is
+rejected the same way, because loading a context later would reset
+the selection. With piped stdin the prompt and banner disappear, so
+a scripted session reads clean, and the same scripts run inside a
+session through `source`. Piped input must be UTF-8: an
+undecodable byte ends the run with an error line and exit 2.
 
 Line editing history persists at `~/.bitlisp_history`, overridable
 through the `BITLISP_HISTORY` environment variable, capped at 2000
@@ -45,7 +48,7 @@ lines.
 | `cont` | continue: run to the result |
 | `trace` | run to the result, showing every step |
 | `abort` | discard the session |
-| `source <path>` | run commands from a file, one per line |
+| `source <path>` | run commands from a file, one per line, an exit in the file ends the session |
 | `help [<command>]` | the command list, or one command's line |
 | `exit`, `quit`, EOF | leave |
 
@@ -95,7 +98,12 @@ the pending task's whole subtree, stopping when the stack returns
 to one shorter than it was. `cont` and `trace` run to the end,
 `trace` printing the display after every task. A finished session
 prints its result and cost, or the pinned error with the frozen
-stacks as a post-mortem, and closes.
+stacks as a post-mortem, and closes. Interrupting a stepping
+command with Ctrl-C discards its session, because an interrupt can
+land mid-task and a half-stepped machine cannot be trusted to
+finish truthfully. The in-REPL `asm` and `disasm` report rejected
+input with the `error:` prefix, like their one-shot counterparts,
+since a converter issues no spend verdict.
 
 ## A worked session
 
