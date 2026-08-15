@@ -31,6 +31,8 @@ oracles = [
 
 [project.scripts]
 bitlisp-run = "bitlisp_tools.cli:main"
+bitlisp-asm = "bitlisp_tools.cli:asm_main"
+bitlisp-disasm = "bitlisp_tools.cli:disasm_main"
 
 [tool.setuptools]
 package-dir = {"" = "python"}
