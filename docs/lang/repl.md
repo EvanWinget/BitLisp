@@ -98,10 +98,11 @@ every call, so those calls now fail, while a direct call, already
 run when the later macro declared, stays baked into that macro's
 program.
 
-A `def` binding is raw-reader vocabulary and no macro can emit
-one: an expansion whose output spells a def-bound name is rejected
-as an unknown name, never read as the binding and never passed
-through as data.
+A `def` binding is raw-reader vocabulary, not a language name, so
+a def-bound name written into a macro call is rejected as an
+unknown name, exactly as it would be in any language expression.
+The binding is never read through a macro, and the raw path and
+the macro path never disagree about one spelling.
 
 The shared namespace narrows `def` from its original surface, a
 deliberate change with the compiler landing: a reserved word or a
