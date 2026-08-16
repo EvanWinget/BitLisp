@@ -5,7 +5,8 @@ Each command is a thin main over the tools library. bitlisp-run runs
 one spend and reports the verdict. bitlisp-asm assembles a text
 s-expression to serialized bytecode hex. bitlisp-disasm renders
 serialized hex back as text. bitlisp-compile compiles a source
-program to serialized bytecode hex.
+program to serialized bytecode hex. The converters take -H to print
+the program's tree hash instead of their usual output.
 """
 
 import argparse
@@ -16,7 +17,7 @@ import sys
 
 from bitlisp import BitLispError, deserialize, serialize
 
-from .compiler import CompileError, compile_program, symbols_to_json
+from .compiler import CompileError, compile_program, symbols_to_json, tree_hash
 from .printer import disassemble
 from .reader import ParseError, assemble
 from .runner import (
@@ -73,6 +74,10 @@ The argument names a file when one exists at that path and reads as
 literal text otherwise. With no argument the text is read from
 stdin. Prints one line of lowercase hex.
 
+With -H the output is the program's tree hash instead, the
+sha256tree digest naming the tree, so the same program hashes
+identically through every command that takes the flag.
+
 Exit status 0 on success, 2 when the text does not parse or the
 file does not open.
 
@@ -80,6 +85,7 @@ Usage:
     bitlisp-asm "(+ (q . 2) (q . 3))"
     bitlisp-asm puzzle.bl
     echo "(q . 1)" | bitlisp-asm
+    bitlisp-asm -H "(+ 2 5)"
 """
 
 _DISASM_DOC = """Render serialized bytecode hex as a text s-expression.
@@ -90,12 +96,18 @@ Deserialization is strict, accepting only the unique canonical
 encoding, and the error line carries the consensus error code when
 it rejects the bytes.
 
+With -H the output is the program's tree hash instead of its text.
+The hash names the decoded tree, not the encoding, so bitlisp-asm
+-H and bitlisp-disasm -H print the same digest for the same
+program.
+
 Exit status 0 on success, 2 when the hex does not decode or the
 file does not open.
 
 Usage:
     bitlisp-disasm ff10ffff0102ffff010380
     echo ff10ffff0102ffff010380 | bitlisp-disasm
+    bitlisp-disasm -H ff10ff02ff0580
 """
 
 
@@ -111,6 +123,10 @@ the tree hash of each compiled function body to its name and
 parameter names. The REPL's sym command loads it, so bytecode
 compiled here debugs with source names.
 
+With -H the output is the whole compiled program's tree hash
+instead of its hex, a different digest from the per-function-body
+hashes keying the symbol table. --symbols still writes either way.
+
 Exit status 0 on success, 2 when the source does not compile, the
 file does not open, or the symbol file does not write.
 
@@ -118,6 +134,7 @@ Usage:
     bitlisp-compile "(program (X) (defun double (N) (* 2 N)) (double X))"
     bitlisp-compile puzzle.bl --symbols puzzle.sym
     bitlisp-compile puzzle.bl | bitlisp-disasm
+    bitlisp-compile -H puzzle.bl
 """
 
 
@@ -136,6 +153,15 @@ def _path_or_code(arg):
 
 def _node(source, as_hex):
     return deserialize(bytes.fromhex(source)) if as_hex else assemble(source)
+
+
+def _tree_hash_flag(parser, usual):
+    parser.add_argument(
+        "-H",
+        "--tree-hash",
+        action="store_true",
+        help=f"print the program's tree hash instead of {usual}",
+    )
 
 
 @contextlib.contextmanager
@@ -228,13 +254,15 @@ def asm_main(argv=None):
         nargs="?",
         help="file path, or the literal text (default stdin)",
     )
+    _tree_hash_flag(parser, "the hex")
     args = parser.parse_args(argv)
     try:
         if args.program is None:
             text = sys.stdin.read()
         else:
             text = _path_or_code(args.program)
-        line = serialize(assemble(text)).hex()
+        node = assemble(text)
+        line = tree_hash(node).hex() if args.tree_hash else serialize(node).hex()
     except BitLispError as exc:
         print(f"error: {exc.code}: {exc}", file=sys.stderr)
         return 2
@@ -259,13 +287,15 @@ def disasm_main(argv=None):
         nargs="?",
         help="file path, or the literal hex (default stdin)",
     )
+    _tree_hash_flag(parser, "the text")
     args = parser.parse_args(argv)
     try:
         if args.bytecode is None:
             text = sys.stdin.read()
         else:
             text = _path_or_code(args.bytecode)
-        line = disassemble(deserialize(bytes.fromhex(text.strip())))
+        node = deserialize(bytes.fromhex(text.strip()))
+        line = tree_hash(node).hex() if args.tree_hash else disassemble(node)
     except BitLispError as exc:
         print(f"error: {exc.code}: {exc}", file=sys.stderr)
         return 2
@@ -293,6 +323,7 @@ def compile_main(argv=None):
         metavar="PATH",
         help="write the symbol table as JSON to this path",
     )
+    _tree_hash_flag(parser, "the hex")
     args = parser.parse_args(argv)
     try:
         if args.source is None:
@@ -300,7 +331,7 @@ def compile_main(argv=None):
         else:
             text = _path_or_code(args.source)
         program, table = compile_program(text)
-        line = serialize(program).hex()
+        line = tree_hash(program).hex() if args.tree_hash else serialize(program).hex()
         if args.symbols is not None:
             with open(args.symbols, "w") as handle:
                 json.dump(symbols_to_json(table), handle)

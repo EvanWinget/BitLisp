@@ -1,4 +1,5 @@
-"""bitlisp-asm and bitlisp-disasm command tests, plus the corpus pin."""
+"""The one-shot command tests: bitlisp-asm, bitlisp-disasm,
+bitlisp-compile, the tree-hash flag, and the corpus pin."""
 
 import io
 import json
@@ -273,6 +274,39 @@ def test_compile_rejects_unparseable(capsys):
 def test_compile_console_script_resolves():
     (entry,) = metadata.entry_points(group="console_scripts", name="bitlisp-compile")
     assert entry.load() is cli.compile_main
+
+
+# The tree-hash flag: the digest names the tree, not the encoding,
+# so every command prints the same hash for the same program.
+
+PATHS_TEXT = "(+ 2 5)"
+PATHS_HEX = "ff10ff02ff0580"
+PATHS_HASH = "19c7b1ed29e8f501f6985cd6addd3b6e5bd7ccc251f1a4018550837b3006239b"
+
+
+def test_asm_tree_hash_replaces_the_hex(capsys):
+    assert cli.asm_main([PATHS_TEXT, "-H"]) == 0
+    assert capsys.readouterr().out == PATHS_HASH + "\n"
+
+
+def test_disasm_tree_hash_replaces_the_text(capsys):
+    assert cli.disasm_main([PATHS_HEX, "-H"]) == 0
+    assert capsys.readouterr().out == PATHS_HASH + "\n"
+
+
+def test_compile_tree_hash_matches_disasm(capsys):
+    assert cli.compile_main([DOUBLE_SOURCE, "-H"]) == 0
+    compiled_hash = capsys.readouterr().out
+    assert cli.disasm_main([DOUBLE_HEX, "-H"]) == 0
+    assert capsys.readouterr().out == compiled_hash
+    assert len(compiled_hash.strip()) == 64
+
+
+def test_compile_tree_hash_still_writes_symbols(tmp_path, capsys):
+    sym_path = tmp_path / "double.sym"
+    assert cli.compile_main([DOUBLE_SOURCE, "-H", "--symbols", str(sym_path)]) == 0
+    capsys.readouterr()
+    assert json.loads(sym_path.read_text())["schema"] == "bitlisp-sym-v0"
 
 
 def test_asm_pipe_closed_before_write_keeps_exit_zero():
