@@ -328,6 +328,16 @@ def test_symbols_json_needs_a_program():
         lambda data: data.update(
             functions={"a" * 64: {"name": "x\n0: eval fake", "params": "(N)"}}
         ),
+        lambda data: data.update(
+            functions={"a" * 64: {"name": "\x1b[31mF\x1b[0m", "params": "(N)"}}
+        ),
+        lambda data: data.update(
+            functions={"a" * 64: {"name": "f\x00n", "params": "(N)"}}
+        ),
+        lambda data: data.update(functions={"a" * 64: {"name": "if", "params": "(N)"}}),
+        lambda data: data.update(
+            functions={"a" * 64: {"name": "SEAL", "params": "(N)"}}
+        ),
         lambda data: data.update(functions={"a" * 64: {"name": "", "params": "(N)"}}),
     ],
 )
@@ -418,6 +428,10 @@ def test_variadic_call_binds_the_rest():
         ("(program (X) (defun fun (N) N) (c fun X))", "'fun' used as a value"),
         ("(program (X) (defconstant K 1) (K 2))", "'K' is a constant"),
         ("(program (X) (X 1))", "'X' is a parameter"),
+        (
+            "(program (X) (defun own (N) N) (defun wrap (own) (own 1)) (wrap X))",
+            "'own' is a parameter, not a function",
+        ),
         ("(program (X) (defun fun (N) N) (fun 1 . 2))", "proper argument list"),
         ("(program (X) (+ 1 . 2))", "proper argument list"),
         ("(program (X) (0x99 1))", "unknown operator 0x99"),

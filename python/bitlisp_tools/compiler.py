@@ -694,11 +694,19 @@ def load_symbols(data):
             raise ValueError("a function entry holds name and params")
         if not isinstance(entry["name"], str) or not isinstance(entry["params"], str):
             raise ValueError("a function entry holds two strings")
-        if not definable(entry["name"]):
+        if (
+            not definable(entry["name"])
+            or not entry["name"].isprintable()
+            or entry["name"] in RESERVED_WORDS
+            or entry["name"] in CONDITION_CONSTANTS
+        ):
             # The file is untrusted input and its names land in the
             # debugger display, so a name must be a spelling the
-            # compiler could have produced, which shuts out control
-            # characters, whitespace, and empty strings.
+            # compiler accepts for a function, narrowed further to
+            # printable characters: definable alone would pass
+            # every control and format character the reader's
+            # four-character whitespace set does not claim, and a
+            # terminal obeys those.
             raise ValueError(f"malformed function name {entry['name']!r}")
         functions[key] = (entry["name"], _loaded_params(entry["params"]))
     return functions
