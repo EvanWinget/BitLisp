@@ -1,2 +1,4 @@
 # One word per line. False positives only, each with a reason comment
-# above it. Currently empty.
+# above it.
+# The set-theory property (pairwise disjoint), not "disjointedness".
+disjointness

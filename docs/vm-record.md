@@ -94,10 +94,10 @@ every leg is released-binary evidence.
 
 ## 3. Design decision record
 
-Decisions taken during Phase 1, each ratified or explicitly left
-open. Overturning a ratified decision is a spec amendment plus
-vector update in one reviewed commit. Items marked open name the
-phase that owes the answer.
+Decisions taken during Phase 1, plus questions recorded since, each
+ratified or explicitly left open. Overturning a ratified decision is
+a spec amendment plus vector update in one reviewed commit. Items
+marked open name the phase that owes the answer.
 
 1. **D3 (unknown operators).** RATIFIED (decision by Evan,
    2026-07-29): strict rejection stands and the operator set is
@@ -203,6 +203,33 @@ phase that owes the answer.
    found. The closed operator set and strict unknown-operator
    rejection above are not reopened: a shipped guard would be an
    assigned table operator, not unknown-opcode acceptance.
+
+   Addendum (2026-08-16, from the public record in §8.5 of the
+   evaluation doc). The reopened sub-decision gains a documented
+   answer shape. The introspection architecture's author states the
+   safe guard form exactly as this entry's analysis assumed: a
+   soft-forked opcode runs inside a subprogram that returns nil or
+   aborts, never with OP_SUCCESS-style acceptance, because
+   witness-supplied code plus success semantics lets a spender
+   inject an unknown opcode and take the funds ("it's just not
+   possible in general to have OP_SUCCESS-like behaviour if you're
+   trying to allow accepting code from the witness data", March
+   2022), and the guard carries an explicit version bound so
+   opcodes beyond it fail rather than pass. The commit-and-verify
+   pattern this entry relies on is likewise on the record: the
+   sandbox validates a witness-supplied value that code outside the
+   guard then consumes. The Simplicity author adopted that pattern
+   in 2024 after stating that delegation "wreaks havoc" on
+   success-shaped soft forks, so both public architectures converge
+   on the shape. None of this changes the pre-registered deciding
+   test, which remains about redundancy against the reserved tier,
+   not about the guard's soundness.
+
+   Deferral (decision by Evan, 2026-08-16). The end-of-Phase-2
+   deadline set on 2026-08-06 is lifted and the sub-decision is
+   deferred with no new deadline. The deciding test stands
+   unchanged, and until the decision is taken nothing in the tree
+   may assume a guard exists.
 2. **D2 (crypto family curation).** RATIFIED (decisions by Evan,
    2026-07-28). The crypto family is `sha256` plus `secp_verify`,
    nothing else, and `secp_verify` is BIP340 only. The family
@@ -376,3 +403,79 @@ phase that owes the answer.
      implementation that hashes first and charges after is open to
      unbounded work under a small budget, the same hazard class as
      the substr copy-on-slice note in COSTS.md section 5.
+
+   Addendum (2026-08-16, from the public record in §8.5 of the
+   evaluation doc). The flexible-coin-earmarks design warns that a
+   state tree living beside taproot commitments must hash in a way
+   distinct from the BIP 341 TapLeaf and TapBranch tagged hashes,
+   "to ensure they can't be misinterpreted as taproot scripts,
+   possibly enabling theft of funds." BitLisp's tree hash is Chia's
+   untagged construction, one-byte 0x01 and 0x02 node prefixes,
+   structurally disjoint from BIP 341's tagged-hash preimages,
+   which begin with two 32-byte tag digests, so no confusion is
+   apparent. The property is currently unstated. Owed with the
+   Phase 4 commitment scheme: a spec statement that a `sha256tree`
+   digest and a taproot tagged hash can never share a preimage
+   interpretation wherever the commitment scheme places them in one
+   tree, and a vector pinning the disjointness argument. This
+   sharpens, and does not reopen, the tagged-variant decline above,
+   which traded protocol-level domain separation for the released
+   oracle on the grounds that the commitment context provides the
+   separation. The owed statement is that context argument, written
+   down and pinned.
+8. **Peak memory and evaluation order.** OPEN, owed with the Phase 4
+   budget mapping (recorded 2026-08-16 from the public record in
+   §8.5 of the evaluation doc). CLVM costing charges total
+   allocation and never live memory, and BitLisp inherits that:
+   COSTS.md states no point-in-time memory bound, and the D8 caps
+   are the oracle's own far-out allocator ceilings, not a designed
+   limit. The consequence was demonstrated publicly by the
+   introspection architecture's author: a recursive doubling
+   program builds a 200 MB live string at a cost near 5.2e9,
+   inside Chia's half-of-11e9 mempool budget. Bitcoin's existing
+   script layer holds live memory near 500 kB at all times, so the
+   inherited model is orders of magnitude more permissive than the
+   context it lands in. The same author states the constraint any
+   fix carries: costing current memory usage implies defining a
+   consensus-preferred evaluation order, since eager and lazy
+   evaluation, tail calls, and argument order have different
+   memory profiles, and the cost result must not change under
+   implementation optimization. His own prototype flipped
+   evaluation order twice on this tension. The default side per
+   ground rule 3: keep CLVM's total-allocation model unchanged and
+   close the row the way D8's first option does, by recording the
+   Phase 4 budget and input bounds and proving the reachable live
+   peak acceptable for validators. The deviation side: adopt an
+   explicit peak-memory bound as a Bitcoin-context requirement,
+   which obliges the spec to pin evaluation order as observable
+   behavior with vectors, a larger spec surface bought for a hard
+   guarantee. Phase 4 owes the measurement that sizes the
+   reachable peak under the real budget, both sides are
+   steelmanned at decision time, and the call is Evan's.
+9. **Surplus solution data.** OPEN, owed a spec decision before the
+   Phase 4 witness format freezes (recorded 2026-08-16 from the
+   public record in §8.5 of the evaluation doc). CLVM tolerates
+   solution structure the program never inspects, and the
+   introspection architecture's author flags the Bitcoin
+   consequence of that tolerance for his own design: unconstrained
+   witness bytes are third-party malleability surface, since a
+   relay peer can mutate them to produce a conflicting wtxid for
+   the same spend at a lower effective feerate. In Chia's context
+   he judged it mostly harmless because bundle handling optimizes
+   unreferenced atoms away, a mitigation Bitcoin's witness
+   commitment does not provide. D5 closes the serialization half
+   of this, one accepted spelling per program. This entry is the
+   semantic half: solution bytes that deserialize canonically but
+   are never consumed by evaluation. The default side per ground
+   rule 3: match CLVM, tolerate surplus, and leave constraining
+   the solution to program authors, the standard-layer templates
+   documenting the pattern. The deviation side: the embedding
+   rejects solutions carrying data evaluation never touched,
+   extending the D5 rationale to its conclusion and closing a
+   vector program authors cannot reliably close alone, at the cost
+   of specifying what "touched" means, which interacts with entry
+   8's evaluation-order question (an argument an eager evaluator
+   consumes and a lazy one skips is exactly the boundary case).
+   Both sides are steelmanned at decision time and the call is
+   Evan's. Until decided, no standard-layer template may depend on
+   surplus tolerance.
