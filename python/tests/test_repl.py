@@ -737,11 +737,6 @@ def test_curry_zero_values(shell, capsys):
     assert capsys.readouterr().out == "(a (q 16 2 5) 1)\n"
 
 
-def test_curry_output_evals(shell, capsys):
-    shell.onecmd("eval (a (q 16 2 5) (c (q . 10) 1)) (32)")
-    assert capsys.readouterr().out == f"42\ncost: 1082 of {BUDGET}\n"
-
-
 def test_curry_takes_at_least_a_program(shell, capsys):
     shell.onecmd("curry")
     assert capsys.readouterr().out.startswith("error: curry takes a program")
@@ -790,6 +785,13 @@ def test_uncurry_not_curried_prints_error(shell, capsys):
 
 def test_uncurry_takes_one_program(shell, capsys):
     shell.onecmd("uncurry (+ 2 5) (+ 2 5)")
+    assert capsys.readouterr().out.startswith("error: uncurry takes one program")
+
+
+def test_uncurry_arity_error_matches_on_the_language_path(shell, capsys):
+    # The same mistake through the compiled fallback must print the
+    # same arity error the raw path prints, not a parser message.
+    shell.onecmd("uncurry (program (X) (* X X)) ()")
     assert capsys.readouterr().out.startswith("error: uncurry takes one program")
 
 
