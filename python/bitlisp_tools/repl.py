@@ -69,6 +69,7 @@ from bitlisp.sexp import NIL, is_pair
 
 from .compiler import (
     CONDITION_CONSTANTS,
+    DECLARATION_KEYWORDS,
     RESERVED_WORDS,
     CompileError,
     Definitions,
@@ -119,7 +120,7 @@ def _declaration_line(stripped):
     return (
         len(tokens) >= 2
         and tokens[0][0] == "("
-        and tokens[1][0] in ("defun", "defconstant")
+        and tokens[1][0] in DECLARATION_KEYWORDS
     )
 
 

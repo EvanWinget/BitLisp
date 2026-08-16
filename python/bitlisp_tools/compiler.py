@@ -70,6 +70,10 @@ RESERVED_WORDS = frozenset(
     {_PROGRAM, _DEFUN, _DEFCONSTANT, _IF, _LIST, _ASSERT, _AND, _OR}
 )
 
+# The declaration heads a program form accepts, the one tuple the
+# REPL's line dispatch reads too, so the two surfaces cannot drift.
+DECLARATION_KEYWORDS = (_DEFUN, _DEFCONSTANT)
+
 
 # The condition vocabulary, one name per assigned opcode, written
 # out literally so a reviewer can check it by eye. A test pins the
@@ -320,7 +324,7 @@ _FORM_SHAPES = {
 def declaration_keyword(tree):
     """The declaration keyword heading a source tree, or None."""
     if is_pair(tree) and isinstance(tree[0], Symbol):
-        if tree[0].name in (_DEFUN, _DEFCONSTANT):
+        if tree[0].name in DECLARATION_KEYWORDS:
             return tree[0].name
     return None
 
@@ -361,26 +365,21 @@ def _check_arity(name, arguments, arity, offset):
         )
 
 
-def _reachable_bodies(defs, body):
-    """The reachable function bodies, conservatively: every name a
-    body mentions counts, shadowing ignored, so the set can only be
-    too large, never too small. An unreached body never compiles,
-    so an error inside one surfaces the first time a program
-    reaches it. The sweep runs in declaration order, restarting
-    until no new body is reached."""
-    bodies = {}
-    mentioned = _symbol_names(body)
-    changed = True
-    while changed:
-        changed = False
-        for name in defs.functions:
-            if name in bodies or name not in mentioned:
-                continue
-            _, fn_body, _ = defs.functions[name]
-            bodies[name] = fn_body
-            mentioned |= _symbol_names(fn_body)
-            changed = True
-    return bodies
+def _reachable_names(defs, body):
+    """The functions a body can reach, conservatively: every
+    mentioned name counts, shadowing ignored, so the set can only
+    be too large, never too small. An unreached body never
+    compiles, so an error inside one surfaces the first time a
+    program reaches it."""
+    reachable = set()
+    pending = _symbol_names(body)
+    while pending:
+        name = pending.pop()
+        if name in reachable or name not in defs.functions:
+            continue
+        reachable.add(name)
+        pending |= _symbol_names(defs.functions[name][1])
+    return reachable
 
 
 def _tree_paths(names, root):
@@ -438,6 +437,26 @@ def _lazy_if(condition, then_branch, else_branch):
     unchanged environment, path 1."""
     selector = _proper_list(_IF_OP, condition, _quote(then_branch), _quote(else_branch))
     return _proper_list(_APPLY, selector, int_to_atom(_TOP))
+
+
+# The two constant nodes the branching forms share. Emitted trees
+# are immutable, so one node can sit in many outputs, and building
+# each once makes the byte identity of single-operand and and or
+# structural rather than coincidental.
+_TRUE = _quote(int_to_atom(1))
+_RAISE_CALL = _proper_list(_RAISE)
+
+
+def _name_spelling(atom):
+    """The name an atom's bytes spell, or None when they spell no
+    single reader-accepted name."""
+    try:
+        text = atom.decode()
+    except UnicodeDecodeError:
+        return None
+    if text and text.isprintable() and definable(text):
+        return text
+    return None
 
 
 class _Compilation:
@@ -535,14 +554,14 @@ class _Compilation:
         # evaluates and the spend fails there.
         result = compiled[-1]
         for condition in reversed(compiled[:-1]):
-            result = _lazy_if(condition, result, (_RAISE, NIL))
+            result = _lazy_if(condition, result, _RAISE_CALL)
         return result
 
     def _and(self, head, tail, bindings):
         items = _proper_items(tail, _AND, head.offset)
         # The result is boolean, 1 or nil, never an operand's
         # value, and the first falsy operand ends evaluation.
-        result = _quote(int_to_atom(1))
+        result = _TRUE
         compiled = [self.expression(item, bindings) for item in items]
         for condition in reversed(compiled):
             result = _lazy_if(condition, result, NIL)
@@ -555,7 +574,7 @@ class _Compilation:
         result = NIL
         compiled = [self.expression(item, bindings) for item in items]
         for condition in reversed(compiled):
-            result = _lazy_if(condition, _quote(int_to_atom(1)), result)
+            result = _lazy_if(condition, _TRUE, result)
         return result
 
     def _call(self, head, tail, bindings):
@@ -579,6 +598,12 @@ class _Compilation:
         # that can never do anything but fail.
         if op != _APPLY and op not in OPERATORS:
             label = "0x" + op.hex() if op else "()"
+            # An authored string or hex atom in head position can
+            # spell a name, so the error shows what a reader would
+            # see in the hex.
+            text = _name_spelling(op)
+            if text is not None:
+                label = f"{label}, which spells {text!r}"
             raise CompileError(f"unknown operator {label}")
         name = ATOM_TO_NAME[op]
         arguments = _proper_items(tail, name)
@@ -610,7 +635,7 @@ def tree_hash(node):
 def _compile(defs, params, body):
     """The program node and symbol table for one body against one
     definitions space, params None for a bare expression."""
-    reachable = _reachable_bodies(defs, body)
+    reachable = _reachable_names(defs, body)
     fn_names = [name for name in defs.functions if name in reachable]
     has_tree = bool(fn_names)
     fn_paths = _tree_paths(fn_names, _LEFT) if has_tree else {}
@@ -624,11 +649,9 @@ def _compile(defs, params, body):
     table = {"functions": {}, "main_params": params}
     bodies = []
     for name in fn_names:
-        fn_params, _, _ = defs.functions[name]
+        fn_params, fn_body, _ = defs.functions[name]
         try:
-            compiled = compilation.expression(
-                reachable[name], _bind_params(fn_params, _RIGHT)
-            )
+            compiled = compilation.expression(fn_body, _bind_params(fn_params, _RIGHT))
         except CompileError as exc:
             # A body compiles when a program reaches it, which in
             # the REPL is a later line than the one that declared
