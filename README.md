@@ -15,7 +15,8 @@ constant provisional pending the Phase 4 measurements. Phase 3
 (the execution front end, authoring language, and compiler) is
 underway: the front end shipped as of 2026-08-15 (assembler,
 disassembler, single-spend runner, and a REPL with a stepping
-debugger), and the language core is next. Nothing here is
+debugger), and the language core landed the same week (the v0
+authoring language and its compiler). Nothing here is
 consensus-ready. The phased plan is in
 [docs/execution-plan.md](docs/execution-plan.md).
 
@@ -25,7 +26,7 @@ consensus-ready. The phased plan is in
 | --- | --- |
 | `spec/` | The specification. `SPEC.md` (architecture), `VM.md` (evaluator), `CONDITIONS.md` (condition vocabulary), `VALIDATION.md` (condition validation rules), `COSTS.md` (cost model) |
 | `python/bitlisp/` | Python reference implementation, the executable spec artifact |
-| `python/bitlisp_tools/` | Authoring-side front end: assembler, disassembler, single-spend runner, and the REPL with its stepping debugger. Tooling, not consensus |
+| `python/bitlisp_tools/` | Authoring-side front end: assembler, disassembler, the v0 language compiler, single-spend runner, and the REPL with its stepping debugger. Tooling, not consensus |
 | `vectors/` | Test vector corpus: `vm/`, `conditions/`, `validation/`, plus `upstream/` for vendored Chia vectors |
 | `tools/` | Vector runner, corpus generators, measurement tooling |
 | `ci/` | Lint tooling with pinned versions |
@@ -43,13 +44,14 @@ ci/lint/lint.sh
 
 ## Using the tools
 
-The editable install adds four console scripts:
+The editable install adds five console scripts:
 
 ```
 .venv/bin/bitlisp [tx.json]                            # REPL with stepping debugger
 .venv/bin/bitlisp-run <program> [solution] <tx.json>   # single-spend runner
 .venv/bin/bitlisp-asm [text]                           # text to serialized bytecode hex
 .venv/bin/bitlisp-disasm [hex]                         # serialized bytecode hex to text
+.venv/bin/bitlisp-compile [source]                     # v0 language source to bytecode hex
 ```
 
 `bitlisp-run` reports the verdict, the emitted conditions, and the
@@ -58,8 +60,11 @@ one, and 2 on input that could not be used. The converters read
 stdin when no argument is given and compose in pipes. The REPL
 loads the same transaction context, keeps a constants scratch
 space, and drives the debugger with `step`, `next`, `cont`, and
-`trace`. The text syntax is specified in
-[docs/lang/syntax.md](docs/lang/syntax.md).
+`trace`. The REPL also accepts the language's definition forms
+directly, so the language reference's examples paste as written.
+The text syntax is specified in
+[docs/lang/syntax.md](docs/lang/syntax.md) and the authoring
+language in [docs/lang/language.md](docs/lang/language.md).
 
 Working rules for agent sessions are in [CLAUDE.md](CLAUDE.md).
 
