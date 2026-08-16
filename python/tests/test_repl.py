@@ -692,14 +692,21 @@ def test_macro_cannot_reach_def_bindings(shell, capsys):
     assert "unknown name 'val'" in capsys.readouterr().out
 
 
-def test_computed_def_spelling_is_data(shell, capsys):
-    # A computed atom coinciding with a def spelling is data: def
-    # names are not language names, nothing resolves, and the fold
-    # keeps its number. Only the written case above errors.
+def test_computed_def_spelling_is_rejected(shell, capsys):
+    # Any macro output atom spelling a def name is rejected,
+    # written or computed, because the raw path reads that
+    # spelling as the binding and one spelling must never mean
+    # two things. Resolution-side, the rule survives macro
+    # composition, which per-call evidence cannot.
     shell.onecmd("def n (q . 5)")
     shell.onecmd("(defmacro add (n1 n2) (+ n1 n2))")
     shell.onecmd("(add 50 60)")
-    assert capsys.readouterr().out.startswith("110\n")
+    assert "unknown name 'n'" in capsys.readouterr().out
+    shell.onecmd("def val (q . 7)")
+    shell.onecmd("(defmacro getval () (qq val))")
+    shell.onecmd("(defmacro use2 () (getval))")
+    shell.onecmd("(use2)")
+    assert "unknown name 'val'" in capsys.readouterr().out
 
 
 def test_undef_breaks_template_spliced_macros(shell, capsys):
@@ -710,7 +717,8 @@ def test_undef_breaks_template_spliced_macros(shell, capsys):
     shell.onecmd("(defmacro inc2 (e) (qq (inc (inc (unquote e)))))")
     shell.onecmd("undef inc")
     shell.onecmd("(inc2 40)")
-    assert "unknown name 'inc'" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "unknown operator 0x696e63, which spells 'inc'" in out
 
 
 def test_program_form_ignores_session_macros(shell, capsys):

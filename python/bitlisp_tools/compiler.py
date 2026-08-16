@@ -103,11 +103,11 @@ class _ExpansionWork:
     """One compile's expansion context: the remaining macro
     executions, shared by every body so branching expansion cannot
     multiply work past the cap, and which world is expanding.
-    strict is the program world, where written names that resolve
-    nowhere become errors. The macro world, a declaration
-    expanding inside another macro's body, is permissive: what it
-    cannot resolve stays data and rides the compiled body out to
-    the call sites that can."""
+    strict is the program world, where a caller's misspelled
+    argument names become errors. The macro world, a declaration
+    expanding inside another macro's body, judges nothing extra:
+    what it cannot resolve stays data and rides the compiled body
+    out to the call sites."""
 
     __slots__ = ("remaining", "strict")
 
@@ -356,31 +356,25 @@ class Definitions:
         or constants, so each macro is a self-contained program.
         Later macros can therefore use earlier ones in their
         bodies, while calls in function bodies and the main body
-        expand against every macro regardless of order.
-
-        Declaration-time expansion is permissive: what an earlier
-        macro splices in stays data when it resolves nowhere here,
-        because its judgment day is the program-world call site,
-        not this line. Only what this body writes directly is
-        resolved strictly now."""
+        expand against every macro regardless of order. What an
+        earlier macro splices in stays data when it resolves
+        nowhere here, and resolves again wherever the compiled
+        body's output finally lands."""
         items = _form_items(form, _DEFMACRO, 4)
         name = self._claim(items[1], taken)
         arity = _check_params(items[2])
-        params = _symbol_names(items[2])
         macro_defs = Definitions()
         macro_defs.macros = dict(self.macros)
         expanded = _expand(
-            items[3], macro_defs, params, 0, _ExpansionWork(strict=False)
+            items[3],
+            macro_defs,
+            _symbol_names(items[2]),
+            0,
+            _ExpansionWork(strict=False),
         )
         compilation = _Compilation(macro_defs, {}, macro_name=name)
         program = compilation.expression(expanded, _bind_params(items[2], _TOP))
-        # The names the body writes, minus the parameters, which
-        # substitute at expansion time and never reach the output
-        # as their own spelling. Real names only, so this evidence
-        # is reader-guaranteed provenance, never a guess about
-        # what computed bytes meant.
-        emittable = frozenset(_symbol_names(items[3]) - params)
-        self.macros[name] = (items[2], items[3], arity, program, emittable)
+        self.macros[name] = (items[2], items[3], arity, program)
         return name
 
 
@@ -468,23 +462,25 @@ def _lift(value, defs, shadowed, evidence, offset):
     An atom whose bytes spell one name the reader would accept
     becomes a name when the name resolves where the call sits, the
     classic Chialisp rule, and also when it is in the evidence,
-    the names the macro's body writes plus the names the caller
-    wrote in the arguments. The second clause is a recorded
-    divergence and is what catches mistakes: a written name that
-    resolves nowhere reaches the resolver as a name and fails as
-    the unknown name it is, exactly as the direct spelling would,
+    the names the caller wrote in this call's own arguments. The
+    second clause is a recorded divergence with a deliberately
+    one-hop scope: this call's argument source is the only place
+    the reader's provenance is still attached, so a misspelled
+    argument reaches the resolver as a name and fails as the
+    unknown name it is, exactly as the direct spelling would,
     where Chialisp reads it back as data and compiles the typo
-    silently. Everything else is data. Computed bytes that spell
-    an in-scope name still resolve and still capture, the sharp
-    edge Chialisp authors already know, kept because no static
-    evidence can tell written from computed once the reader's
-    token kinds are gone: quote data that must stay data.
+    silently. Everything else is data, including names spelled
+    only inside templates or inherited through other macros, whose
+    provenance the VM boundary erased: computed bytes that spell
+    an in-scope name resolve and capture, and stale spellings that
+    resolve nowhere pass as data, the sharp edges Chialisp authors
+    already know. Quote data that must stay data.
 
     evidence is None in the macro world, declaration-time
-    expansion inside another macro's body, where nothing errs:
-    what resolves lifts and the rest stays data, riding the
-    compiled body out to the program-world call sites whose
-    read-back is its real judgment day.
+    expansion inside another macro's body, where what resolves
+    lifts and the rest stays data, riding the compiled body out
+    to the call sites where resolution happens against real
+    scope.
 
     The lifted names carry the macro call's offset, so a
     downstream error points at the call site."""
@@ -621,6 +617,41 @@ def _check_arity(name, arguments, arity, offset):
         )
 
 
+def _argument_names(node):
+    """The names a caller wrote in a macro call's own arguments,
+    the one place the reader's provenance is still attached when
+    the expansion is read back. The walk is expression directed
+    like the read-back itself: spine pairs never mean quote, and
+    quoted content and qq templates are excluded, because their
+    spellings are data to the read-back and must not vouch for
+    output atoms."""
+    names = set()
+
+    def spine(node):
+        while is_pair(node):
+            element(node[0])
+            node = node[1]
+        if isinstance(node, Symbol):
+            names.add(node.name)
+
+    def element(expr):
+        if isinstance(expr, Symbol):
+            names.add(expr.name)
+            return
+        if not is_pair(expr):
+            return
+        head = expr[0]
+        if is_atom(head) and head == _QUOTE:
+            return
+        if isinstance(head, Symbol) and head.name == _QQ:
+            return
+        element(head)
+        spine(expr[1])
+
+    spine(node)
+    return names
+
+
 def _expand_call(head, tail, defs, shadowed, depth, work):
     """One macro call replaced by its expansion."""
     name = head.name
@@ -644,17 +675,14 @@ def _expand_call(head, tail, defs, shadowed, depth, work):
         raise CompileError(
             f"macro {name!r} failed: {exc.code}: {exc}", head.offset
         ) from None
-    # Typo evidence, built only where it will be judged: the
-    # names the macro's body writes plus the names the caller
-    # wrote in this call. The macro world passes none and defers.
-    evidence = None
-    if work.strict:
-        evidence = defs.macros[name][4] | _symbol_names(tail)
+    # Typo evidence: only what the caller wrote in this call, and
+    # only in the program world. The macro world passes none.
+    evidence = _argument_names(tail) if work.strict else None
     lifted = _lift(value, defs, shadowed, evidence, head.offset)
     return _expand(lifted, defs, shadowed, depth + 1, work)
 
 
-def _expanded_bodies(defs, body, work):
+def _expanded_bodies(defs, body, work, session_names):
     """The reachable function bodies, expanded, conservatively:
     every name a post-expansion body mentions counts, shadowing
     ignored, so the set can only be too large, never too small.
@@ -672,8 +700,9 @@ def _expanded_bodies(defs, body, work):
             if name in bodies or name not in mentioned:
                 continue
             fn_params, fn_body, _ = defs.functions[name]
+            shadow = _symbol_names(fn_params) | session_names
             try:
-                expanded = _expand(fn_body, defs, _symbol_names(fn_params), 0, work)
+                expanded = _expand(fn_body, defs, shadow, 0, work)
             except CompileError as exc:
                 raise CompileError(f"in {name!r}: {exc}") from None
             bodies[name] = expanded
@@ -935,13 +964,20 @@ def tree_hash(node):
     return hashes[0]
 
 
-def _compile(defs, params, body):
+def _compile(defs, params, body, session_names=frozenset()):
     """The program node and symbol table for one body against one
-    definitions space, params None for a bare expression."""
+    definitions space, params None for a bare expression.
+    session_names are the REPL's def bindings, folded into the
+    resolution shadow: any macro output atom spelling one becomes
+    a name and fails as unknown, however it arose, because the
+    raw path reads that spelling as the binding and one spelling
+    must never mean two things. Resolution-side, the rule holds
+    through macro composition for free."""
     shadow = _symbol_names(params) if params is not None else frozenset()
+    shadow = shadow | session_names
     work = _ExpansionWork()
     body = _expand(body, defs, shadow, 0, work)
-    expanded = _expanded_bodies(defs, body, work)
+    expanded = _expanded_bodies(defs, body, work, session_names)
     fn_names = [name for name in defs.functions if name in expanded]
     has_tree = bool(fn_names)
     fn_paths = _tree_paths(fn_names, _LEFT) if has_tree else {}
@@ -1014,14 +1050,17 @@ def compile_program(source):
     return _compile(defs, params, items[-1])
 
 
-def compile_expression(source, defs):
+def compile_expression(source, defs, session_names=frozenset()):
     """The program node and symbol table for one bare expression
     against a definitions space. The expression has no parameters,
-    so the compiled program ignores its environment."""
+    so the compiled program ignores its environment. session_names
+    are the caller's bindings outside the language, the REPL's def
+    names, barred from macro output. A program form ignores them,
+    staying self-contained."""
     tree = parse_source(source) if isinstance(source, str) else source
     if program_form(tree):
         return compile_program(tree)
-    return _compile(defs, None, tree)
+    return _compile(defs, None, tree, session_names)
 
 
 def bind_values(params, env):

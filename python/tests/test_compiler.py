@@ -607,14 +607,45 @@ def test_caller_written_typo_is_an_unknown_name():
     assert "unknown name 'Y'" in str(excinfo.value)
 
 
-def test_stale_template_name_is_an_unknown_name():
-    # The template spells gone, so it is evidence, and nothing
-    # defines it: the rejection names the source token instead of
-    # letting the spelling land as operator bytes.
+def test_stale_template_name_is_a_documented_edge():
+    # A template name is beyond the one-hop typo guarantee: its
+    # provenance died at the VM boundary, so an unresolvable one
+    # is data, and in head position the operator error at least
+    # spells the bytes. The Chialisp edge, kept and documented.
     defs = _defs("(defmacro call-gone (e) (qq (gone (unquote e))))")
     with pytest.raises(CompileError) as excinfo:
         compile_expression("(call-gone 1)", defs)
-    assert "unknown name 'gone'" in str(excinfo.value)
+    assert "unknown operator 0x676f6e65, which spells 'gone'" in str(excinfo.value)
+
+
+def test_composed_typo_is_a_documented_edge():
+    # Same boundary one hop further out: a spelling written only
+    # in an inner macro's body reaches the program world as data,
+    # so in value position it silently compiles, the documented
+    # limit of the one-hop guarantee.
+    program, _ = compile_program(
+        "(program (X) (defmacro getg () (qq Gone)) "
+        "(defmacro passg () (getg)) (+ X (passg)))"
+    )
+    assert disassemble(program) == '(+ 2 (q . "Gone"))'
+
+
+def test_deliberate_data_spellings_never_condemn_output():
+    # Names written as quoted data or template data are not typo
+    # evidence, so unrelated computed bytes in the same expansion
+    # compile exactly as Chialisp would compile them.
+    program, _ = compile_program(
+        "(program () (defmacro tag () (qq (c (q . n) (unquote (+ 100 10))))) (tag))"
+    )
+    cost, result = run(program, NIL, BUDGET)
+    assert result == (b"n", int_to_atom(110))
+    program, _ = compile_program(
+        "(program (w) (defmacro tagd (d) (c 4 (c (+ 100 10) (c d ())))) (tagd (q . n)))"
+    )
+    cost, result = run(program, (int_to_atom(1), NIL), BUDGET)
+    # The emitted (c 110 (q . n)) conses to the dotted pair whose
+    # halves are the same byte: 110 is the letter n.
+    assert result == (int_to_atom(110), b"n")
 
 
 def test_string_built_names_resolve_like_chialisp():

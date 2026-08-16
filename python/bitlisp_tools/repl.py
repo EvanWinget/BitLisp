@@ -226,7 +226,9 @@ class BitLispShell(cmd.Cmd):
                         "which is data and cannot hold names",
                         symbol.offset,
                     )
-            program, table = compile_expression(nodes[0], self.defs)
+            program, table = compile_expression(
+                nodes[0], self.defs, frozenset(self.names)
+            )
             self._register_symbols(table)
             nodes = [program, *nodes[1:]]
         return nodes
@@ -450,7 +452,9 @@ class BitLispShell(cmd.Cmd):
     def do_compile(self, arg):
         """compile <expr-or-program>: show the compiled tree as
         canonical text, the artifact itself, never renamed."""
-        program, table = compile_expression(parse_source(arg), self.defs)
+        program, table = compile_expression(
+            parse_source(arg), self.defs, frozenset(self.names)
+        )
         self._register_symbols(table)
         print(self._node_text(program))
 
