@@ -25,6 +25,9 @@
 - [lang/language.md](lang/language.md): the v0 authoring language,
   the program form, its declarations and special forms, the
   compiled environment shape, and the symbol table format.
+- [lang/macros.md](lang/macros.md): the macro system, defmacro with
+  qq and unquote, compile-time expansion, its limits, and its sharp
+  edges.
 - [lang/repl.md](lang/repl.md): the bitlisp REPL, its debugger, and
   the one-shot converter and compiler commands beside it.
 - [lang/curry.md](lang/curry.md): currying and program identity,

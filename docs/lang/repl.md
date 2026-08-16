@@ -45,6 +45,7 @@ lines.
 | `maxcost [<n>]` | show or set the cost budget for eval, spend, and debug |
 | `(defun <name> <params> <body>)` | define a named function |
 | `(defconstant <name> <value>)` | define a constant |
+| `(defmacro <name> <params> <body>)` | define a macro |
 | `def <name> <sexpr>` | bind a name to a parsed node |
 | `undef <name>` | remove a definition or binding |
 | `defs` | list definitions and bindings |
@@ -83,12 +84,15 @@ A definition body assembles under the bindings current at `def`
 time, so definitions snapshot: redefining a dependency later does
 not rewrite what an earlier definition captured.
 
-A line whose head is `defun` or `defconstant` is a language
-declaration, `language.md` syntax exactly, and adds to the
-session's compiler definitions. Declarations and `def` bindings
-share one namespace with the reserved words and the condition
-constants, so one spelling can never mean two things, and `undef`
-removes a name from whichever space holds it.
+A line whose head is `defun`, `defconstant`, or `defmacro` is a
+language declaration, `language.md` syntax exactly, and adds to
+the session's compiler definitions. A macro's body compiles on its
+own line, so its errors print there, and a macro already compiled
+into a later macro stays compiled if its name is removed.
+Declarations and `def` bindings share one namespace with the
+reserved words and the condition constants, so one spelling can
+never mean two things, and `undef` removes a name from whichever
+space holds it.
 
 The shared namespace narrows `def` from its original surface, a
 deliberate change with the compiler landing: a reserved word or a

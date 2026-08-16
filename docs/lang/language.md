@@ -11,7 +11,7 @@ name is exactly a token the raw reader rejects as an unknown symbol,
 so strings, hex, operator names, and decimals keep their raw
 spelling rules, and the language occupies only text that previously
 errored. The reserved words are `program`, `defun`, `defconstant`,
-`if`, and `list`.
+`defmacro`, `if`, `list`, `qq`, and `unquote`.
 
 ## The program form
 
@@ -21,8 +21,9 @@ errored. The reserved words are `program`, `defun`, `defconstant`,
 
 A source program is one self-contained form: a parameter tree, any
 number of declarations in any order, and exactly one body
-expression. The declarations are `defun` and `defconstant`, and
-nothing else may appear in declaration position. Compiling a
+expression. The declarations are `defun`, `defconstant`, and
+`defmacro`, and nothing else may appear in declaration position.
+Compiling a
 program uses nothing outside the form, so a program that compiles
 in a file compiles identically pasted into the REPL.
 
@@ -71,9 +72,9 @@ compiles to its quoted value at the use site. `(defconstant K
 (+ 1 2))` therefore binds the three-element tree whose head is the
 byte 0x10, not 3, exactly as `(q . (+ 1 2))` would read it.
 
-A name is defined once: functions, constants, condition constants,
-and reserved words share one namespace, and redefinition is an
-error.
+A name is defined once: functions, constants, macros, condition
+constants, and reserved words share one namespace, and
+redefinition is an error.
 
 ## Condition constants
 
@@ -113,6 +114,17 @@ select.
 Builds a proper list of its evaluated arguments, folding into `c`
 calls: `(list A B)` compiles as `(c A (c B ()))`, and `(list)` is
 nil. Condition output is written with it.
+
+## defmacro, qq, and unquote
+
+```
+(defmacro <name> <params> <body>)
+```
+
+Declares a macro, a compile-time program whose calls expand into
+source before anything else compiles, with `qq` and `unquote` as
+its template forms. The system, its visibility rules, its limits,
+and its sharp edges are `macros.md`.
 
 ## Expressions and quoting
 
@@ -170,8 +182,11 @@ it, not at the declaration. A body error names its function,
 because in the REPL the offset indexes the declaring line's text,
 not the line that triggered the compile.
 
-The compiler emits code directly and runs no rewriting passes. What
-the rules above produce is what serializes.
+Macro expansion is the compiler's one source rewrite, finished
+before reachability is computed and anything emits, which is why a
+macro's expansion may call a function its source never names.
+Emission itself is direct: what the rules above produce is what
+serializes.
 
 The worked example, `bitlisp-compile` output disassembled:
 
@@ -224,15 +239,26 @@ nothing forces a change. The deliberate differences:
   environment tree, so no optimizer is needed to collapse them and
   the symbol table holds only function bodies.
 - The function tree is ordered by declaration, not alphabetically.
-- Call arity is checked at compile time.
+- Call arity is checked at compile time, macro calls included.
 - `defconstant` is literal-only. There is no compile-time-evaluated
   constant form.
 - Unknown bare operator atoms in call position are rejected at
   compile time rather than at run time.
-- `if` and `list` are compiler forms, not macros, and there is no
-  macro system, no include mechanism, and no inline functions in
-  v0. Currying is not a language form either: it operates on
-  compiled programs, through the surfaces defined in `curry.md`.
+- `if` and `list` are compiler forms, not macros, with the same
+  emitted semantics. Macros therefore cannot shadow them, or
+  anything else: where Chialisp's newest macro silently wins, the
+  one-namespace rule makes redefinition an error.
+- Macro expansion is bounded, by the depth cap and the execution
+  budget `macros.md` states, where Chialisp expands until the
+  interpreter dies. A macro name used as a value is an error in
+  ordinary code, as a function name is.
+- There is no `function` or `com` reflection form. Macro output
+  cannot carry names into quoted data, so a user macro cannot
+  introduce laziness, and lazy branching exists only through the
+  built-in `if`.
+- There is no include mechanism and no inline functions in v0.
+  Currying is not a language form either: it operates on compiled
+  programs, through the surfaces defined in `curry.md`.
 
 ## A worked session
 
