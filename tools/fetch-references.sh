@@ -24,5 +24,9 @@ clone https://github.com/ajtowns/bllsh.git bllsh
 clone https://github.com/Chia-Network/clvm_tools.git clvm_tools
 clone https://github.com/Chia-Network/clvm_tools_rs.git clvm_tools_rs
 
+# Deployed-puzzle corpora, surveyed for language-design decisions.
+clone https://github.com/Chia-Network/chia-gaming.git chia-gaming
+clone https://github.com/yakuhito/tibet.git tibet
+
 echo
 echo "Done. These checkouts are git-ignored and are not a build input."
