@@ -104,14 +104,14 @@ The library functions are `curry` and `uncurry` in
 `bitlisp_tools`, taking and returning program trees. Around them:
 
 ```
-bitlisp-curry [-a <sexpr>]... [-H] [<program>]
+bitlisp-curry [-a <sexpr>]... [-T] [<program>]
 bitlisp-uncurry [<program>]
 ```
 
 `bitlisp-curry` takes the program as serialized bytecode hex, a
 file or a literal or stdin, and each `-a` value as text
 s-expression syntax, fixed in the order given. It prints the
-curried program's hex, or with `-H` its tree hash. With no `-a`
+curried program's hex, or with `-T` its tree hash. With no `-a`
 the wrapper is still built, a curry of zero values.
 `bitlisp-uncurry` takes hex the same way and prints the inner
 program's hex, then one value per line as text. Input without the
@@ -119,14 +119,14 @@ curried shape is an error. Exit status follows the converter
 convention, 0 on success and 2 on every failure, never a consensus
 verdict.
 
-The converters take the same flag: `bitlisp-asm -H`,
-`bitlisp-disasm -H`, and `bitlisp-compile -H` print the parsed or
+The converters take the same flag: `bitlisp-asm -T`,
+`bitlisp-disasm -T`, and `bitlisp-compile -T` print the parsed or
 compiled program's tree hash instead of their usual output. For
 `bitlisp-compile` that digest covers the whole program, a
 different thing from the per-function-body hashes keying its
 `--symbols` table.
 
-In the REPL, `curry`, `uncurry`, and `hash` do the same over the
+In the REPL, `curry`, `uncurry`, and `treehash` do the same over the
 session's programs, language source included, and the debugger's
 symbol names survive currying because the wrapped function bodies
 are untouched. The command rows live in `repl.md`.
@@ -141,7 +141,7 @@ $ bitlisp-compile '(program (X Y) (* X Y))'
 ff12ff02ff0580
 $ bitlisp-compile '(program (X Y) (* X Y))' | bitlisp-curry -a 6
 ff02ffff01ff12ff02ff0580ffff04ffff0106ff018080
-$ bitlisp-compile '(program (X Y) (* X Y))' | bitlisp-curry -a 6 -H
+$ bitlisp-compile '(program (X Y) (* X Y))' | bitlisp-curry -a 6 -T
 d8dc6cb1396e4bccd408878df8f7a450c79ff646ee256665bff412077b5a1925
 ```
 
@@ -158,12 +158,12 @@ cost: 1326 of 11000000000
 bitlisp> uncurry (a (q 18 2 5) (c (q . 6) 1))
 program: (* 2 5)
 value: 6
-bitlisp> hash (a (q 18 2 5) (c (q . 6) 1))
+bitlisp> treehash (a (q 18 2 5) (c (q . 6) 1))
 d8dc6cb1396e4bccd408878df8f7a450c79ff646ee256665bff412077b5a1925
 bitlisp> exit
 ```
 
 The program compiles bare because it declares no functions, so the
 inner program reads back as `(* 2 5)`, multiply over the first two
-environment paths. The REPL hash and the `-H` digest agree, one
+environment paths. The REPL treehash and the `-T` digest agree, one
 identity through every entry point.

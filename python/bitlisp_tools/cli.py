@@ -7,7 +7,7 @@ s-expression to serialized bytecode hex. bitlisp-disasm renders
 serialized hex back as text. bitlisp-compile compiles a source
 program to serialized bytecode hex. bitlisp-curry fixes argument
 values into a program and bitlisp-uncurry splits them back out. The
-converters and bitlisp-curry take -H to print the program's tree
+converters and bitlisp-curry take -T to print the program's tree
 hash instead of their usual output.
 """
 
@@ -77,7 +77,7 @@ The argument names a file when one exists at that path and reads as
 literal text otherwise. With no argument the text is read from
 stdin. Prints one line of lowercase hex.
 
-With -H the output is the program's tree hash instead, the
+With -T the output is the program's tree hash instead, the
 sha256tree digest naming the tree, so the same program hashes
 identically through every command that takes the flag.
 
@@ -88,7 +88,7 @@ Usage:
     bitlisp-asm "(+ (q . 2) (q . 3))"
     bitlisp-asm puzzle.bl
     echo "(q . 1)" | bitlisp-asm
-    bitlisp-asm -H "(+ 2 5)"
+    bitlisp-asm -T "(+ 2 5)"
 """
 
 _DISASM_DOC = """Render serialized bytecode hex as a text s-expression.
@@ -99,9 +99,9 @@ Deserialization is strict, accepting only the unique canonical
 encoding, and the error line carries the consensus error code when
 it rejects the bytes.
 
-With -H the output is the program's tree hash instead of its text.
+With -T the output is the program's tree hash instead of its text.
 The hash names the decoded tree, not the encoding, so bitlisp-asm
--H and bitlisp-disasm -H print the same digest for the same
+-T and bitlisp-disasm -T print the same digest for the same
 program.
 
 Exit status 0 on success, 2 when the hex does not decode or the
@@ -110,7 +110,7 @@ file does not open.
 Usage:
     bitlisp-disasm ff10ffff0102ffff010380
     echo ff10ffff0102ffff010380 | bitlisp-disasm
-    bitlisp-disasm -H ff10ff02ff0580
+    bitlisp-disasm -T ff10ff02ff0580
 """
 
 
@@ -126,7 +126,7 @@ the tree hash of each compiled function body to its name and
 parameter names. The REPL's sym command loads it, so bytecode
 compiled here debugs with source names.
 
-With -H the output is the whole compiled program's tree hash
+With -T the output is the whole compiled program's tree hash
 instead of its hex, a different digest from the per-function-body
 hashes keying the symbol table. --symbols still writes either way.
 
@@ -137,7 +137,7 @@ Usage:
     bitlisp-compile "(program (X) (defun double (N) (* 2 N)) (double X))"
     bitlisp-compile puzzle.bl --symbols puzzle.sym
     bitlisp-compile puzzle.bl | bitlisp-disasm
-    bitlisp-compile -H puzzle.bl
+    bitlisp-compile -T puzzle.bl
 """
 
 
@@ -155,7 +155,7 @@ placed ahead of the environment, so a program taking (A B C)
 curried with one value becomes a program taking (B C). With no
 --arg the wrapper is still built, a curry of zero values.
 
-With -H the output is the curried program's tree hash instead of
+With -T the output is the curried program's tree hash instead of
 its hex, the identity an output would commit to.
 
 Exit status 0 on success, 2 when the hex does not decode, a value
@@ -164,7 +164,7 @@ does not parse, or the file does not open.
 Usage:
     bitlisp-curry ff10ff02ff0580 --arg 10
     bitlisp-curry puzzle.hex --arg 0x0014ab --arg 600
-    bitlisp-compile puzzle.bl | bitlisp-curry -a 600 -H
+    bitlisp-compile puzzle.bl | bitlisp-curry -a 600 -T
 """
 
 
@@ -219,7 +219,7 @@ def _node(source, as_hex):
 
 def _tree_hash_flag(parser, usual):
     parser.add_argument(
-        "-H",
+        "-T",
         "--tree-hash",
         action="store_true",
         help=f"print the program's tree hash instead of {usual}",

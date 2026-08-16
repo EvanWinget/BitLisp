@@ -52,7 +52,7 @@ lines.
 | `sym <path>` | load a symbol file written by bitlisp-compile |
 | `curry <program> <value> ...` | fix the values into the program, printing the curried program |
 | `uncurry <program>` | split a curried program back into program and fixed values |
-| `hash <program>` | the program's tree hash |
+| `treehash <program>` | the program's tree hash |
 | `debug <program> [<solution>]` | open a stepping session |
 | `step` | execute one task, show the stacks |
 | `next` | step over: the pending task and its whole subtree |
@@ -181,11 +181,11 @@ bitlisp> exit
 ## The converter commands
 
 ```
-bitlisp-asm [-H] [<file-or-literal>]      text to serialized hex
-bitlisp-disasm [-H] [<file-or-literal>]   serialized hex to text
-bitlisp-compile [--symbols <path>] [-H] [<file-or-literal>]
+bitlisp-asm [-T] [<file-or-literal>]      text to serialized hex
+bitlisp-disasm [-T] [<file-or-literal>]   serialized hex to text
+bitlisp-compile [--symbols <path>] [-T] [<file-or-literal>]
                                           language source to serialized hex
-bitlisp-curry [-a <sexpr>]... [-H] [<file-or-literal>]
+bitlisp-curry [-a <sexpr>]... [-T] [<file-or-literal>]
                                           fix values into a program
 bitlisp-uncurry [<file-or-literal>]       split a curried program back
 ```
@@ -211,10 +211,10 @@ program's hex and then one fixed value per line as text. The
 curried shape and its contract are defined in `curry.md`.
 
 `bitlisp-asm`, `bitlisp-disasm`, `bitlisp-compile`, and
-`bitlisp-curry` take `-H`, printing the program's tree hash
+`bitlisp-curry` take `-T`, printing the program's tree hash
 instead of their usual output. The digest names the tree, not the
 encoding, so every command prints the same hash for the same
-program, the in-REPL `hash` command included.
+program, the in-REPL `treehash` command included.
 
 `bitlisp-disasm` deserializes strictly, accepting only the unique
 canonical encoding. Exit status is 0 on success and 2 on every

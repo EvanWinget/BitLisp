@@ -288,26 +288,26 @@ CURRIED_HASH = "8227d2eef6f1cdb6d949e075e8c185d1316af6a65d9241ba473a0e8fc72aa880
 
 
 def test_asm_tree_hash_replaces_the_hex(capsys):
-    assert cli.asm_main([PATHS_TEXT, "-H"]) == 0
+    assert cli.asm_main([PATHS_TEXT, "-T"]) == 0
     assert capsys.readouterr().out == PATHS_HASH + "\n"
 
 
 def test_disasm_tree_hash_replaces_the_text(capsys):
-    assert cli.disasm_main([PATHS_HEX, "-H"]) == 0
+    assert cli.disasm_main([PATHS_HEX, "-T"]) == 0
     assert capsys.readouterr().out == PATHS_HASH + "\n"
 
 
 def test_compile_tree_hash_matches_disasm(capsys):
-    assert cli.compile_main([DOUBLE_SOURCE, "-H"]) == 0
+    assert cli.compile_main([DOUBLE_SOURCE, "-T"]) == 0
     compiled_hash = capsys.readouterr().out
-    assert cli.disasm_main([DOUBLE_HEX, "-H"]) == 0
+    assert cli.disasm_main([DOUBLE_HEX, "-T"]) == 0
     assert capsys.readouterr().out == compiled_hash
     assert len(compiled_hash.strip()) == 64
 
 
 def test_compile_tree_hash_still_writes_symbols(tmp_path, capsys):
     sym_path = tmp_path / "double.sym"
-    assert cli.compile_main([DOUBLE_SOURCE, "-H", "--symbols", str(sym_path)]) == 0
+    assert cli.compile_main([DOUBLE_SOURCE, "-T", "--symbols", str(sym_path)]) == 0
     capsys.readouterr()
     assert json.loads(sym_path.read_text())["schema"] == "bitlisp-sym-v0"
 
@@ -334,7 +334,7 @@ def test_curry_file(tmp_path, capsys):
 
 
 def test_curry_tree_hash(capsys):
-    assert cli.curry_main([PATHS_HEX, "-a", "10", "-H"]) == 0
+    assert cli.curry_main([PATHS_HEX, "-a", "10", "-T"]) == 0
     assert capsys.readouterr().out == CURRIED_HASH + "\n"
 
 

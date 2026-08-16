@@ -795,24 +795,24 @@ def test_uncurry_arity_error_matches_on_the_language_path(shell, capsys):
     assert capsys.readouterr().out.startswith("error: uncurry takes one program")
 
 
-def test_hash_prints_the_tree_hash(shell, capsys):
-    shell.onecmd("hash (+ 2 5)")
+def test_treehash_prints_the_tree_hash(shell, capsys):
+    shell.onecmd("treehash (+ 2 5)")
     assert capsys.readouterr().out == PATHS_HASH + "\n"
 
 
-def test_hash_of_compiled_source_matches_compile_flag(shell, capsys):
-    # The same digest bitlisp-compile -H prints for this program,
+def test_treehash_of_compiled_source_matches_compile_flag(shell, capsys):
+    # The same digest bitlisp-compile -T prints for this program,
     # so identity does not depend on the entry point.
-    shell.onecmd("hash (program (X Y) (* X Y))")
+    shell.onecmd("treehash (program (X Y) (* X Y))")
     out = capsys.readouterr().out.strip()
     from bitlisp_tools import cli
 
-    assert cli.compile_main(["(program (X Y) (* X Y))", "-H"]) == 0
+    assert cli.compile_main(["(program (X Y) (* X Y))", "-T"]) == 0
     assert capsys.readouterr().out.strip() == out
 
 
-def test_hash_takes_one_program(shell, capsys):
-    shell.onecmd("hash")
+def test_treehash_takes_one_program(shell, capsys):
+    shell.onecmd("treehash")
     assert capsys.readouterr().out.startswith("error: ")
 
 

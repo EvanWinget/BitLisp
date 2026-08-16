@@ -27,7 +27,7 @@ Currying and identity:
                                    printing the curried program
     uncurry <program>              split a curried program back into
                                    program and fixed values
-    hash <program>                 the program's tree hash
+    treehash <program>             the program's tree hash
 
 Debugger:
     debug <program> [<solution>]   open a stepping session
@@ -465,10 +465,10 @@ class BitLispShell(cmd.Cmd):
             print(f"value: {self._node_text(value)}")
 
     @_survives
-    def do_hash(self, arg):
-        """hash <program>: the program's tree hash, the identity
+    def do_treehash(self, arg):
+        """treehash <program>: the program's tree hash, the identity
         an output would commit to."""
-        print(tree_hash(self._one_program(arg, "hash")).hex())
+        print(tree_hash(self._one_program(arg, "treehash")).hex())
 
     # The debugger.
 
