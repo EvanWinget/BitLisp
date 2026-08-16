@@ -1,9 +1,11 @@
-"""The one-shot command surface: bitlisp-run, bitlisp-asm, bitlisp-disasm.
+"""The one-shot command surface: bitlisp-run, bitlisp-asm,
+bitlisp-disasm, bitlisp-compile.
 
 Each command is a thin main over the tools library. bitlisp-run runs
 one spend and reports the verdict. bitlisp-asm assembles a text
 s-expression to serialized bytecode hex. bitlisp-disasm renders
-serialized hex back as text.
+serialized hex back as text. bitlisp-compile compiles a source
+program to serialized bytecode hex.
 """
 
 import argparse
@@ -14,6 +16,7 @@ import sys
 
 from bitlisp import BitLispError, deserialize, serialize
 
+from .compiler import CompileError, compile_program, symbols_to_json
 from .printer import disassemble
 from .reader import ParseError, assemble
 from .runner import (
@@ -93,6 +96,28 @@ file does not open.
 Usage:
     bitlisp-disasm ff10ffff0102ffff010380
     echo ff10ffff0102ffff010380 | bitlisp-disasm
+"""
+
+
+_COMPILE_DOC = """Compile a source program to serialized bytecode hex.
+
+The input is one self-contained (program ...) form in the v0
+authoring language. The argument names a file when one exists at
+that path and reads as literal text otherwise. With no argument the
+text is read from stdin. Prints one line of lowercase hex.
+
+--symbols writes the program's symbol table, a JSON object mapping
+the tree hash of each compiled function body to its name and
+parameter names. The REPL's sym command loads it, so bytecode
+compiled here debugs with source names.
+
+Exit status 0 on success, 2 when the source does not compile, the
+file does not open, or the symbol file does not write.
+
+Usage:
+    bitlisp-compile "(program (X) (defun double (N) (* 2 N)) (double X))"
+    bitlisp-compile puzzle.bl --symbols puzzle.sym
+    bitlisp-compile puzzle.bl | bitlisp-disasm
 """
 
 
@@ -238,6 +263,47 @@ def disasm_main(argv=None):
         print(f"error: {exc.code}: {exc}", file=sys.stderr)
         return 2
     except (OSError, ValueError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    with _pipe_shield():
+        print(line)
+    return 0
+
+
+def compile_main(argv=None):
+    parser = argparse.ArgumentParser(
+        prog="bitlisp-compile",
+        description=_COMPILE_DOC,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "source",
+        nargs="?",
+        help="file path, or the literal source text (default stdin)",
+    )
+    parser.add_argument(
+        "--symbols",
+        metavar="PATH",
+        help="write the symbol table as JSON to this path",
+    )
+    args = parser.parse_args(argv)
+    try:
+        if args.source is None:
+            text = sys.stdin.read()
+        else:
+            text = _path_or_code(args.source)
+        program, table = compile_program(text)
+        line = serialize(program).hex()
+        if args.symbols is not None:
+            with open(args.symbols, "w") as handle:
+                json.dump(symbols_to_json(table), handle)
+                handle.write("\n")
+    except BitLispError as exc:
+        # A converter issues no spend verdict, so even a pinned code
+        # reports as unusable input.
+        print(f"error: {exc.code}: {exc}", file=sys.stderr)
+        return 2
+    except (CompileError, ParseError, OSError, RecursionError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
     with _pipe_shield():

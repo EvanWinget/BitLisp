@@ -197,3 +197,76 @@ def test_asm_broken_pipe_keeps_exit_zero(tmp_path):
     process.stderr.close()
     assert process.wait() == 0
     assert stderr == b""
+
+
+# bitlisp-compile.
+
+DOUBLE_SOURCE = "(program (X) (defun double (N) (* 2 N)) (double X))"
+DOUBLE_HEX = (
+    "ff02ffff01ff02ff02ffff04ff02ffff04ff05ff80808080"
+    "ffff04ffff01ff12ffff0102ff0580ff018080"
+)
+
+
+def test_compile_literal(capsys):
+    assert cli.compile_main([DOUBLE_SOURCE]) == 0
+    assert capsys.readouterr().out == DOUBLE_HEX + "\n"
+
+
+def test_compile_file(tmp_path, capsys):
+    path = tmp_path / "double.bl"
+    path.write_text(DOUBLE_SOURCE + "\n")
+    assert cli.compile_main([str(path)]) == 0
+    assert capsys.readouterr().out == DOUBLE_HEX + "\n"
+
+
+def test_compile_stdin(capsys, monkeypatch):
+    monkeypatch.setattr(sys, "stdin", io.StringIO(DOUBLE_SOURCE))
+    assert cli.compile_main([]) == 0
+    assert capsys.readouterr().out == DOUBLE_HEX + "\n"
+
+
+def test_compile_output_disassembles(capsys):
+    assert cli.compile_main([DOUBLE_SOURCE]) == 0
+    hex_line = capsys.readouterr().out.strip()
+    assert cli.disasm_main([hex_line]) == 0
+    assert (
+        capsys.readouterr().out == "(a (q 2 2 (c 2 (c 5 ()))) (c (q 18 (q . 2) 5) 1))\n"
+    )
+
+
+def test_compile_writes_symbols_only_when_asked(tmp_path, capsys):
+    sym_path = tmp_path / "double.sym"
+    assert cli.compile_main([DOUBLE_SOURCE]) == 0
+    capsys.readouterr()
+    assert not sym_path.exists()
+    assert cli.compile_main([DOUBLE_SOURCE, "--symbols", str(sym_path)]) == 0
+    capsys.readouterr()
+    data = json.loads(sym_path.read_text())
+    assert data["schema"] == "bitlisp-sym-v0"
+    assert data["main_params"] == "(X)"
+    ((key, entry),) = data["functions"].items()
+    assert entry == {"name": "double", "params": "(N)"}
+    assert len(key) == 64
+
+
+def test_compile_rejects_bare_expression(capsys):
+    assert cli.compile_main(["(+ (q . 1) (q . 2))"]) == 2
+    assert "must be a (program ...) form" in capsys.readouterr().err
+
+
+def test_compile_rejects_bad_source(capsys):
+    assert cli.compile_main(["(program (X) (undefined X))"]) == 2
+    err = capsys.readouterr().err
+    assert err.startswith("error: ")
+    assert "unknown name 'undefined'" in err
+
+
+def test_compile_rejects_unparseable(capsys):
+    assert cli.compile_main(["(program (X"]) == 2
+    assert capsys.readouterr().err.startswith("error: ")
+
+
+def test_compile_console_script_resolves():
+    (entry,) = metadata.entry_points(group="console_scripts", name="bitlisp-compile")
+    assert entry.load() is cli.compile_main

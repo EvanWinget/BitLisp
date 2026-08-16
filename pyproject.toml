@@ -34,6 +34,7 @@ bitlisp = "bitlisp_tools.repl:main"
 bitlisp-run = "bitlisp_tools.cli:main"
 bitlisp-asm = "bitlisp_tools.cli:asm_main"
 bitlisp-disasm = "bitlisp_tools.cli:disasm_main"
+bitlisp-compile = "bitlisp_tools.cli:compile_main"
 
 [tool.setuptools]
 package-dir = {"" = "python"}
