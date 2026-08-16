@@ -349,21 +349,29 @@ class Definitions:
         or constants, so each macro is a self-contained program.
         Later macros can therefore use earlier ones in their
         bodies, while calls in function bodies and the main body
-        expand against every macro regardless of order."""
+        expand against every macro regardless of order.
+
+        Declaration-time expansion is permissive: what an earlier
+        macro splices in stays data when it resolves nowhere here,
+        because its judgment day is the program-world call site,
+        not this line. Only what this body writes directly is
+        resolved strictly now."""
         items = _form_items(form, _DEFMACRO, 4)
         name = self._claim(items[1], taken)
         arity = _check_params(items[2])
+        params = _symbol_names(items[2])
         macro_defs = Definitions()
         macro_defs.macros = dict(self.macros)
         expanded = _expand(
-            items[3], macro_defs, _symbol_names(items[2]), 0, _ExpansionWork()
+            items[3], macro_defs, params, 0, _ExpansionWork(), strict=False
         )
         compilation = _Compilation(macro_defs, {}, macro_name=name)
         program = compilation.expression(expanded, _bind_params(items[2], _TOP))
-        # Every name the body spells is evidence at read-back time
-        # that an output atom with that spelling was written on
-        # purpose, not computed by coincidence.
-        emittable = frozenset(_symbol_names(items[3]))
+        # The spellings this macro can emit, read off the expanded
+        # body so strings and what earlier macros contributed both
+        # count, minus the parameters, which substitute at run time
+        # and never appear in output as their own spelling.
+        emittable = frozenset(_spelled_names(expanded) - params)
         self.macros[name] = (items[2], items[3], arity, program, emittable)
         return name
 
@@ -429,7 +437,58 @@ def _lower_symbols(tree):
     return tree
 
 
-def _lift(value, defs, shadowed, evidence, offset):
+def _name_spelling(atom):
+    """The name an atom's bytes spell, or None when they spell no
+    single reader-accepted name."""
+    try:
+        text = atom.decode()
+    except UnicodeDecodeError:
+        return None
+    if text and text.isprintable() and definable(text):
+        return text
+    return None
+
+
+def _written_names(tree):
+    """The names a caller wrote in a macro call's argument source.
+    Quoted content is excluded: (q . X) is data there as
+    everywhere, so a name inside it is not evidence of writing."""
+    names = set()
+    stack = [tree]
+    while stack:
+        current = stack.pop()
+        if isinstance(current, Symbol):
+            names.add(current.name)
+        elif is_pair(current):
+            if is_atom(current[0]) and current[0] == _QUOTE:
+                continue
+            stack.append(current[1])
+            stack.append(current[0])
+    return names
+
+
+def _spelled_names(tree):
+    """Every spelling an expanded macro body can put into its
+    output: the names it holds and every atom whose bytes read as
+    one name, string literals and inherited expansion content
+    included."""
+    names = set()
+    stack = [tree]
+    while stack:
+        current = stack.pop()
+        if isinstance(current, Symbol):
+            names.add(current.name)
+        elif is_pair(current):
+            stack.append(current[1])
+            stack.append(current[0])
+        elif current != NIL:
+            text = _name_spelling(current)
+            if text is not None:
+                names.add(text)
+    return names
+
+
+def _lift(value, defs, shadowed, evidence, offset, strict):
     """The value a macro returned, read back as one expression. An
     expression headed by the quote opcode passes through whole, its
     content data by construction, and the walk is expression
@@ -437,48 +496,54 @@ def _lift(value, defs, shadowed, evidence, offset):
     whose value merely starts with the quote byte, like the number
     one, stays an ordinary argument.
 
-    An atom whose bytes spell one name the reader would accept is
-    judged on two axes: whether the name resolves where the
-    expansion sits, and whether there is evidence the name was
-    written rather than computed, meaning the macro's body spells
-    it or the caller wrote it in the arguments. Written and
-    resolving lifts to a name. Written but resolving nowhere is an
-    unknown name, the same error the direct spelling gets, so a
-    typo cannot compile as data. Resolving without being written is
-    rejected as a computed collision, so an arithmetic result whose
-    bytes spell an in-scope name (110 is the letter n) can never
+    Strict is the program world. An atom whose bytes spell one
+    name the reader would accept lifts to a name exactly when
+    there is evidence it was written rather than computed: the
+    expanded body spells it, or the caller wrote it in the
+    arguments. A written name that resolves nowhere then gets the
+    ordinary unknown-name error from the one resolver, exactly as
+    the direct spelling would, so a typo or a stale template name
+    cannot compile as data. A computed atom that resolves is
+    rejected here as a collision, so an arithmetic result whose
+    bytes spell an in-scope name (110 is the letter n) does not
     become a reference behind the author's back: data that must
     stay data travels quoted. Everything else is data. This is a
-    recorded divergence: classic Chialisp lifts any resolving atom
-    and captures on the collision. The lifted names carry the macro
-    call's offset, so a downstream error points at the call site."""
+    recorded divergence with its residue stated in the language
+    docs: classic Chialisp lifts any resolving atom and captures
+    on every collision.
+
+    Permissive is the macro world, declaration-time expansion
+    inside another macro's body, where the resolving-only rule
+    applies and nothing raises: a spelling that resolves nowhere
+    here stays data and rides the compiled body to the call
+    sites, whose strict read-back is its real judgment day.
+
+    The lifted names carry the macro call's offset, so a
+    downstream error points at the call site."""
     if is_pair(value):
         if is_atom(value[0]) and value[0] == _QUOTE:
             return value
         return (
-            _lift(value[0], defs, shadowed, evidence, offset),
-            _lift_tail(value[1], defs, shadowed, evidence, offset),
+            _lift(value[0], defs, shadowed, evidence, offset, strict),
+            _lift_tail(value[1], defs, shadowed, evidence, offset, strict),
         )
     if value == NIL:
         return value
-    try:
-        text = value.decode()
-    except UnicodeDecodeError:
+    text = _name_spelling(value)
+    if text is None:
         return value
-    if not text.isprintable() or not definable(text):
+    if not strict:
+        if _resolvable(text, defs, shadowed):
+            return Symbol(text, offset)
         return value
-    resolves = _resolvable(text, defs, shadowed)
-    written = text in evidence
-    if resolves and written:
+    if text in evidence:
         return Symbol(text, offset)
-    if resolves:
+    if _resolvable(text, defs, shadowed):
         raise CompileError(
             f"macro output 0x{value.hex()} spells {text!r}, "
             "a name the macro never wrote: quote data that must stay data",
             offset,
         )
-    if written:
-        raise CompileError(f"unknown name {text!r}", offset)
     return value
 
 
@@ -499,19 +564,19 @@ def _resolvable(name, defs, shadowed):
     )
 
 
-def _lift_tail(node, defs, shadowed, evidence, offset):
+def _lift_tail(node, defs, shadowed, evidence, offset, strict):
     """An argument spine of a macro's returned value, each element
     lifted as an expression. The spine's own pairs never mean
     quote, whatever their first bytes are."""
     if not is_pair(node):
         return node
     return (
-        _lift(node[0], defs, shadowed, evidence, offset),
-        _lift_tail(node[1], defs, shadowed, evidence, offset),
+        _lift(node[0], defs, shadowed, evidence, offset, strict),
+        _lift_tail(node[1], defs, shadowed, evidence, offset, strict),
     )
 
 
-def _expand(tree, defs, shadowed, depth, work):
+def _expand(tree, defs, shadowed, depth, work, strict=True):
     """The source tree with every macro call replaced by what the
     macro's program computes over the raw, unevaluated argument
     source. The returned value is read back as source and expanded
@@ -519,7 +584,9 @@ def _expand(tree, defs, shadowed, depth, work):
     other macros or splice its own name back in, terminating by
     consuming its argument list. Quoted content is data and is
     never entered. A qq template is entered only through its
-    unquote escapes."""
+    unquote escapes. strict selects the read-back rule: the
+    program world judges, the macro world defers, as _lift
+    states."""
     if not is_pair(tree):
         return tree
     head, tail = tree
@@ -527,16 +594,19 @@ def _expand(tree, defs, shadowed, depth, work):
         return tree
     if isinstance(head, Symbol):
         if head.name == _QQ:
-            return (head, _expand_template(tail, defs, shadowed, depth, work, 1))
+            return (
+                head,
+                _expand_template(tail, defs, shadowed, depth, work, strict, 1),
+            )
         if head.name in defs.macros and head.name not in shadowed:
-            return _expand_call(head, tail, defs, shadowed, depth, work)
+            return _expand_call(head, tail, defs, shadowed, depth, work, strict)
     return (
-        _expand(head, defs, shadowed, depth, work),
-        _expand_tail(tail, defs, shadowed, depth, work),
+        _expand(head, defs, shadowed, depth, work, strict),
+        _expand_tail(tail, defs, shadowed, depth, work, strict),
     )
 
 
-def _expand_tail(node, defs, shadowed, depth, work):
+def _expand_tail(node, defs, shadowed, depth, work, strict):
     """The argument spine of a form, each element expanded as an
     expression. The spine itself is never mistaken for a call, so
     a bare macro name sitting as an argument stays a name and gets
@@ -544,12 +614,12 @@ def _expand_tail(node, defs, shadowed, depth, work):
     if not is_pair(node):
         return node
     return (
-        _expand(node[0], defs, shadowed, depth, work),
-        _expand_tail(node[1], defs, shadowed, depth, work),
+        _expand(node[0], defs, shadowed, depth, work, strict),
+        _expand_tail(node[1], defs, shadowed, depth, work, strict),
     )
 
 
-def _expand_template(node, defs, shadowed, depth, work, level):
+def _expand_template(node, defs, shadowed, depth, work, strict, level):
     """A qq template with its level-one unquote escapes expanded.
     A nested qq deepens the level, an unquote raises it back, and
     both are walked as data otherwise, mirroring how the template
@@ -564,18 +634,21 @@ def _expand_template(node, defs, shadowed, depth, work, level):
         if head.name == _QQ:
             return (
                 head,
-                _expand_template(tail, defs, shadowed, depth, work, level + 1),
+                _expand_template(tail, defs, shadowed, depth, work, strict, level + 1),
             )
         if head.name == _UNQUOTE:
             if level == 1:
-                return (head, _expand_tail(tail, defs, shadowed, depth, work))
+                return (
+                    head,
+                    _expand_tail(tail, defs, shadowed, depth, work, strict),
+                )
             return (
                 head,
-                _expand_template(tail, defs, shadowed, depth, work, level - 1),
+                _expand_template(tail, defs, shadowed, depth, work, strict, level - 1),
             )
     return (
-        _expand_template(head, defs, shadowed, depth, work, level),
-        _expand_template(tail, defs, shadowed, depth, work, level),
+        _expand_template(head, defs, shadowed, depth, work, strict, level),
+        _expand_template(tail, defs, shadowed, depth, work, strict, level),
     )
 
 
@@ -594,7 +667,7 @@ def _check_arity(name, arguments, arity, offset):
         )
 
 
-def _expand_call(head, tail, defs, shadowed, depth, work):
+def _expand_call(head, tail, defs, shadowed, depth, work, strict):
     """One macro call replaced by its expansion."""
     name = head.name
     if depth == MACRO_DEPTH_LIMIT:
@@ -617,11 +690,12 @@ def _expand_call(head, tail, defs, shadowed, depth, work):
         raise CompileError(
             f"macro {name!r} failed: {exc.code}: {exc}", head.offset
         ) from None
-    # The names this expansion may produce: what the body spells,
-    # plus what the caller wrote in this call's arguments.
-    evidence = defs.macros[name][4] | _symbol_names(tail)
-    lifted = _lift(value, defs, shadowed, evidence, head.offset)
-    return _expand(lifted, defs, shadowed, depth + 1, work)
+    # The names this expansion may produce: the spellings the
+    # expanded body holds, plus what the caller wrote in this
+    # call's arguments, quoted argument content excluded.
+    evidence = defs.macros[name][4] | _written_names(tail)
+    lifted = _lift(value, defs, shadowed, evidence, head.offset, strict)
+    return _expand(lifted, defs, shadowed, depth + 1, work, strict)
 
 
 def _expanded_bodies(defs, body, work):

@@ -692,6 +692,16 @@ def test_macro_cannot_reach_def_bindings(shell, capsys):
     assert "unknown name 'val'" in capsys.readouterr().out
 
 
+def test_computed_def_spelling_is_data(shell, capsys):
+    # A computed atom coinciding with a def spelling is data: def
+    # names are not language names, nothing resolves, and the fold
+    # keeps its number. Only the written case above errors.
+    shell.onecmd("def n (q . 5)")
+    shell.onecmd("(defmacro add (n1 n2) (+ n1 n2))")
+    shell.onecmd("(add 50 60)")
+    assert capsys.readouterr().out.startswith("110\n")
+
+
 def test_undef_breaks_template_spliced_macros(shell, capsys):
     # inc2's template splices the spelling of inc back out, so
     # every inc2 call needs inc again, and after undef the stale

@@ -614,14 +614,86 @@ def test_stale_template_name_is_an_unknown_name():
     assert "unknown name 'gone'" in str(excinfo.value)
 
 
-def test_computed_operator_bytes_error_with_their_spelling():
-    # Bytes with no evidence stay data even when they spell a
-    # would-be name, and in head position the operator error spells
-    # them so the hex is traceable.
+def test_string_written_names_are_evidence():
+    # A string literal in the body is a spelling the macro wrote,
+    # so it lifts: resolving, it calls the function, and
+    # unresolving, it gets the resolver's unknown-name error.
+    defs = _defs(
+        "(defun dbl (v) (* v 2))",
+        "(defmacro m (v) (c 'dbl' (c v ())))",
+    )
+    program, _ = compile_expression("(m 7)", defs)
+    cost, result = run(program, NIL, BUDGET)
+    assert result == int_to_atom(14)
     defs = _defs("(defmacro bad () (c 'zzz' ()))")
     with pytest.raises(CompileError) as excinfo:
         compile_expression("(bad)", defs)
-    assert "unknown operator 0x7a7a7a, which spells 'zzz'" in str(excinfo.value)
+    assert "unknown name 'zzz'" in str(excinfo.value)
+
+
+def test_computed_operator_bytes_error_with_their_spelling():
+    # Bytes with no evidence stay data even when they spell a
+    # would-be name, and in head position the operator error spells
+    # them so the hex is traceable: 122 is the letter z.
+    defs = _defs("(defmacro bad () (c (+ 100 22) ()))")
+    with pytest.raises(CompileError) as excinfo:
+        compile_expression("(bad)", defs)
+    assert "unknown operator 0x7a, which spells 'z'" in str(excinfo.value)
+
+
+def test_macro_params_are_not_evidence():
+    # 28209 spells n1, the macro's own parameter. Parameters
+    # substitute at run time and never reach output as spellings,
+    # so the collision errors when a caller n1 is in scope and the
+    # fold stays data when nothing resolves, alpha-renaming safe.
+    with pytest.raises(CompileError) as excinfo:
+        compile_program("(program (n1) (defmacro add (n1 n2) (+ n1 n2)) (add 28209 0))")
+    assert "spells 'n1', a name the macro never wrote" in str(excinfo.value)
+    program, _ = compile_program(
+        "(program (m1) (defmacro add (n1 n2) (+ n1 n2)) (add 28000 209))"
+    )
+    assert disassemble(program) == "(q . 28209)"
+
+
+def test_macro_composition_carries_spellings():
+    # An earlier macro's template contributes spellings at
+    # declaration time, and the later macro's evidence is read off
+    # its expanded body, so composition that splices program-world
+    # names works and judgment waits for the call site.
+    program, _, result = _run_program(
+        "(program (X) (defconstant G 7) (defmacro getg () (qq G)) "
+        "(defmacro passg () (getg)) (+ X (passg)))",
+        "(35)",
+    )
+    assert disassemble(program) == "(+ 2 (q . 7))"
+    assert result == int_to_atom(42)
+
+
+def test_generated_template_keeps_deliberate_spellings():
+    # A macro that emits a qq template holding a bare name is
+    # generating code whose spelling is data either way, so the
+    # lifted name emits identically and nothing rejects it.
+    _, _, result = _run_program("(program (y) (defmacro gen () (qq (qq foo))) (gen))")
+    assert result == b"foo"
+
+
+def test_caller_handed_names_are_evidence_residue():
+    # The documented residue: handing a macro a name as an
+    # argument is evidence for that spelling anywhere in the
+    # expansion, so a computed collision with a handed-in spelling
+    # still captures, narrower than Chialisp but not gone.
+    program, _ = compile_program(
+        "(program (n) (defmacro add3 (p1 p2 p3) (+ p1 p2)) (add3 50 60 n))"
+    )
+    assert disassemble(program) == "2"
+
+
+def test_quoted_argument_content_is_not_evidence():
+    # (q . n) in an argument is data there as everywhere, so it
+    # cannot whitelist the spelling for computed output.
+    with pytest.raises(CompileError) as excinfo:
+        compile_program("(program (n) (defmacro payload (e) (r e)) (payload (q . n)))")
+    assert "spells 'n', a name the macro never wrote" in str(excinfo.value)
 
 
 def test_qq_levels_agree_between_expansion_and_emission():
