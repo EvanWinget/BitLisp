@@ -1,5 +1,6 @@
 """The one-shot command tests: bitlisp-asm, bitlisp-disasm,
-bitlisp-compile, the tree-hash flag, and the corpus pin."""
+bitlisp-compile, bitlisp-curry, bitlisp-uncurry, the tree-hash
+flag, and the corpus pin."""
 
 import io
 import json
@@ -282,6 +283,9 @@ def test_compile_console_script_resolves():
 PATHS_TEXT = "(+ 2 5)"
 PATHS_HEX = "ff10ff02ff0580"
 PATHS_HASH = "19c7b1ed29e8f501f6985cd6addd3b6e5bd7ccc251f1a4018550837b3006239b"
+CURRIED_HEX = "ff02ffff01ff10ff02ff0580ffff04ffff010aff018080"
+CURRIED_TEXT = "(a (q 16 2 5) (c (q . 10) 1))"
+CURRIED_HASH = "8227d2eef6f1cdb6d949e075e8c185d1316af6a65d9241ba473a0e8fc72aa880"
 
 
 def test_asm_tree_hash_replaces_the_hex(capsys):
@@ -307,6 +311,101 @@ def test_compile_tree_hash_still_writes_symbols(tmp_path, capsys):
     assert cli.compile_main([DOUBLE_SOURCE, "-H", "--symbols", str(sym_path)]) == 0
     capsys.readouterr()
     assert json.loads(sym_path.read_text())["schema"] == "bitlisp-sym-v0"
+
+
+# bitlisp-curry and bitlisp-uncurry.
+
+
+def test_curry_literal(capsys):
+    assert cli.curry_main([PATHS_HEX, "-a", "10"]) == 0
+    assert capsys.readouterr().out == CURRIED_HEX + "\n"
+
+
+def test_curry_output_disassembles(capsys):
+    assert cli.disasm_main([CURRIED_HEX]) == 0
+    assert capsys.readouterr().out == CURRIED_TEXT + "\n"
+
+
+def test_curry_stdin(capsys, monkeypatch):
+    monkeypatch.setattr(sys, "stdin", io.StringIO(PATHS_HEX + "\n"))
+    assert cli.curry_main(["-a", "10"]) == 0
+    assert capsys.readouterr().out == CURRIED_HEX + "\n"
+
+
+def test_curry_file(tmp_path, capsys):
+    path = tmp_path / "add.hex"
+    path.write_text(PATHS_HEX + "\n")
+    assert cli.curry_main([str(path), "-a", "10"]) == 0
+    assert capsys.readouterr().out == CURRIED_HEX + "\n"
+
+
+def test_curry_tree_hash(capsys):
+    assert cli.curry_main([PATHS_HEX, "-a", "10", "-H"]) == 0
+    assert capsys.readouterr().out == CURRIED_HASH + "\n"
+
+
+def test_curry_zero_values(capsys):
+    assert cli.curry_main([PATHS_HEX]) == 0
+    hex_line = capsys.readouterr().out.strip()
+    assert cli.disasm_main([hex_line]) == 0
+    assert capsys.readouterr().out == "(a (q 16 2 5) 1)\n"
+
+
+def test_curry_values_fix_in_order(capsys):
+    assert cli.curry_main([PATHS_HEX, "-a", "10", "-a", "0xdead"]) == 0
+    hex_line = capsys.readouterr().out.strip()
+    assert cli.uncurry_main([hex_line]) == 0
+    assert capsys.readouterr().out == PATHS_HEX + "\n10\n-8531\n"
+
+
+def test_uncurry_literal(capsys):
+    assert cli.uncurry_main([CURRIED_HEX]) == 0
+    assert capsys.readouterr().out == PATHS_HEX + "\n10\n"
+
+
+def test_uncurry_stdin(capsys, monkeypatch):
+    monkeypatch.setattr(sys, "stdin", io.StringIO(CURRIED_HEX + "\n"))
+    assert cli.uncurry_main([]) == 0
+    assert capsys.readouterr().out == PATHS_HEX + "\n10\n"
+
+
+def test_uncurry_zero_value_curry_prints_only_the_program(capsys):
+    assert cli.curry_main([PATHS_HEX]) == 0
+    hex_line = capsys.readouterr().out.strip()
+    assert cli.uncurry_main([hex_line]) == 0
+    assert capsys.readouterr().out == PATHS_HEX + "\n"
+
+
+def test_uncurry_not_curried_exit_two(capsys):
+    assert cli.uncurry_main([PATHS_HEX]) == 2
+    assert capsys.readouterr().err == "error: not a curried program\n"
+
+
+def test_uncurry_non_hex_exit_two(capsys):
+    assert cli.uncurry_main(["zz"]) == 2
+    assert capsys.readouterr().err.startswith("error: ")
+
+
+def test_curry_non_hex_exit_two(capsys):
+    assert cli.curry_main(["zz", "-a", "10"]) == 2
+    assert capsys.readouterr().err.startswith("error: ")
+
+
+def test_curry_unparseable_value_exit_two(capsys):
+    assert cli.curry_main([PATHS_HEX, "-a", "(+ 1"]) == 2
+    assert capsys.readouterr().err.startswith("error: ")
+
+
+def test_curry_unknown_symbol_value_exit_two(capsys):
+    assert cli.curry_main([PATHS_HEX, "-a", "(secret)"]) == 2
+    assert "unknown symbol" in capsys.readouterr().err
+
+
+def test_curry_console_scripts_resolve():
+    (entry,) = metadata.entry_points(group="console_scripts", name="bitlisp-curry")
+    assert entry.load() is cli.curry_main
+    (entry,) = metadata.entry_points(group="console_scripts", name="bitlisp-uncurry")
+    assert entry.load() is cli.uncurry_main
 
 
 def test_asm_pipe_closed_before_write_keeps_exit_zero():

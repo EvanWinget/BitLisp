@@ -1,12 +1,14 @@
 """The one-shot command surface: bitlisp-run, bitlisp-asm,
-bitlisp-disasm, bitlisp-compile.
+bitlisp-disasm, bitlisp-compile, bitlisp-curry, bitlisp-uncurry.
 
 Each command is a thin main over the tools library. bitlisp-run runs
 one spend and reports the verdict. bitlisp-asm assembles a text
 s-expression to serialized bytecode hex. bitlisp-disasm renders
 serialized hex back as text. bitlisp-compile compiles a source
-program to serialized bytecode hex. The converters take -H to print
-the program's tree hash instead of their usual output.
+program to serialized bytecode hex. bitlisp-curry fixes argument
+values into a program and bitlisp-uncurry splits them back out. The
+converters and bitlisp-curry take -H to print the program's tree
+hash instead of their usual output.
 """
 
 import argparse
@@ -18,6 +20,7 @@ import sys
 from bitlisp import BitLispError, deserialize, serialize
 
 from .compiler import CompileError, compile_program, symbols_to_json, tree_hash
+from .curry import curry, uncurry
 from .printer import disassemble
 from .reader import ParseError, assemble
 from .runner import (
@@ -135,6 +138,53 @@ Usage:
     bitlisp-compile puzzle.bl --symbols puzzle.sym
     bitlisp-compile puzzle.bl | bitlisp-disasm
     bitlisp-compile -H puzzle.bl
+"""
+
+
+_CURRY_DOC = """Fix argument values into a program, making a new program.
+
+The program is serialized bytecode hex, naming a file when one
+exists at that path and reading as literal hex otherwise. With no
+program argument the hex is read from stdin, so the command
+composes with bitlisp-asm and bitlisp-compile in a pipeline. Each
+--arg is a text s-expression value, fixed in the order given.
+Prints the curried program as one line of lowercase hex.
+
+The curried program applies the original with the fixed values
+placed ahead of the environment, so a program taking (A B C)
+curried with one value becomes a program taking (B C). With no
+--arg the wrapper is still built, a curry of zero values.
+
+With -H the output is the curried program's tree hash instead of
+its hex, the identity an output would commit to.
+
+Exit status 0 on success, 2 when the hex does not decode, a value
+does not parse, or the file does not open.
+
+Usage:
+    bitlisp-curry ff10ff02ff0580 --arg 10
+    bitlisp-curry puzzle.hex --arg 0x0014ab --arg 600
+    bitlisp-compile puzzle.bl | bitlisp-curry -a 600 -H
+"""
+
+
+_UNCURRY_DOC = """Split a curried program back into program and values.
+
+The argument is serialized bytecode hex, naming a file when one
+exists at that path and reading as literal hex otherwise, or stdin
+when omitted. Prints the inner program's hex on the first line,
+then one fixed value per line as text, in currying order. A curry
+of zero values prints only the program line.
+
+The shape check is strict: input that decodes but is not exactly
+the curried shape is an error, never a partial answer.
+
+Exit status 0 on success, 2 when the hex does not decode, the tree
+is not a curried program, or the file does not open.
+
+Usage:
+    bitlisp-uncurry ff02ffff01ff10ff02ff0580ffff04ffff010aff018080
+    bitlisp-compile puzzle.bl | bitlisp-curry -a 600 | bitlisp-uncurry
 """
 
 
@@ -346,6 +396,81 @@ def compile_main(argv=None):
         return 2
     with _pipe_shield():
         print(line)
+    return 0
+
+
+def curry_main(argv=None):
+    parser = argparse.ArgumentParser(
+        prog="bitlisp-curry",
+        description=_CURRY_DOC,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "program",
+        nargs="?",
+        help="file path, or the literal hex (default stdin)",
+    )
+    parser.add_argument(
+        "-a",
+        "--arg",
+        action="append",
+        default=[],
+        metavar="SEXPR",
+        help="a text s-expression value to fix, repeatable, in order",
+    )
+    _tree_hash_flag(parser, "the hex")
+    args = parser.parse_args(argv)
+    try:
+        if args.program is None:
+            text = sys.stdin.read()
+        else:
+            text = _path_or_code(args.program)
+        program = deserialize(bytes.fromhex(text.strip()))
+        curried = curry(program, [assemble(value) for value in args.arg])
+        line = tree_hash(curried).hex() if args.tree_hash else serialize(curried).hex()
+    except BitLispError as exc:
+        print(f"error: {exc.code}: {exc}", file=sys.stderr)
+        return 2
+    except (ParseError, OSError, ValueError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    with _pipe_shield():
+        print(line)
+    return 0
+
+
+def uncurry_main(argv=None):
+    parser = argparse.ArgumentParser(
+        prog="bitlisp-uncurry",
+        description=_UNCURRY_DOC,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "bytecode",
+        nargs="?",
+        help="file path, or the literal hex (default stdin)",
+    )
+    args = parser.parse_args(argv)
+    try:
+        if args.bytecode is None:
+            text = sys.stdin.read()
+        else:
+            text = _path_or_code(args.bytecode)
+        program, values = uncurry(deserialize(bytes.fromhex(text.strip())))
+        if values is None:
+            print("error: not a curried program", file=sys.stderr)
+            return 2
+        lines = [serialize(program).hex()]
+        lines.extend(disassemble(value) for value in values)
+    except BitLispError as exc:
+        print(f"error: {exc.code}: {exc}", file=sys.stderr)
+        return 2
+    except (OSError, ValueError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    with _pipe_shield():
+        for line in lines:
+            print(line)
     return 0
 
 
