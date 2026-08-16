@@ -99,6 +99,22 @@ The other side of the same coin: an unquoted argument is spliced
 as source, so a template that unquotes the same parameter twice
 evaluates that argument twice at run time, cost included.
 
+The rule also shapes the error a stale name gets. A name that
+resolved when the macro was written but resolves no longer, a
+function removed in the REPL, a spelling typoed in a template,
+comes back as data, and in operator position it is rejected as
+`unknown operator 0x...`, with the spelling named in the error
+when the bytes read as one. The compiler cannot tell a stale name
+from intended data, so the rejection happens at the use, not the
+macro.
+
+At the REPL, `def` bindings are the one vocabulary macros cannot
+touch: an expansion that emits a def-bound name is rejected as an
+unknown name, because reading it as the binding would make the
+raw path and the macro path disagree about one spelling, and
+passing it through as data would compile a wrong program
+silently.
+
 ## The splicing idiom
 
 A variadic macro that rebuilds the built-in `list` form, verbatim
@@ -119,7 +135,7 @@ the recursion terminates, and the result compiles to exactly what
 
 ## Limits
 
-Two guards bound compile time, both deliberate departures from
+Three guards bound compile time, all deliberate departures from
 Chialisp, which lets a runaway macro run until the interpreter
 dies:
 
@@ -128,6 +144,11 @@ dies:
   self-splicing macro spends one level per argument plus one for
   the final empty round, so the cap bounds such calls at 99
   arguments.
+- Total expansions. One compile may run at most 10000 macro
+  executions across all its bodies, rejected past that with
+  `macro expansion exceeded 10000 executions`. Depth alone would
+  not do: a template that splices two calls to itself doubles the
+  work per level while every chain stays shallow.
 - Execution cost. Each macro execution runs under the same
   11000000000 budget a spend gets, and a burst is rejected with
   `macro '<name>' failed: cost_exceeded` naming the macro.

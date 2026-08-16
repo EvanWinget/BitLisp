@@ -87,12 +87,21 @@ not rewrite what an earlier definition captured.
 A line whose head is `defun`, `defconstant`, or `defmacro` is a
 language declaration, `language.md` syntax exactly, and adds to
 the session's compiler definitions. A macro's body compiles on its
-own line, so its errors print there, and a macro already compiled
-into a later macro stays compiled if its name is removed.
-Declarations and `def` bindings share one namespace with the
-reserved words and the condition constants, so one spelling can
-never mean two things, and `undef` removes a name from whichever
-space holds it.
+own line, so its errors print there. Declarations and `def`
+bindings share one namespace with the reserved words and the
+condition constants, so one spelling can never mean two things,
+and `undef` removes a name from whichever space holds it.
+
+Removing a macro changes what later lines mean. A macro whose
+template spliced the removed name back out looks it up again at
+every call, so those calls now fail, while a direct call, already
+run when the later macro declared, stays baked into that macro's
+program.
+
+A `def` binding is raw-reader vocabulary and no macro can emit
+one: an expansion whose output spells a def-bound name is rejected
+as an unknown name, never read as the binding and never passed
+through as data.
 
 The shared namespace narrows `def` from its original surface, a
 deliberate change with the compiler landing: a reserved word or a
