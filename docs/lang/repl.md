@@ -181,13 +181,13 @@ bitlisp> exit
 ## The converter commands
 
 ```
-bitlisp-asm  [<file-or-literal>]     text to serialized hex
-bitlisp-disasm [<file-or-literal>]   serialized hex to text
-bitlisp-compile [<file-or-literal>] [--symbols <path>]
-                                     language source to serialized hex
-bitlisp-curry [-a <sexpr>]... [<file-or-literal>]
-                                     fix values into a program
-bitlisp-uncurry [<file-or-literal>]  split a curried program back
+bitlisp-asm [-H] [<file-or-literal>]      text to serialized hex
+bitlisp-disasm [-H] [<file-or-literal>]   serialized hex to text
+bitlisp-compile [--symbols <path>] [-H] [<file-or-literal>]
+                                          language source to serialized hex
+bitlisp-curry [-a <sexpr>]... [-H] [<file-or-literal>]
+                                          fix values into a program
+bitlisp-uncurry [<file-or-literal>]       split a curried program back
 ```
 
 All five take one argument, a file when one exists at that path

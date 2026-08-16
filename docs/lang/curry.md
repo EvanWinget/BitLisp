@@ -61,6 +61,23 @@ An atom, a different head, an extra operand, an unquoted operand,
 an improper tail, or a chain ending anywhere but `1` is not a
 curried program, never a partial answer.
 
+The strict contract is BitLisp's own. It matches the documented
+clvm_rs Python uncurry, but not Chia's deployed wheel, whose
+uncurry never checks the chain terminator and raises on some
+malformed quote nodes, so a tree that wheel reports as curried can
+be rejected here. The curry direction is the byte-identical shared
+artifact. The uncurry direction is deliberately stricter, in line
+with preferring to reject valid-looking input, and a test pins the
+divergence against the wheel.
+
+One structural collision is worth knowing. A compiled program that
+declares functions has exactly this shape, the main expression
+applied over the quoted function tree, so uncurry reports it as a
+curry of one value, and that value is the function tree. Uncurry
+proves shape, not history: it cannot tell a program somebody
+curried from a program that merely compiles to the same tree, and
+a zero exit status is never evidence that currying happened.
+
 ## Tree hash as identity
 
 The tree hash is the `sha256tree` digest of a program tree: an
