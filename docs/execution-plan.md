@@ -5,8 +5,7 @@
 Companion to `bitcoin-script-successor-evaluation.md`. This file is
 the skeleton: phases, units, status, done-criteria, and dated
 one-line decisions. Rationale lives in the record docs, PR
-descriptions, and commit messages (trimmed to this shape
-2026-08-15, decision by Evan).*
+descriptions, and commit messages*
 
 ---
 
