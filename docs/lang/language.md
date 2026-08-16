@@ -253,14 +253,15 @@ nothing forces a change. The deliberate differences:
   where Chialisp expands until the interpreter dies. A macro name
   used as a value is an error in ordinary code, as a function
   name is.
-- Macro read-back requires provenance. Chialisp reads any
-  resolving output atom as a name, which captures when computed
-  bytes spell an in-scope name and compiles caller typos as data.
-  BitLisp lifts a name only with evidence it was written, the
-  expanded body spells it or the caller wrote it in the
-  arguments, so typos error and capture narrows to spellings the
-  macro was handed or writes itself. The exact rule and the
-  honest residue are `macros.md`.
+- Macro read-back catches written typos. Chialisp reads an
+  unresolving output atom back as data, so a misspelled macro
+  argument or a stale template name silently compiles. BitLisp
+  additionally lifts names that were demonstrably written, the
+  macro's body spells them or the caller wrote them, so those
+  fail as unknown names at the call site. Capture of computed
+  bytes that spell an in-scope name is kept as Chialisp has it,
+  a documented sharp edge in `macros.md`, because post-reader
+  bytes carry no provenance to build a sound guard on.
 - There is no `function` or `com` reflection form. Macro output
   cannot carry names into quoted data, so a user macro cannot
   introduce laziness, and lazy branching exists only through the

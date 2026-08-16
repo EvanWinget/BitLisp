@@ -71,93 +71,63 @@ may contain further macro calls, which expand the same way, so a
 macro can build on other macros or splice its own name back in.
 
 Reading bytes back as source means deciding which atoms are
-names. Two questions are asked of every atom that spells a name
-the reader would accept. Does the name resolve where the call
-sits: a parameter of the surrounding body, a function, a
-constant, a macro, a condition constant, or an expression form?
-And is there evidence it was written rather than computed? The
-answers decide everything:
+names. An atom that spells a name the reader would accept becomes
+a name in two cases. It resolves where the call sits: a parameter
+of the surrounding body, a function, a constant, a macro, a
+condition constant, or an expression form. That is the classic
+Chialisp rule, and it is what makes every ordinary template work.
+Or it is a name that was demonstrably written: the macro's own
+body spells it, or the caller spelled it in this call's
+arguments, the macro's parameters excepted since those substitute
+at expansion time. A written name that resolves nowhere then
+fails as the unknown name it is, exactly as the direct spelling
+would. This second case is the recorded divergence from Chialisp,
+which reads such an atom back as data and silently compiles the
+typo: here a misspelled argument, a stale template name, or a
+removed definition is an error at the call site, never a wrong
+program.
 
-```
-                       resolves here          resolves nowhere
-                    +---------------------+---------------------+
-   written          |  a name             |  error:             |
-                    |                     |  unknown name       |
-                    +---------------------+---------------------+
-   computed         |  error: spells a    |  data               |
-                    |  name never written |                     |
-                    +---------------------+---------------------+
-```
-
-Written means the spelling is in the macro's evidence, which has
-exactly two sources. First, everything the macro's own expanded
-body spells: template names, string literals, and whatever
-earlier macros contributed at its declaration, but not its
-parameters, which substitute at expansion time and never reach
-the output as spellings. Second, every name the caller wrote in
-this call's arguments, quoted argument content excluded, which is
-what lets a spliced argument come back as the name the caller
-meant.
-
-A written, resolving spelling is a name, which is every ordinary
-template and every spliced argument. A written spelling that
-resolves nowhere is the same unknown-name error the direct
-spelling gets, so a typo in a call or a stale name in a template
-is caught, not compiled as data. A computed atom whose bytes
-happen to spell something in scope is rejected outright, the
-capture guard below. Everything else is data. A pair whose head
-is the quote opcode passes through whole, its content data, so a
-macro that must emit name-shaped bytes as data wraps them in
-`(q . ...)`.
+Every other atom stays data, and a pair whose head is the quote
+opcode passes through whole, its content data, so a macro that
+must emit name-shaped bytes as data wraps them in `(q . ...)`.
 
 One refinement keeps macro composition working. Inside another
-macro's body, at declaration time, an expansion is not judged by
-this table: a spelling that resolves in the macro world lifts,
-and everything else stays data and rides the compiled body
-outward, because its real judgment happens where a program
-finally uses it.
+macro's body, at declaration time, nothing errs: a spelling that
+resolves in the macro world lifts, and everything else stays data
+and rides the compiled body outward, because its real judgment
+happens where a program finally uses it.
 
-## The capture guard
+## Capture, the Chialisp sharp edge
 
-Classic Chialisp reads back any resolving atom as a name, and
-that captures. The number 110 and the letter `n` are the same
-byte, so under Chialisp
+The resolution rule is positional and textual, exactly as in
+Chialisp, and it can capture. The number 110 and the letter `n`
+are the same byte, so
 
 ```
 (program (n) (defmacro add (n1 n2) (+ n1 n2)) (add 50 60))
 ```
 
-compiles not to a constant but to a reference to the parameter
-`n`, silently. BitLisp rejects it instead, a recorded divergence:
-the macro computed 110, never wrote an `n`, and the collision is
-reported as `macro output 0x6e spells 'n', a name the macro never
-wrote`. The same fold with no `n` in scope stays the constant
-`(q . 110)`, so constant folding works until the day it would
-misbind, and that day is an error, not a wrong program.
+compiles not to `(q . 110)` but to a reference to the parameter
+`n`. The macro computed 110, the read-back found an `n` in scope,
+and the program now returns whatever its argument is. Nothing
+warns, and nothing can: once the reader is done, a computed
+number, a string, and a spelled name are the same bytes, so no
+compile-time rule can tell them apart, only quoting can. Keep
+macro output away from name-shaped bytes unless naming things is
+the intent, and quote data that must stay data: a `(q . ...)`
+wrapper survives read-back untouched.
 
-The guard is evidence-based, not value-based, so it has a stated
-residue with two faces. A computed atom whose bytes spell a name
-the body also legitimately writes is indistinguishable from the
-written one and still lifts. And handing a macro a name as an
-argument is evidence for that spelling anywhere in the expansion,
-so a computed collision with a handed-in name also still lifts:
-`(add3 50 60 n)` under a two-argument fold captures the caller's
-`n` exactly as Chialisp would, because the caller put `n` on the
-table. The guard therefore narrows capture to spellings the
-macro was given or writes itself, it does not abolish it. Quote
-data that must stay data and neither face arises.
-
-Macros remain positionally unhygienic in Chialisp's sense: an
+Macros are also positionally unhygienic in Chialisp's sense: an
 unquoted argument is spliced as source, so a template that
 unquotes the same parameter twice evaluates that argument twice
 at run time, cost included, and a template may deliberately name
 whatever is in scope at the call site.
 
-At the REPL, `def` bindings fall out of the same rule: they are
-not language names, so a caller-written def name through a macro
-is evidence that resolves nowhere, rejected as an unknown name
-rather than silently read as data while the raw path reads the
-binding.
+At the REPL, `def` bindings fall out of the written-name rule:
+they are not language names, so a def-bound name written into a
+macro call is rejected as an unknown name, never read as the
+binding, and a computed atom that merely coincides with a def
+spelling is data like any other computed bytes.
 
 ## The splicing idiom
 
