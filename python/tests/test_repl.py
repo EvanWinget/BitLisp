@@ -121,8 +121,10 @@ def test_undef(shell, capsys):
     assert capsys.readouterr().out == ""
     shell.onecmd("undef fee")
     assert "is not defined" in capsys.readouterr().out
+    # The unbound name now falls through to the compiler, where a
+    # quoted 'fee' is data that cannot hold names.
     shell.onecmd("eval (q . fee)")
-    assert "unknown symbol 'fee'" in capsys.readouterr().out
+    assert "'fee' in quoted content" in capsys.readouterr().out
 
 
 def test_asm_uses_definitions(shell, capsys):
@@ -543,3 +545,161 @@ def test_piped_non_utf8_exits_two():
     assert completed.returncode == 2
     assert completed.stderr.startswith(b"error: input is not valid UTF-8")
     assert b"Traceback" not in completed.stderr
+
+
+# The language surface: declarations, the compile fallback, and the
+# symbol table in the debugger.
+
+
+def test_defun_line_and_call(shell, capsys):
+    shell.onecmd("(defun double (N) (* 2 N))")
+    assert capsys.readouterr().out == ""
+    shell.onecmd("(double 21)")
+    out = capsys.readouterr().out
+    assert out.startswith("42\n")
+
+
+def test_raw_meaning_is_unchanged(shell, capsys):
+    # Numbers in raw VM text are environment paths, and a line that
+    # parses raw never reaches the compiler, definitions or not.
+    shell.onecmd("(defun double (N) (* 2 N))")
+    shell.onecmd("eval (f 1) (7 . 8)")
+    assert capsys.readouterr().out.startswith("7\n")
+    shell.onecmd("eval (+ 1 2)")
+    assert "invalid: path_into_atom" in capsys.readouterr().out
+
+
+def test_defconstant_line_inlines(shell, capsys):
+    shell.onecmd("(defconstant FEE 500)")
+    shell.onecmd("eval (- 1000 FEE)")
+    assert capsys.readouterr().out.startswith("500\n")
+
+
+def test_program_form_runs_with_solution(shell, capsys):
+    shell.onecmd("eval (program (X Y) (+ X Y)) (2 3)")
+    assert capsys.readouterr().out.startswith("5\n")
+
+
+def test_solution_never_compiles(shell, capsys):
+    shell.onecmd("(defconstant FEE 500)")
+    shell.onecmd("eval (program (X) X) (FEE)")
+    out = capsys.readouterr().out
+    assert out.startswith("error: ")
+    assert "'FEE' in the solution" in out
+
+
+def test_conditions_and_list_at_the_prompt(shell, capsys):
+    shell.onecmd(f"(list (list CREATE_OUTPUT 0x{SPK_P2WPKH} 600))")
+    out = capsys.readouterr().out
+    assert out.splitlines()[0] == f"((q 0x{SPK_P2WPKH} 600))"
+
+
+def test_declaration_errors_print(shell, capsys):
+    # An operator name resolves before the compiler sees it, so it
+    # can never name a function.
+    shell.onecmd("(defun q (N) N)")
+    assert "name must be a bare name" in capsys.readouterr().out
+    shell.onecmd("(defun dup (N N) N)")
+    assert "duplicate parameter" in capsys.readouterr().out
+    shell.onecmd("(defconstant CREATE_OUTPUT 9)")
+    assert "condition constant" in capsys.readouterr().out
+    shell.onecmd("(defun keep (N) N)")
+    shell.onecmd("(defun keep (N) N)")
+    assert "already defined" in capsys.readouterr().out
+
+
+def test_def_and_defun_share_one_namespace(shell, capsys):
+    shell.onecmd("def fee 500")
+    shell.onecmd("(defconstant fee 400)")
+    assert "'fee' is already defined" in capsys.readouterr().out
+    shell.onecmd("(defun pay (N) N)")
+    shell.onecmd("def pay (q . 1)")
+    assert "'pay' is already defined" in capsys.readouterr().out
+    shell.onecmd("def SEAL (q . 1)")
+    assert "reserved by the language" in capsys.readouterr().out
+    shell.onecmd("def list (q . 1)")
+    assert "reserved by the language" in capsys.readouterr().out
+
+
+def test_undef_removes_declarations(shell, capsys):
+    shell.onecmd("(defun keep (N) N)")
+    shell.onecmd("undef keep")
+    shell.onecmd("(keep 1)")
+    assert "unknown name 'keep'" in capsys.readouterr().out
+
+
+def test_defs_lists_all_three_kinds(shell, capsys):
+    shell.onecmd("def raw (q . 1)")
+    shell.onecmd("(defconstant FEE 500)")
+    shell.onecmd("(defun double (N) (* 2 N))")
+    shell.onecmd("defs")
+    assert capsys.readouterr().out == (
+        "raw = (q . 1)\n(defconstant FEE 500)\n(defun double (N) (* 2 N))\n"
+    )
+
+
+def test_compile_command_shows_canonical_text(shell, capsys):
+    shell.onecmd("(defun double (N) (* 2 N))")
+    shell.onecmd("compile (double 3)")
+    assert capsys.readouterr().out == (
+        "(a (q 2 2 (c 2 (c (q . 3) ()))) (c (q 18 (q . 2) 5) 1))\n"
+    )
+
+
+def test_debugger_names_compiled_functions(shell, capsys):
+    shell.onecmd("(defun fact (N) (if (= N 1) 1 (* N (fact (- N 1)))))")
+    shell.onecmd("debug (fact 3)")
+    capsys.readouterr()
+    seen = ""
+    while shell.session is not None:
+        shell.onecmd("step")
+        out = capsys.readouterr().out
+        if "eval fact [N=3]" in out:
+            seen = out
+            break
+    assert "eval fact [N=3]" in seen
+    shell.onecmd("abort")
+    capsys.readouterr()
+
+
+def test_sym_load_names_foreign_bytecode(shell, tmp_path, capsys):
+    import json as _json
+
+    from bitlisp_tools.compiler import compile_program, symbols_to_json
+
+    source = "(program (X) (defun double (N) (* 2 N)) (double X))"
+    _, table = compile_program(source)
+    path = tmp_path / "double.sym"
+    path.write_text(_json.dumps(symbols_to_json(table)))
+    shell.onecmd(f"sym {path}")
+    assert "1 function name(s) loaded" in capsys.readouterr().out
+    shell.onecmd("debug (program (X) (defun double (N) (* 2 N)) (double X)) (21)")
+    out = capsys.readouterr().out
+    assert "(q . double)" in out
+    shell.onecmd("abort")
+    capsys.readouterr()
+
+
+def test_sym_rejects_bad_file(shell, tmp_path, capsys):
+    path = tmp_path / "bad.sym"
+    path.write_text('{"schema": "wrong"}')
+    shell.onecmd(f"sym {path}")
+    assert capsys.readouterr().out.startswith("error: ")
+
+
+def test_source_file_with_declarations(shell, tmp_path, capsys):
+    path = tmp_path / "defs.bl"
+    path.write_text(
+        "(defconstant FEE 500)\n(defun charge (AMT) (- AMT FEE))\n(charge 1200)\n"
+    )
+    shell.onecmd(f"source {path}")
+    assert capsys.readouterr().out.startswith("700\n")
+
+
+def test_spend_accepts_compiled_program(shell, ctx_file, capsys):
+    shell.onecmd(f"tx {ctx_file}")
+    capsys.readouterr()
+    shell.onecmd(f"spend (program () (list (list CREATE_OUTPUT 0x{SPK_P2WPKH} 600)))")
+    out = capsys.readouterr().out
+    assert "CREATE_OUTPUT" in out
+    assert "valid: 1 condition(s)" in out

@@ -13,10 +13,14 @@ Transaction context:
     input <n>                      select the input being spent
     maxcost [<n>]                  show or set the cost budget
 
-Definitions, constants only until the compiler unit:
+Definitions:
+    (defun <name> <params> <body>)   define a named function
+    (defconstant <name> <value>)     define a constant
     def <name> <sexpr>             bind a name to a parsed node
-    undef <name>                   remove a binding
-    defs                           list the bindings
+    undef <name>                   remove a definition or binding
+    defs                           list definitions and bindings
+    compile <expr>                 show an expression's compiled tree
+    sym <path>                     load a bitlisp-compile symbol file
 
 Debugger:
     debug <program> [<solution>]   open a stepping session
@@ -36,6 +40,13 @@ Session:
 Lines starting with ; are comments. Definitions substitute only
 where a bare symbol would otherwise be unknown, so a binding can
 never change the meaning of text that already parses.
+
+The same rule shapes the compiler surface: eval, spend, and debug
+read their text as raw VM syntax first, and only text the reader
+rejects on an unknown name retries as language source against the
+session's defun and defconstant definitions, the condition
+constants included. A program's solution is always data and never
+compiles.
 """
 
 import argparse
@@ -47,11 +58,33 @@ import re
 import sys
 
 from bitlisp import BitLispError, deserialize, run, serialize
-from bitlisp.sexp import NIL
+from bitlisp.sexp import NIL, is_pair
 
+from .compiler import (
+    CONDITION_CONSTANTS,
+    RESERVED_WORDS,
+    CompileError,
+    Definitions,
+    bind_values,
+    compile_expression,
+    declaration_keyword,
+    first_symbol,
+    load_symbols,
+    parse_source,
+    parse_source_many,
+    source_text,
+    tree_hash,
+)
 from .keywords import ATOM_TO_NAME
 from .printer import disassemble
-from .reader import ParseError, assemble, assemble_many, definable
+from .reader import (
+    ParseError,
+    UnknownSymbol,
+    assemble,
+    assemble_many,
+    definable,
+    tokenize,
+)
 from .runner import (
     DEFAULT_MAX_COST,
     ContextError,
@@ -64,6 +97,22 @@ from .stepper import APPLY_OP, EVAL, DebugMachine
 _HISTORY_LENGTH = 2000
 
 _NAME_SPLIT = re.compile(r"[ \t\r\n]+")
+
+
+# A ( line is a declaration exactly when its head token is a
+# definition keyword, decided on the reader's own tokens so no
+# whitespace or comment spelling can split the dispatch from what
+# the parse will see.
+def _declaration_line(stripped):
+    try:
+        tokens = tokenize(stripped)
+    except ParseError:
+        return False
+    return (
+        len(tokens) >= 2
+        and tokens[0][0] == "("
+        and tokens[1][0] in ("defun", "defconstant")
+    )
 
 
 def _survives(method):
@@ -80,7 +129,14 @@ def _survives(method):
             return method(self, arg)
         except BitLispError as exc:
             print(f"invalid: {exc.code}: {exc}")
-        except (ContextError, ParseError, OSError, RecursionError, ValueError) as exc:
+        except (
+            CompileError,
+            ContextError,
+            ParseError,
+            OSError,
+            RecursionError,
+            ValueError,
+        ) as exc:
             print(f"error: {exc}")
         except KeyboardInterrupt:
             # An interrupt cancels the command. A stepping command
@@ -101,6 +157,8 @@ class BitLispShell(cmd.Cmd):
     def __init__(self):
         super().__init__()
         self.names = {}
+        self.defs = Definitions()
+        self.symbols = {}
         self.context = None
         self.context_path = None
         self.input_index = 0
@@ -120,23 +178,68 @@ class BitLispShell(cmd.Cmd):
         if stripped.startswith(";"):
             return None
         if stripped.startswith("("):
+            if _declaration_line(stripped):
+                return self._declare(stripped)
             return self.do_eval(stripped)
         word = stripped.split()[0]
         print(f"error: unknown command {word!r}, type help for the list")
         return None
 
     def _programs(self, arg, what):
-        """The program and optional solution one argument line holds."""
-        nodes = assemble_many(arg, self.names)
+        """The program and optional solution one argument line holds.
+
+        Raw VM text first, its meaning unchanged forever. Only text
+        the reader rejects on an unknown name retries as language
+        source, so no line that ran before the compiler existed can
+        change meaning, and which reading applied is determined by
+        the text alone.
+        """
+        try:
+            nodes = assemble_many(arg, self.names)
+        except UnknownSymbol:
+            return self._compiled_programs(arg, what)
         if len(nodes) not in (1, 2):
             raise ValueError(f"{what} takes a program and an optional solution")
         return nodes[0], nodes[1] if len(nodes) == 2 else NIL
 
+    def _compiled_programs(self, arg, what):
+        trees = parse_source_many(arg)
+        if len(trees) not in (1, 2):
+            raise ValueError(f"{what} takes a program and an optional solution")
+        solution = NIL
+        if len(trees) == 2:
+            symbol = first_symbol(trees[1])
+            if symbol is not None:
+                raise CompileError(
+                    f"{symbol.name!r} in the solution, "
+                    "which is data and cannot hold names",
+                    symbol.offset,
+                )
+            solution = trees[1]
+        program, table = compile_expression(trees[0], self.defs)
+        self._register_symbols(table)
+        return program, solution
+
+    def _register_symbols(self, table):
+        for key, entry in table["functions"].items():
+            self.symbols[key] = entry
+
     def _node_text(self, node):
         # The one rendering seam: every node the shell displays
-        # passes through here, so a compiler symbol table can later
-        # rename nodes in one place.
+        # passes through here. The debugger branches off through
+        # _debug_text, where the symbol table renames compiled
+        # function bodies. Everything else prints canonical text, so
+        # results, definitions, and disasm output stay assemblable.
         return disassemble(node)
+
+    def _debug_text(self, node):
+        if not self.symbols:
+            return self._node_text(node)
+        return disassemble(node, rename=self._symbol_name)
+
+    def _symbol_name(self, node):
+        entry = self.symbols.get(tree_hash(node).hex())
+        return entry[0] if entry is not None else None
 
     # Evaluation.
 
@@ -238,6 +341,19 @@ class BitLispShell(cmd.Cmd):
     # Definitions.
 
     @_survives
+    def _declare(self, line):
+        """A (defun ...) or (defconstant ...) line adds to the
+        compiler definitions space. Names are claimed once across
+        this space and the def bindings, so one spelling can never
+        mean two things."""
+        tree = parse_source(line)
+        taken = set(self.names)
+        if declaration_keyword(tree) == "defun":
+            self.defs.add_defun(tree, taken)
+        else:
+            self.defs.add_defconstant(tree, taken)
+
+    @_survives
     def do_def(self, arg):
         """def <name> <sexpr>: bind a name to a parsed node. The
         body assembles under the current bindings, so a definition
@@ -254,6 +370,12 @@ class BitLispShell(cmd.Cmd):
         if not definable(name):
             print(f"error: {name!r} is not definable")
             return
+        if name in RESERVED_WORDS or name in CONDITION_CONSTANTS:
+            print(f"error: {name!r} is reserved by the language")
+            return
+        if name in self.defs.functions or name in self.defs.constants:
+            print(f"error: {name!r} is already defined")
+            return
         nodes = assemble_many(body, self.names)
         if len(nodes) != 1:
             print("error: def takes a name and one expression")
@@ -262,18 +384,42 @@ class BitLispShell(cmd.Cmd):
 
     @_survives
     def do_undef(self, arg):
-        """undef <name>: remove a binding."""
+        """undef <name>: remove a definition or binding."""
         name = arg.strip()
-        if name not in self.names:
-            print(f"error: {name!r} is not defined")
-            return
-        del self.names[name]
+        for space in (self.names, self.defs.functions, self.defs.constants):
+            if name in space:
+                del space[name]
+                return
+        print(f"error: {name!r} is not defined")
 
     @_survives
     def do_defs(self, arg):
-        """defs: list the bindings."""
+        """defs: list definitions and bindings."""
         for name in sorted(self.names):
             print(f"{name} = {self._node_text(self.names[name])}")
+        for name in sorted(self.defs.constants):
+            print(f"(defconstant {name} {source_text(self.defs.constants[name])})")
+        for name in sorted(self.defs.functions):
+            params, body, _ = self.defs.functions[name]
+            print(f"(defun {name} {source_text(params)} {source_text(body)})")
+
+    @_survives
+    def do_compile(self, arg):
+        """compile <expr-or-program>: show the compiled tree as
+        canonical text, the artifact itself, never renamed."""
+        program, table = compile_expression(parse_source(arg), self.defs)
+        self._register_symbols(table)
+        print(disassemble(program))
+
+    @_survives
+    def do_sym(self, arg):
+        """sym <path>: load a symbol file written by
+        bitlisp-compile, so foreign bytecode debugs with names."""
+        with open(arg.strip()) as handle:
+            data = json.load(handle)
+        loaded = load_symbols(data)
+        self.symbols.update(loaded)
+        print(f"{len(loaded)} function name(s) loaded")
 
     # The debugger.
 
@@ -357,7 +503,7 @@ class BitLispShell(cmd.Cmd):
             kind = task[0]
             if kind == EVAL:
                 _, node, env = task
-                line = f"eval {self._node_text(node)} env={self._node_text(env)}"
+                line = self._eval_line(node, env)
             elif kind == APPLY_OP:
                 _, op, arg_count = task
                 name = ATOM_TO_NAME.get(op, "0x" + op.hex())
@@ -368,9 +514,30 @@ class BitLispShell(cmd.Cmd):
             print(f"  {depth}: {line}")
         if machine.values:
             rendered = " ".join(
-                self._node_text(value) for value in reversed(machine.values)
+                self._debug_text(value) for value in reversed(machine.values)
             )
             print(f"  values: {rendered}")
+
+    def _eval_line(self, node, env):
+        """One eval task's display. A node matching a compiled
+        function body shows its source name, and its live arguments
+        by parameter name when the environment has the call shape
+        the compiler emits, (function tree . arguments)."""
+        if self.symbols and is_pair(node):
+            entry = self.symbols.get(tree_hash(node).hex())
+            if entry is not None:
+                name, params = entry
+                bindings = bind_values(params, env)
+                if bindings:
+                    bound = " ".join(
+                        f"{key}={self._debug_text(value)}"
+                        for key, value in bindings.items()
+                    )
+                    return f"eval {name} [{bound}]"
+                if bindings == {}:
+                    return f"eval {name}"
+                return f"eval {name} env={self._debug_text(env)}"
+        return f"eval {self._debug_text(node)} env={self._debug_text(env)}"
 
     # Session.
 
