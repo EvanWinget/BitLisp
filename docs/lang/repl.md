@@ -100,9 +100,11 @@ program.
 
 A `def` binding is raw-reader vocabulary, not a language name, so
 a def-bound name written into a macro call is rejected as an
-unknown name, exactly as it would be in any language expression.
-The binding is never read through a macro, and the raw path and
-the macro path never disagree about one spelling.
+unknown name, exactly as it would be in any language expression,
+and the binding is never read through a macro. A computed atom
+that merely coincides with a def spelling is data like any other
+computed bytes: the number is the number, and only writing the
+name reaches for the binding.
 
 The shared namespace narrows `def` from its original surface, a
 deliberate change with the compiler landing: a reserved word or a

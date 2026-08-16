@@ -75,8 +75,7 @@ names. Two questions are asked of every atom that spells a name
 the reader would accept. Does the name resolve where the call
 sits: a parameter of the surrounding body, a function, a
 constant, a macro, a condition constant, or an expression form?
-And was it written rather than computed: does the macro's body
-spell it, or did the caller write it in the arguments? The
+And is there evidence it was written rather than computed? The
 answers decide everything:
 
 ```
@@ -90,6 +89,16 @@ answers decide everything:
                     +---------------------+---------------------+
 ```
 
+Written means the spelling is in the macro's evidence, which has
+exactly two sources. First, everything the macro's own expanded
+body spells: template names, string literals, and whatever
+earlier macros contributed at its declaration, but not its
+parameters, which substitute at expansion time and never reach
+the output as spellings. Second, every name the caller wrote in
+this call's arguments, quoted argument content excluded, which is
+what lets a spliced argument come back as the name the caller
+meant.
+
 A written, resolving spelling is a name, which is every ordinary
 template and every spliced argument. A written spelling that
 resolves nowhere is the same unknown-name error the direct
@@ -100,6 +109,13 @@ capture guard below. Everything else is data. A pair whose head
 is the quote opcode passes through whole, its content data, so a
 macro that must emit name-shaped bytes as data wraps them in
 `(q . ...)`.
+
+One refinement keeps macro composition working. Inside another
+macro's body, at declaration time, an expansion is not judged by
+this table: a spelling that resolves in the macro world lifts,
+and everything else stays data and rides the compiled body
+outward, because its real judgment happens where a program
+finally uses it.
 
 ## The capture guard
 
@@ -120,10 +136,16 @@ wrote`. The same fold with no `n` in scope stays the constant
 misbind, and that day is an error, not a wrong program.
 
 The guard is evidence-based, not value-based, so it has a stated
-residue: a computed atom whose bytes spell a name the body also
-legitimately writes is indistinguishable from the written one and
-still lifts. Quote data that must stay data and the question
-never arises.
+residue with two faces. A computed atom whose bytes spell a name
+the body also legitimately writes is indistinguishable from the
+written one and still lifts. And handing a macro a name as an
+argument is evidence for that spelling anywhere in the expansion,
+so a computed collision with a handed-in name also still lifts:
+`(add3 50 60 n)` under a two-argument fold captures the caller's
+`n` exactly as Chialisp would, because the caller put `n` on the
+table. The guard therefore narrows capture to spellings the
+macro was given or writes itself, it does not abolish it. Quote
+data that must stay data and neither face arises.
 
 Macros remain positionally unhygienic in Chialisp's sense: an
 unquoted argument is spliced as source, so a template that

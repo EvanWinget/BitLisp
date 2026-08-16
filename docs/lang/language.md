@@ -257,9 +257,10 @@ nothing forces a change. The deliberate differences:
   resolving output atom as a name, which captures when computed
   bytes spell an in-scope name and compiles caller typos as data.
   BitLisp lifts a name only with evidence it was written, the
-  macro's body spells it or the caller wrote it, and the two
-  silent cases are compile errors instead. The rule and its
-  residue are `macros.md`.
+  expanded body spells it or the caller wrote it in the
+  arguments, so typos error and capture narrows to spellings the
+  macro was handed or writes itself. The exact rule and the
+  honest residue are `macros.md`.
 - There is no `function` or `com` reflection form. Macro output
   cannot carry names into quoted data, so a user macro cannot
   introduce laziness, and lazy branching exists only through the
