@@ -19,6 +19,7 @@ from .compiler import (
     symbols_to_json,
     tree_hash,
 )
+from .curry import curry, uncurry
 from .keywords import ATOM_TO_NAME, NAME_TO_ATOM
 from .printer import disassemble
 from .reader import ParseError, UnknownSymbol, assemble, assemble_many, definable
@@ -38,6 +39,7 @@ __all__ = [
     "assemble_many",
     "compile_expression",
     "compile_program",
+    "curry",
     "definable",
     "disassemble",
     "load_symbols",
@@ -45,4 +47,5 @@ __all__ = [
     "parse_source_many",
     "symbols_to_json",
     "tree_hash",
+    "uncurry",
 ]
