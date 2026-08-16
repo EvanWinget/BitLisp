@@ -22,6 +22,13 @@ Definitions:
     compile <expr>                 show an expression's compiled tree
     sym <path>                     load a bitlisp-compile symbol file
 
+Currying and identity:
+    curry <program> <value> ...    fix the values into the program,
+                                   printing the curried program
+    uncurry <program>              split a curried program back into
+                                   program and fixed values
+    hash <program>                 the program's tree hash
+
 Debugger:
     debug <program> [<solution>]   open a stepping session
     step                           execute one task, show the stacks
@@ -75,6 +82,7 @@ from .compiler import (
     source_text,
     tree_hash,
 )
+from .curry import curry, uncurry
 from .keywords import ATOM_TO_NAME
 from .printer import disassemble
 from .reader import (
@@ -422,6 +430,75 @@ class BitLispShell(cmd.Cmd):
         loaded = load_symbols(data)
         self.symbols.update(loaded)
         print(f"{len(loaded)} function name(s) loaded")
+
+    # Currying and identity.
+
+    def _one_program(self, arg, what):
+        """One program from the argument line, the _programs seam
+        at arity one: raw VM text first, language source only when
+        the reader rejects an unknown name."""
+        try:
+            nodes = assemble_many(arg, self.names)
+        except UnknownSymbol:
+            program, table = compile_expression(parse_source(arg), self.defs)
+            self._register_symbols(table)
+            return program
+        if len(nodes) != 1:
+            raise ValueError(f"{what} takes one program")
+        return nodes[0]
+
+    def _curry_parts(self, arg):
+        """The program and the fixed values one line holds, the
+        _programs seam with any number of values, every value data
+        exactly as a solution is."""
+        try:
+            nodes = assemble_many(arg, self.names)
+        except UnknownSymbol:
+            return self._compiled_curry_parts(arg)
+        if not nodes:
+            raise ValueError("curry takes a program and optional values")
+        return nodes[0], nodes[1:]
+
+    def _compiled_curry_parts(self, arg):
+        trees = parse_source_many(arg)
+        if not trees:
+            raise ValueError("curry takes a program and optional values")
+        for tree in trees[1:]:
+            symbol = first_symbol(tree)
+            if symbol is not None:
+                raise CompileError(
+                    f"{symbol.name!r} in a fixed value, "
+                    "which is data and cannot hold names",
+                    symbol.offset,
+                )
+        program, table = compile_expression(trees[0], self.defs)
+        self._register_symbols(table)
+        return program, trees[1:]
+
+    @_survives
+    def do_curry(self, arg):
+        """curry <program> <value> ...: fix the values into the
+        program, printing the curried program."""
+        program, values = self._curry_parts(arg)
+        print(self._node_text(curry(program, values)))
+
+    @_survives
+    def do_uncurry(self, arg):
+        """uncurry <program>: split a curried program back into
+        the inner program and its fixed values."""
+        program, values = uncurry(self._one_program(arg, "uncurry"))
+        if values is None:
+            print("error: not a curried program")
+            return
+        print(f"program: {self._node_text(program)}")
+        for value in values:
+            print(f"value: {self._node_text(value)}")
+
+    @_survives
+    def do_hash(self, arg):
+        """hash <program>: the program's tree hash, the identity
+        an output would commit to."""
+        print(tree_hash(self._one_program(arg, "hash")).hex())
 
     # The debugger.
 
