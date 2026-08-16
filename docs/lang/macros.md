@@ -76,32 +76,34 @@ a name in two cases. It resolves where the call sits: a parameter
 of the surrounding body, a function, a constant, a macro, a
 condition constant, or an expression form. That is the classic
 Chialisp rule, and it is what makes every ordinary template work.
-Or it is a name that was demonstrably written: the macro's own
-body spells it, or the caller spelled it in this call's
-arguments, the macro's parameters excepted since those substitute
-at expansion time. A written name that resolves nowhere then
-fails as the unknown name it is, exactly as the direct spelling
-would. This second case is the recorded divergence from Chialisp,
-which reads such an atom back as data and silently compiles the
-typo: here a misspelled argument, a stale template name, or a
-removed definition is an error at the call site, never a wrong
-program.
+Or the caller wrote that name in this call's own arguments,
+outside quoted content and templates. A caller-written name that
+resolves nowhere then fails as the unknown name it is, exactly as
+the direct spelling would. This second case is the recorded
+divergence from Chialisp, which reads such an atom back as data
+and silently compiles the typo, and its scope is deliberately one
+hop: the call's own argument source is the only place a name's
+provenance is still attached when the expansion is read back,
+because everything that crosses the VM boundary comes back as
+bare bytes.
 
 Every other atom stays data, and a pair whose head is the quote
 opcode passes through whole, its content data, so a macro that
 must emit name-shaped bytes as data wraps them in `(q . ...)`.
+Inside another macro's body, at declaration time, the same
+resolve-or-stay-data reading applies with no argument check, and
+what stays data rides the compiled body outward to resolve where
+a program finally uses it, which is what keeps macro composition
+working.
 
-One refinement keeps macro composition working. Inside another
-macro's body, at declaration time, nothing errs: a spelling that
-resolves in the macro world lifts, and everything else stays data
-and rides the compiled body outward, because its real judgment
-happens where a program finally uses it.
+## The sharp edges, Chialisp's and ours
 
-## Capture, the Chialisp sharp edge
+Beyond the one-hop guarantee, read-back behaves exactly as
+Chialisp's, sharp edges included, because once the reader is done
+a computed number, a string, and a spelled name are the same
+bytes, and no compile-time rule can tell them apart.
 
-The resolution rule is positional and textual, exactly as in
-Chialisp, and it can capture. The number 110 and the letter `n`
-are the same byte, so
+Capture: the number 110 and the letter `n` are the same byte, so
 
 ```
 (program (n) (defmacro add (n1 n2) (+ n1 n2)) (add 50 60))
@@ -110,12 +112,17 @@ are the same byte, so
 compiles not to `(q . 110)` but to a reference to the parameter
 `n`. The macro computed 110, the read-back found an `n` in scope,
 and the program now returns whatever its argument is. Nothing
-warns, and nothing can: once the reader is done, a computed
-number, a string, and a spelled name are the same bytes, so no
-compile-time rule can tell them apart, only quoting can. Keep
-macro output away from name-shaped bytes unless naming things is
-the intent, and quote data that must stay data: a `(q . ...)`
-wrapper survives read-back untouched.
+warns. Keep macro output away from name-shaped bytes unless
+naming things is the intent, and quote data that must stay data:
+a `(q . ...)` wrapper survives read-back untouched.
+
+Stale spellings: a name written only in a template, or reaching
+the program through another macro, is outside the one-hop
+guarantee. If it resolves nowhere it is data, compiling silently
+in value position and failing as an unknown operator that spells
+its bytes in head position. Recompile and rerun after renaming
+things, and keep the worked session's habit of checking `compile`
+output when a macro changes.
 
 Macros are also positionally unhygienic in Chialisp's sense: an
 unquoted argument is spliced as source, so a template that
@@ -123,11 +130,11 @@ unquotes the same parameter twice evaluates that argument twice
 at run time, cost included, and a template may deliberately name
 whatever is in scope at the call site.
 
-At the REPL, `def` bindings fall out of the written-name rule:
-they are not language names, so a def-bound name written into a
-macro call is rejected as an unknown name, never read as the
-binding, and a computed atom that merely coincides with a def
-spelling is data like any other computed bytes.
+At the REPL, `def` bindings are barred from macro output entirely
+and in both directions: any output atom spelling a def-bound name
+is rejected as an unknown name, written or computed, because the
+raw path reads that spelling as the binding and one spelling must
+never mean two things. This holds through macro composition.
 
 ## The splicing idiom
 

@@ -98,13 +98,12 @@ every call, so those calls now fail, while a direct call, already
 run when the later macro declared, stays baked into that macro's
 program.
 
-A `def` binding is raw-reader vocabulary, not a language name, so
-a def-bound name written into a macro call is rejected as an
-unknown name, exactly as it would be in any language expression,
-and the binding is never read through a macro. A computed atom
-that merely coincides with a def spelling is data like any other
-computed bytes: the number is the number, and only writing the
-name reaches for the binding.
+A `def` binding is raw-reader vocabulary, not a language name,
+and macro output cannot touch one in either direction: any
+expansion atom spelling a def-bound name is rejected as an
+unknown name, written or computed, through macro composition
+included. The binding is never read through a macro, and the raw
+path and the macro path never disagree about one spelling.
 
 The shared namespace narrows `def` from its original surface, a
 deliberate change with the compiler landing: a reserved word or a
