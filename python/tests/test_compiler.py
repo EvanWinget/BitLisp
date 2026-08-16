@@ -20,6 +20,7 @@ from bitlisp.sexp import NIL, int_to_atom  # noqa: E402
 from bitlisp_tools import assemble, disassemble  # noqa: E402
 from bitlisp_tools.compiler import (  # noqa: E402
     CONDITION_CONSTANTS,
+    RESERVED_WORDS,
     CompileError,
     Definitions,
     bind_values,
@@ -225,9 +226,8 @@ def test_if_is_lazy():
 
 
 def test_assert_passes_its_value_and_raises_on_falsy():
-    _, _, result = _run_program("(program (X) (assert X (* X 3)))", "(14)")
+    program, _, result = _run_program("(program (X) (assert X (* X 3)))", "(14)")
     assert result == int_to_atom(42)
-    program, _ = compile_program("(program (X) (assert X (* X 3)))")
     with pytest.raises(BitLispError) as excinfo:
         run(program, assemble("(())"), BUDGET)
     assert excinfo.value.code == "user_raise"
@@ -409,8 +409,8 @@ def test_load_symbols_rejects(mutate):
 
 def test_load_symbols_tracks_the_reserved_words():
     # The loader validates names against today's language, so the
-    # reserved-word set change is a compatibility break in both
-    # directions, recorded in the execution plan: a symbol file
+    # reserved-word set change is a deliberate, recorded
+    # compatibility break in both directions: a symbol file
     # naming a function assert, and, or is rejected whole, and one
     # naming a function qq, a spelling reserved before this unit,
     # loads again.
@@ -547,6 +547,23 @@ def test_definitions_taken_names_conflict():
     with pytest.raises(CompileError) as excinfo:
         defs.add_defun(parse_source("(defun fee (N) N)"), taken={"fee"})
     assert "'fee' is already defined" in str(excinfo.value)
+
+
+def test_reserved_words_are_pinned_and_all_dispatch():
+    # The literal set, transcribed like the condition-name table, so
+    # growing the language forces this test to grow with it. Every
+    # reserved word must mean something in head position: a fixed
+    # form added to dispatch but not the reserved set would let one
+    # spelling be claimed as a definition and hijacked at its call
+    # sites, one spelling meaning two things.
+    assert RESERVED_WORDS == frozenset(
+        {"program", "defun", "defconstant", "if", "list", "assert", "and", "or"}
+    )
+    for word in sorted(RESERVED_WORDS):
+        try:
+            compile_program(f"(program (X) ({word}))")
+        except CompileError as exc:
+            assert "unknown name" not in str(exc)
 
 
 # Properties.

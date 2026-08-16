@@ -607,6 +607,14 @@ def test_conditions_and_list_at_the_prompt(shell, capsys):
     assert out.splitlines()[0] == f"((q 0x{SPK_P2WPKH} 600))"
 
 
+def test_program_form_ignores_session_definitions(shell, capsys):
+    # Self-containment: a pasted program form compiles against its
+    # own declarations only, exactly as it would from a file.
+    shell.onecmd("(defun inc (N) (+ N 1))")
+    shell.onecmd("eval (program (X) (inc X)) (1)")
+    assert "unknown name 'inc'" in capsys.readouterr().out
+
+
 def test_declaration_errors_print(shell, capsys):
     # An operator name resolves before the compiler sees it, so it
     # can never name a function.
