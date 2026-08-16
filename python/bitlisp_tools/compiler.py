@@ -360,7 +360,11 @@ class Definitions:
         )
         compilation = _Compilation(macro_defs, {}, macro_name=name)
         program = compilation.expression(expanded, _bind_params(items[2], _TOP))
-        self.macros[name] = (items[2], items[3], arity, program)
+        # Every name the body spells is evidence at read-back time
+        # that an output atom with that spelling was written on
+        # purpose, not computed by coincidence.
+        emittable = frozenset(_symbol_names(items[3]))
+        self.macros[name] = (items[2], items[3], arity, program, emittable)
         return name
 
 
@@ -425,27 +429,35 @@ def _lower_symbols(tree):
     return tree
 
 
-def _lift(value, defs, shadowed, offset):
+def _lift(value, defs, shadowed, evidence, offset):
     """The value a macro returned, read back as one expression. An
     expression headed by the quote opcode passes through whole, its
     content data by construction, and the walk is expression
     directed so only a head position can mean quote: an argument
     whose value merely starts with the quote byte, like the number
-    one, stays an ordinary argument. Any other atom becomes a name
-    exactly when its bytes spell one name the reader would accept
-    and that name resolves where the expansion sits: a parameter of
-    the enclosing body, a definition, a condition constant, or an
-    expression form. Every other atom stays data, so a computed
-    number whose bytes happen to spell an out-of-scope name (110 is
-    the letter n) never turns into a reference behind the author's
-    back. The lifted names carry the macro call's offset, so a
-    downstream error points at the call site."""
+    one, stays an ordinary argument.
+
+    An atom whose bytes spell one name the reader would accept is
+    judged on two axes: whether the name resolves where the
+    expansion sits, and whether there is evidence the name was
+    written rather than computed, meaning the macro's body spells
+    it or the caller wrote it in the arguments. Written and
+    resolving lifts to a name. Written but resolving nowhere is an
+    unknown name, the same error the direct spelling gets, so a
+    typo cannot compile as data. Resolving without being written is
+    rejected as a computed collision, so an arithmetic result whose
+    bytes spell an in-scope name (110 is the letter n) can never
+    become a reference behind the author's back: data that must
+    stay data travels quoted. Everything else is data. This is a
+    recorded divergence: classic Chialisp lifts any resolving atom
+    and captures on the collision. The lifted names carry the macro
+    call's offset, so a downstream error points at the call site."""
     if is_pair(value):
         if is_atom(value[0]) and value[0] == _QUOTE:
             return value
         return (
-            _lift(value[0], defs, shadowed, offset),
-            _lift_tail(value[1], defs, shadowed, offset),
+            _lift(value[0], defs, shadowed, evidence, offset),
+            _lift_tail(value[1], defs, shadowed, evidence, offset),
         )
     if value == NIL:
         return value
@@ -455,8 +467,18 @@ def _lift(value, defs, shadowed, offset):
         return value
     if not text.isprintable() or not definable(text):
         return value
-    if _resolvable(text, defs, shadowed):
+    resolves = _resolvable(text, defs, shadowed)
+    written = text in evidence
+    if resolves and written:
         return Symbol(text, offset)
+    if resolves:
+        raise CompileError(
+            f"macro output 0x{value.hex()} spells {text!r}, "
+            "a name the macro never wrote: quote data that must stay data",
+            offset,
+        )
+    if written:
+        raise CompileError(f"unknown name {text!r}", offset)
     return value
 
 
@@ -477,15 +499,15 @@ def _resolvable(name, defs, shadowed):
     )
 
 
-def _lift_tail(node, defs, shadowed, offset):
+def _lift_tail(node, defs, shadowed, evidence, offset):
     """An argument spine of a macro's returned value, each element
     lifted as an expression. The spine's own pairs never mean
     quote, whatever their first bytes are."""
     if not is_pair(node):
         return node
     return (
-        _lift(node[0], defs, shadowed, offset),
-        _lift_tail(node[1], defs, shadowed, offset),
+        _lift(node[0], defs, shadowed, evidence, offset),
+        _lift_tail(node[1], defs, shadowed, evidence, offset),
     )
 
 
@@ -595,11 +617,14 @@ def _expand_call(head, tail, defs, shadowed, depth, work):
         raise CompileError(
             f"macro {name!r} failed: {exc.code}: {exc}", head.offset
         ) from None
-    lifted = _lift(value, defs, shadowed, head.offset)
+    # The names this expansion may produce: what the body spells,
+    # plus what the caller wrote in this call's arguments.
+    evidence = defs.macros[name][4] | _symbol_names(tail)
+    lifted = _lift(value, defs, shadowed, evidence, head.offset)
     return _expand(lifted, defs, shadowed, depth + 1, work)
 
 
-def _expanded_bodies(defs, body, session_names, work):
+def _expanded_bodies(defs, body, work):
     """The reachable function bodies, expanded, conservatively:
     every name a post-expansion body mentions counts, shadowing
     ignored, so the set can only be too large, never too small.
@@ -617,9 +642,8 @@ def _expanded_bodies(defs, body, session_names, work):
             if name in bodies or name not in mentioned:
                 continue
             fn_params, fn_body, _ = defs.functions[name]
-            shadow = _symbol_names(fn_params) | session_names
             try:
-                expanded = _expand(fn_body, defs, shadow, 0, work)
+                expanded = _expand(fn_body, defs, _symbol_names(fn_params), 0, work)
             except CompileError as exc:
                 raise CompileError(f"in {name!r}: {exc}") from None
             bodies[name] = expanded
@@ -884,18 +908,13 @@ def tree_hash(node):
     return hashes[0]
 
 
-def _compile(defs, params, body, session_names=frozenset()):
+def _compile(defs, params, body):
     """The program node and symbol table for one body against one
-    definitions space, params None for a bare expression.
-    session_names are the REPL's def bindings: they resolve nowhere
-    in compiled output, and naming them here makes a macro that
-    emits one fail loudly as an unknown name instead of silently
-    passing the spelling through as data."""
+    definitions space, params None for a bare expression."""
     shadow = _symbol_names(params) if params is not None else frozenset()
-    shadow = shadow | session_names
     work = _ExpansionWork()
     body = _expand(body, defs, shadow, 0, work)
-    expanded = _expanded_bodies(defs, body, session_names, work)
+    expanded = _expanded_bodies(defs, body, work)
     fn_names = [name for name in defs.functions if name in expanded]
     has_tree = bool(fn_names)
     fn_paths = _tree_paths(fn_names, _LEFT) if has_tree else {}
@@ -968,18 +987,14 @@ def compile_program(source):
     return _compile(defs, params, items[-1])
 
 
-def compile_expression(source, defs, session_names=frozenset()):
+def compile_expression(source, defs):
     """The program node and symbol table for one bare expression
     against a definitions space. The expression has no parameters,
-    so the compiled program ignores its environment. session_names
-    are the caller's bindings outside the language, the REPL's def
-    names: a macro expansion that emits one is rejected as an
-    unknown name rather than read as data. A program form ignores
-    them, staying self-contained."""
+    so the compiled program ignores its environment."""
     tree = parse_source(source) if isinstance(source, str) else source
     if program_form(tree):
         return compile_program(tree)
-    return _compile(defs, None, tree, session_names)
+    return _compile(defs, None, tree)
 
 
 def bind_values(params, env):

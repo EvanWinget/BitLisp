@@ -441,15 +441,28 @@ def test_pin_macro_constant_folds():
     assert disassemble(program) == "(q . 110)"
 
 
-def test_pin_macro_capture_is_unhygienic():
-    # 110 spells the letter n, and with a caller parameter named n
-    # in scope the folded atom becomes a reference to it: the
-    # documented positional unhygiene, pinned bug for bug against
-    # classic Chialisp.
+def test_computed_name_collision_is_rejected():
+    # 110 spells the letter n. Classic Chialisp would capture: the
+    # folded atom becomes a reference to the caller's parameter n.
+    # BitLisp's recorded divergence rejects it instead, because the
+    # spelling is in scope but the macro never wrote it.
+    with pytest.raises(CompileError) as excinfo:
+        compile_program("(program (n) (defmacro add (n1 n2) (+ n1 n2)) (add 50 60))")
+    assert "0x6e spells 'n', a name the macro never wrote" in str(excinfo.value)
+
+
+def test_written_names_lift_computed_data_stays():
+    # The same fold with no colliding name in scope stays data, so
+    # constant folding works, and a spliced caller-written name
+    # still lifts: the two evidence sources side by side.
     program, _ = compile_program(
-        "(program (n) (defmacro add (n1 n2) (+ n1 n2)) (add 50 60))"
+        "(program () (defmacro add (n1 n2) (+ n1 n2)) (add 50 60))"
     )
-    assert disassemble(program) == "2"
+    assert disassemble(program) == "(q . 110)"
+    program, _ = compile_program(
+        "(program (n) (defmacro keep (e) (qq (+ (unquote e) 1))) (keep n))"
+    )
+    assert disassemble(program) == "(+ 2 (q . 1))"
 
 
 def test_pin_qq_escapes_compile_in_place():
@@ -580,24 +593,35 @@ def test_expansion_errors_name_the_first_declared_function():
     assert str(excinfo.value).startswith("in 'zz':")
 
 
-def test_session_names_are_barred_from_macro_output():
-    # A REPL def binding resolves nowhere in compiled output, so a
-    # macro that emits its spelling is rejected as an unknown name
-    # rather than silently reading the bytes as data.
-    defs = _defs("(defmacro inc (e) (qq (+ (unquote e) 1)))")
+def test_caller_written_typo_is_an_unknown_name():
+    # The caller wrote Y as a name, so it is evidence, and it
+    # resolves nowhere: the macro path reports exactly what the
+    # direct spelling would, never compiling the typo as data.
     with pytest.raises(CompileError) as excinfo:
-        compile_expression("(inc val)", defs, frozenset({"val"}))
-    assert "unknown name 'val'" in str(excinfo.value)
+        compile_program(
+            "(program (X) (defmacro inc (e) (qq (+ (unquote e) 1))) (inc Y))"
+        )
+    assert "unknown name 'Y'" in str(excinfo.value)
 
 
-def test_stale_macro_name_errors_with_its_spelling():
-    # A name that resolves nowhere stays data, and in operator
-    # position the rejection spells it so the user can trace the
-    # hex back to the template that emitted it.
+def test_stale_template_name_is_an_unknown_name():
+    # The template spells gone, so it is evidence, and nothing
+    # defines it: the rejection names the source token instead of
+    # letting the spelling land as operator bytes.
     defs = _defs("(defmacro call-gone (e) (qq (gone (unquote e))))")
     with pytest.raises(CompileError) as excinfo:
         compile_expression("(call-gone 1)", defs)
-    assert "unknown operator 0x676f6e65, which spells 'gone'" in str(excinfo.value)
+    assert "unknown name 'gone'" in str(excinfo.value)
+
+
+def test_computed_operator_bytes_error_with_their_spelling():
+    # Bytes with no evidence stay data even when they spell a
+    # would-be name, and in head position the operator error spells
+    # them so the hex is traceable.
+    defs = _defs("(defmacro bad () (c 'zzz' ()))")
+    with pytest.raises(CompileError) as excinfo:
+        compile_expression("(bad)", defs)
+    assert "unknown operator 0x7a7a7a, which spells 'zzz'" in str(excinfo.value)
 
 
 def test_qq_levels_agree_between_expansion_and_emission():

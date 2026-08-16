@@ -682,9 +682,10 @@ def test_defs_lists_macros_after_functions(shell, capsys):
 
 
 def test_macro_cannot_reach_def_bindings(shell, capsys):
-    # The raw path reads val as its binding, so the macro path must
-    # not quietly read the same spelling as data: the expansion is
-    # rejected instead, one spelling never meaning two things.
+    # The raw path reads val as its binding, but def names are not
+    # language names: through a macro the caller-written spelling
+    # is evidence that resolves nowhere, so the general unknown
+    # name rule rejects it, one spelling never meaning two things.
     shell.onecmd("def val (q . 5)")
     shell.onecmd("(defmacro inc (e) (qq (+ (unquote e) 1)))")
     shell.onecmd("(inc val)")
@@ -699,8 +700,7 @@ def test_undef_breaks_template_spliced_macros(shell, capsys):
     shell.onecmd("(defmacro inc2 (e) (qq (inc (inc (unquote e)))))")
     shell.onecmd("undef inc")
     shell.onecmd("(inc2 40)")
-    out = capsys.readouterr().out
-    assert "unknown operator 0x696e63, which spells 'inc'" in out
+    assert "unknown name 'inc'" in capsys.readouterr().out
 
 
 def test_program_form_ignores_session_macros(shell, capsys):
