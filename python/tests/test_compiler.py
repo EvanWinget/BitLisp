@@ -21,6 +21,7 @@ from bitlisp_tools import assemble, disassemble  # noqa: E402
 from bitlisp_tools.compiler import (  # noqa: E402
     CONDITION_CONSTANTS,
     MACRO_DEPTH_LIMIT,
+    MACRO_EXPANSION_LIMIT,
     CompileError,
     Definitions,
     Symbol,
@@ -363,6 +364,22 @@ def test_load_symbols_rejects(mutate):
         load_symbols(data)
 
 
+def test_load_symbols_rejects_newly_reserved_names():
+    # A symbol file written before this unit may name a function
+    # qq, unquote, or defmacro, spellings the compiler accepted
+    # then. The loader validates against today's language, so such
+    # a file is rejected whole: a deliberate compatibility break,
+    # recorded in the execution plan.
+    _, table = compile_program("(program (X) (defun fun (N) (* 2 N)) (fun X))")
+    data = symbols_to_json(table)
+    (key,) = data["functions"]
+    for name in ("qq", "unquote", "defmacro"):
+        data["functions"][key]["name"] = name
+        with pytest.raises(ValueError) as excinfo:
+            load_symbols(data)
+        assert "malformed function name" in str(excinfo.value)
+
+
 def test_atom_bodies_stay_out_of_the_table():
     _, table = compile_program("(program (X) (defun own (N) N) (c (own X) X))")
     assert table["functions"] == {}
@@ -533,6 +550,83 @@ def test_expression_compiles_against_session_macros():
     program, _ = compile_expression("(inc 41)", defs)
     cost, result = run(program, NIL, BUDGET)
     assert result == int_to_atom(42)
+
+
+def test_branching_macro_hits_the_execution_cap():
+    # Every chain stays far under the depth cap and every run far
+    # under the cost budget, but the template splices two calls to
+    # itself, doubling the work per level, so only the total
+    # execution guard stops the compile.
+    source = (
+        "(program (N) (defmacro m (n) (if n "
+        "(qq (c (unquote (c m (c (- n 1) ()))) "
+        "(unquote (c m (c (- n 1) ()))))) (q . 1))) (m 20))"
+    )
+    with pytest.raises(CompileError) as excinfo:
+        compile_program(source)
+    assert f"exceeded {MACRO_EXPANSION_LIMIT} executions" in str(excinfo.value)
+
+
+def test_expansion_errors_name_the_first_declared_function():
+    # The reachability sweep runs in declaration order, so which
+    # function an expansion error is attributed to cannot vary
+    # with string-hash randomization.
+    source = (
+        "(program (X) (defmacro boom (e) (x)) "
+        "(defun zz (v) (boom v)) (defun aa (v) (boom v)) (c (zz X) (aa X)))"
+    )
+    with pytest.raises(CompileError) as excinfo:
+        compile_program(source)
+    assert str(excinfo.value).startswith("in 'zz':")
+
+
+def test_session_names_are_barred_from_macro_output():
+    # A REPL def binding resolves nowhere in compiled output, so a
+    # macro that emits its spelling is rejected as an unknown name
+    # rather than silently reading the bytes as data.
+    defs = _defs("(defmacro inc (e) (qq (+ (unquote e) 1)))")
+    with pytest.raises(CompileError) as excinfo:
+        compile_expression("(inc val)", defs, frozenset({"val"}))
+    assert "unknown name 'val'" in str(excinfo.value)
+
+
+def test_stale_macro_name_errors_with_its_spelling():
+    # A name that resolves nowhere stays data, and in operator
+    # position the rejection spells it so the user can trace the
+    # hex back to the template that emitted it.
+    defs = _defs("(defmacro call-gone (e) (qq (gone (unquote e))))")
+    with pytest.raises(CompileError) as excinfo:
+        compile_expression("(call-gone 1)", defs)
+    assert "unknown operator 0x676f6e65, which spells 'gone'" in str(excinfo.value)
+
+
+def test_qq_levels_agree_between_expansion_and_emission():
+    # The expansion pre-pass and template emission each walk qq
+    # nesting levels, and they must locate the same escapes: the
+    # level-one unquote expands its macro call, the one under a
+    # nested qq keeps the call as spelled data.
+    _, _, result = _run_program(
+        "(program (X) (defmacro inc (e) (qq (+ (unquote e) 1))) "
+        "(qq ((unquote (inc X)) (qq (unquote (inc X))))))",
+        "(41)",
+    )
+    nested = (b"qq", ((b"unquote", ((b"inc", (b"X", NIL)), NIL)), NIL))
+    assert result == (int_to_atom(42), (nested, NIL))
+
+
+def test_macro_budget_matches_the_runner_default():
+    from bitlisp_tools import compiler, runner
+
+    assert compiler.MACRO_COST_BUDGET == runner.DEFAULT_MAX_COST
+
+
+def test_macro_cost_burst_is_reported(monkeypatch):
+    from bitlisp_tools import compiler
+
+    monkeypatch.setattr(compiler, "MACRO_COST_BUDGET", 100)
+    with pytest.raises(CompileError) as excinfo:
+        compile_program("(program () (defmacro m (e) (+ e 1)) (m 5))")
+    assert "macro 'm' failed: cost_exceeded" in str(excinfo.value)
 
 
 @pytest.mark.parametrize(

@@ -681,6 +681,28 @@ def test_defs_lists_macros_after_functions(shell, capsys):
     )
 
 
+def test_macro_cannot_reach_def_bindings(shell, capsys):
+    # The raw path reads val as its binding, so the macro path must
+    # not quietly read the same spelling as data: the expansion is
+    # rejected instead, one spelling never meaning two things.
+    shell.onecmd("def val (q . 5)")
+    shell.onecmd("(defmacro inc (e) (qq (+ (unquote e) 1)))")
+    shell.onecmd("(inc val)")
+    assert "unknown name 'val'" in capsys.readouterr().out
+
+
+def test_undef_breaks_template_spliced_macros(shell, capsys):
+    # inc2's template splices the spelling of inc back out, so
+    # every inc2 call needs inc again, and after undef the stale
+    # spelling is rejected with the name in the error.
+    shell.onecmd("(defmacro inc (e) (qq (+ (unquote e) 1)))")
+    shell.onecmd("(defmacro inc2 (e) (qq (inc (inc (unquote e)))))")
+    shell.onecmd("undef inc")
+    shell.onecmd("(inc2 40)")
+    out = capsys.readouterr().out
+    assert "unknown operator 0x696e63, which spells 'inc'" in out
+
+
 def test_program_form_ignores_session_macros(shell, capsys):
     # Self-containment: a pasted program form compiles against its
     # own declarations only, exactly as it would from a file.

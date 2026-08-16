@@ -91,6 +91,24 @@ MACRO_COST_BUDGET = 11_000_000_000
 # interpreter's recursion limit.
 MACRO_DEPTH_LIMIT = 100
 
+# How many macro executions one compile may spend in total, all
+# bodies combined. The depth cap bounds each chain but not the
+# number of chains: a macro whose template splices two calls to
+# itself doubles the work per level, staying under both per-chain
+# guards while the total explodes, so the total is guarded too.
+MACRO_EXPANSION_LIMIT = 10_000
+
+
+class _ExpansionWork:
+    """One compile's remaining macro executions, shared by every
+    body so branching expansion cannot multiply work past it."""
+
+    __slots__ = ("remaining",)
+
+    def __init__(self):
+        self.remaining = MACRO_EXPANSION_LIMIT
+
+
 # The condition vocabulary, one name per assigned opcode, written
 # out literally so a reviewer can check it by eye. A test pins the
 # set against CONDITION_COSTS so a vocabulary change fails loudly
@@ -337,7 +355,9 @@ class Definitions:
         arity = _check_params(items[2])
         macro_defs = Definitions()
         macro_defs.macros = dict(self.macros)
-        expanded = _expand(items[3], macro_defs, _symbol_names(items[2]), 0)
+        expanded = _expand(
+            items[3], macro_defs, _symbol_names(items[2]), 0, _ExpansionWork()
+        )
         compilation = _Compilation(macro_defs, {}, macro_name=name)
         program = compilation.expression(expanded, _bind_params(items[2], _TOP))
         self.macros[name] = (items[2], items[3], arity, program)
@@ -435,16 +455,26 @@ def _lift(value, defs, shadowed, offset):
         return value
     if not text.isprintable() or not definable(text):
         return value
-    if (
-        text in shadowed
-        or text in defs.functions
-        or text in defs.constants
-        or text in defs.macros
-        or text in CONDITION_CONSTANTS
-        or text in _EXPRESSION_FORMS
-    ):
+    if _resolvable(text, defs, shadowed):
         return Symbol(text, offset)
     return value
+
+
+def _resolvable(name, defs, shadowed):
+    """True when a name means something where an expansion sits.
+    This is the read-back's copy of the resolution domain that
+    _reference and _named_form implement as control flow, and the
+    two must cover the same names: a category added to one and not
+    the other either turns valid names into silent data or valid
+    data into spurious names."""
+    return (
+        name in shadowed
+        or name in defs.functions
+        or name in defs.constants
+        or name in defs.macros
+        or name in CONDITION_CONSTANTS
+        or name in _EXPRESSION_FORMS
+    )
 
 
 def _lift_tail(node, defs, shadowed, offset):
@@ -459,7 +489,7 @@ def _lift_tail(node, defs, shadowed, offset):
     )
 
 
-def _expand(tree, defs, shadowed, depth):
+def _expand(tree, defs, shadowed, depth, work):
     """The source tree with every macro call replaced by what the
     macro's program computes over the raw, unevaluated argument
     source. The returned value is read back as source and expanded
@@ -475,16 +505,16 @@ def _expand(tree, defs, shadowed, depth):
         return tree
     if isinstance(head, Symbol):
         if head.name == _QQ:
-            return (head, _expand_template(tail, defs, shadowed, depth, 1))
+            return (head, _expand_template(tail, defs, shadowed, depth, work, 1))
         if head.name in defs.macros and head.name not in shadowed:
-            return _expand_call(head, tail, defs, shadowed, depth)
+            return _expand_call(head, tail, defs, shadowed, depth, work)
     return (
-        _expand(head, defs, shadowed, depth),
-        _expand_tail(tail, defs, shadowed, depth),
+        _expand(head, defs, shadowed, depth, work),
+        _expand_tail(tail, defs, shadowed, depth, work),
     )
 
 
-def _expand_tail(node, defs, shadowed, depth):
+def _expand_tail(node, defs, shadowed, depth, work):
     """The argument spine of a form, each element expanded as an
     expression. The spine itself is never mistaken for a call, so
     a bare macro name sitting as an argument stays a name and gets
@@ -492,34 +522,57 @@ def _expand_tail(node, defs, shadowed, depth):
     if not is_pair(node):
         return node
     return (
-        _expand(node[0], defs, shadowed, depth),
-        _expand_tail(node[1], defs, shadowed, depth),
+        _expand(node[0], defs, shadowed, depth, work),
+        _expand_tail(node[1], defs, shadowed, depth, work),
     )
 
 
-def _expand_template(node, defs, shadowed, depth, level):
+def _expand_template(node, defs, shadowed, depth, work, level):
     """A qq template with its level-one unquote escapes expanded.
     A nested qq deepens the level, an unquote raises it back, and
     both are walked as data otherwise, mirroring how the template
-    emits. Malformed escape arities pass through untouched here
-    and are rejected once, at emission."""
+    emits: this walk and _Compilation._template must locate the
+    same escape positions on every tree, and a test holds them to
+    it. Malformed escape arities pass through untouched here and
+    are rejected once, at emission."""
     if not is_pair(node):
         return node
     head, tail = node
     if isinstance(head, Symbol):
         if head.name == _QQ:
-            return (head, _expand_template(tail, defs, shadowed, depth, level + 1))
+            return (
+                head,
+                _expand_template(tail, defs, shadowed, depth, work, level + 1),
+            )
         if head.name == _UNQUOTE:
             if level == 1:
-                return (head, _expand_tail(tail, defs, shadowed, depth))
-            return (head, _expand_template(tail, defs, shadowed, depth, level - 1))
+                return (head, _expand_tail(tail, defs, shadowed, depth, work))
+            return (
+                head,
+                _expand_template(tail, defs, shadowed, depth, work, level - 1),
+            )
     return (
-        _expand_template(head, defs, shadowed, depth, level),
-        _expand_template(tail, defs, shadowed, depth, level),
+        _expand_template(head, defs, shadowed, depth, work, level),
+        _expand_template(tail, defs, shadowed, depth, work, level),
     )
 
 
-def _expand_call(head, tail, defs, shadowed, depth):
+def _check_arity(name, arguments, arity, offset):
+    """One arity check for calls and macro calls, so the two sites
+    cannot drift apart in behavior or wording."""
+    exact, count = arity
+    if exact and len(arguments) != count:
+        raise CompileError(
+            f"{name!r} takes {count} argument(s), got {len(arguments)}", offset
+        )
+    if not exact and len(arguments) < count:
+        raise CompileError(
+            f"{name!r} takes at least {count} argument(s), got {len(arguments)}",
+            offset,
+        )
+
+
+def _expand_call(head, tail, defs, shadowed, depth, work):
     """One macro call replaced by its expansion."""
     name = head.name
     if depth == MACRO_DEPTH_LIMIT:
@@ -527,18 +580,14 @@ def _expand_call(head, tail, defs, shadowed, depth):
             f"macro expansion depth exceeded {MACRO_DEPTH_LIMIT} levels",
             head.offset,
         )
+    if work.remaining == 0:
+        raise CompileError(
+            f"macro expansion exceeded {MACRO_EXPANSION_LIMIT} executions",
+            head.offset,
+        )
+    work.remaining -= 1
     arguments = _proper_items(tail, name, head.offset)
-    exact, count = defs.macros[name][2]
-    if exact and len(arguments) != count:
-        raise CompileError(
-            f"{name!r} takes {count} argument(s), got {len(arguments)}",
-            head.offset,
-        )
-    if not exact and len(arguments) < count:
-        raise CompileError(
-            f"{name!r} takes at least {count} argument(s), got {len(arguments)}",
-            head.offset,
-        )
+    _check_arity(name, arguments, defs.macros[name][2], head.offset)
     program = defs.macros[name][3]
     try:
         _, value = run(program, _lower_symbols(tail), MACRO_COST_BUDGET)
@@ -547,29 +596,35 @@ def _expand_call(head, tail, defs, shadowed, depth):
             f"macro {name!r} failed: {exc.code}: {exc}", head.offset
         ) from None
     lifted = _lift(value, defs, shadowed, head.offset)
-    return _expand(lifted, defs, shadowed, depth + 1)
+    return _expand(lifted, defs, shadowed, depth + 1, work)
 
 
-def _expanded_bodies(defs, body):
+def _expanded_bodies(defs, body, session_names, work):
     """The reachable function bodies, expanded, conservatively:
     every name a post-expansion body mentions counts, shadowing
     ignored, so the set can only be too large, never too small.
     Expansion must come first because a macro may emit a call to a
     function its source never names. An unreached body never
-    expands and never compiles."""
+    expands and never compiles. The sweep runs in declaration
+    order, restarting until no new body is reached, so which body
+    an expansion error names is deterministic."""
     bodies = {}
-    pending = list(_symbol_names(body))
-    while pending:
-        name = pending.pop()
-        if name in bodies or name not in defs.functions:
-            continue
-        fn_params, fn_body, _ = defs.functions[name]
-        try:
-            expanded = _expand(fn_body, defs, _symbol_names(fn_params), 0)
-        except CompileError as exc:
-            raise CompileError(f"in {name!r}: {exc}") from None
-        bodies[name] = expanded
-        pending.extend(_symbol_names(expanded))
+    mentioned = _symbol_names(body)
+    changed = True
+    while changed:
+        changed = False
+        for name in defs.functions:
+            if name in bodies or name not in mentioned:
+                continue
+            fn_params, fn_body, _ = defs.functions[name]
+            shadow = _symbol_names(fn_params) | session_names
+            try:
+                expanded = _expand(fn_body, defs, shadow, 0, work)
+            except CompileError as exc:
+                raise CompileError(f"in {name!r}: {exc}") from None
+            bodies[name] = expanded
+            mentioned |= _symbol_names(expanded)
+            changed = True
     return bodies
 
 
@@ -774,17 +829,7 @@ class _Compilation:
     def _call(self, head, tail, bindings):
         name = head.name
         arguments = _proper_items(tail, name, head.offset)
-        exact, count = self.defs.functions[name][2]
-        if exact and len(arguments) != count:
-            raise CompileError(
-                f"{name!r} takes {count} argument(s), got {len(arguments)}",
-                head.offset,
-            )
-        if not exact and len(arguments) < count:
-            raise CompileError(
-                f"{name!r} takes at least {count} argument(s), got {len(arguments)}",
-                head.offset,
-            )
+        _check_arity(name, arguments, self.defs.functions[name][2], head.offset)
         # The callee sees the caller's layout rebuilt: the function
         # tree it received at path 2, consed onto the evaluated
         # arguments as a proper list.
@@ -802,6 +847,15 @@ class _Compilation:
         # that can never do anything but fail.
         if op != _APPLY and op not in OPERATORS:
             label = "0x" + op.hex() if op else "()"
+            # A macro can emit a name that resolves nowhere, which
+            # stays data and can land here as head bytes, so the
+            # error spells the name a reader would see in the hex.
+            try:
+                text = op.decode()
+            except UnicodeDecodeError:
+                text = ""
+            if text and text.isprintable() and definable(text):
+                label = f"{label}, which spells {text!r}"
             raise CompileError(f"unknown operator {label}")
         name = ATOM_TO_NAME[op]
         arguments = _proper_items(tail, name)
@@ -830,12 +884,18 @@ def tree_hash(node):
     return hashes[0]
 
 
-def _compile(defs, params, body):
+def _compile(defs, params, body, session_names=frozenset()):
     """The program node and symbol table for one body against one
-    definitions space, params None for a bare expression."""
+    definitions space, params None for a bare expression.
+    session_names are the REPL's def bindings: they resolve nowhere
+    in compiled output, and naming them here makes a macro that
+    emits one fail loudly as an unknown name instead of silently
+    passing the spelling through as data."""
     shadow = _symbol_names(params) if params is not None else frozenset()
-    body = _expand(body, defs, shadow, 0)
-    expanded = _expanded_bodies(defs, body)
+    shadow = shadow | session_names
+    work = _ExpansionWork()
+    body = _expand(body, defs, shadow, 0, work)
+    expanded = _expanded_bodies(defs, body, session_names, work)
     fn_names = [name for name in defs.functions if name in expanded]
     has_tree = bool(fn_names)
     fn_paths = _tree_paths(fn_names, _LEFT) if has_tree else {}
@@ -908,14 +968,18 @@ def compile_program(source):
     return _compile(defs, params, items[-1])
 
 
-def compile_expression(source, defs):
+def compile_expression(source, defs, session_names=frozenset()):
     """The program node and symbol table for one bare expression
     against a definitions space. The expression has no parameters,
-    so the compiled program ignores its environment."""
+    so the compiled program ignores its environment. session_names
+    are the caller's bindings outside the language, the REPL's def
+    names: a macro expansion that emits one is rejected as an
+    unknown name rather than read as data. A program form ignores
+    them, staying self-contained."""
     tree = parse_source(source) if isinstance(source, str) else source
     if program_form(tree):
         return compile_program(tree)
-    return _compile(defs, None, tree)
+    return _compile(defs, None, tree, session_names)
 
 
 def bind_values(params, env):

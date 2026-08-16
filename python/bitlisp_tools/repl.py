@@ -226,7 +226,9 @@ class BitLispShell(cmd.Cmd):
                         "which is data and cannot hold names",
                         symbol.offset,
                     )
-            program, table = compile_expression(nodes[0], self.defs)
+            program, table = compile_expression(
+                nodes[0], self.defs, frozenset(self.names)
+            )
             self._register_symbols(table)
             nodes = [program, *nodes[1:]]
         return nodes
@@ -423,9 +425,11 @@ class BitLispShell(cmd.Cmd):
         )
         for space in spaces:
             if name in space:
-                # A macro already compiled into another macro's
-                # program stays compiled: removal changes what
-                # later lines mean, never what earlier ones built.
+                # Removal changes what later lines mean. A macro
+                # whose expansion splices this name back out needs
+                # it again at every later call, so those calls now
+                # fail. Only a direct call, already run at the
+                # later macro's declaration, stays baked in.
                 del space[name]
                 return
         print(f"error: {name!r} is not defined")
@@ -448,7 +452,9 @@ class BitLispShell(cmd.Cmd):
     def do_compile(self, arg):
         """compile <expr-or-program>: show the compiled tree as
         canonical text, the artifact itself, never renamed."""
-        program, table = compile_expression(parse_source(arg), self.defs)
+        program, table = compile_expression(
+            parse_source(arg), self.defs, frozenset(self.names)
+        )
         self._register_symbols(table)
         print(self._node_text(program))
 
