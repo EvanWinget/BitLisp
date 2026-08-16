@@ -14,7 +14,7 @@ currying and tree-hash surfaces in `curry.md`.
 ## Starting the REPL
 
 ```
-bitlisp [tx.json] [--input N] [--max-cost N]
+bitlisp [tx.json] [--input N] [--max-cost N] [-I PATH]...
 ```
 
 The optional positional loads a transaction context at startup, the
@@ -26,6 +26,10 @@ the selection. With piped stdin the prompt and banner disappear, so
 a scripted session reads clean, and the same scripts run inside a
 session through `source`. Piped input must be UTF-8: an
 undecodable byte ends the run with an error line and exit 2.
+
+`-I` adds a directory to the include search path, repeatable and
+searched in flag order, the same flag `bitlisp-compile` takes, so
+a program using `include` compiles identically in both.
 
 Line editing history persists at `~/.bitlisp_history`, overridable
 through the `BITLISP_HISTORY` environment variable, capped at 2000
@@ -44,7 +48,9 @@ lines.
 | `input <n>` | select the transaction input being spent |
 | `maxcost [<n>]` | show or set the cost budget for eval, spend, and debug |
 | `(defun <name> <params> <body>)` | define a named function |
-| `(defconstant <name> <value>)` | define a constant |
+| `(defun-inline <name> <params> <body>)` | define an inline function |
+| `(defconstant <name> <value>)` | define a constant, its value evaluated at declaration |
+| `(include "<file>")` | splice a declaration file from the include search path |
 | `def <name> <sexpr>` | bind a name to a parsed node |
 | `undef <name>` | remove a definition or binding |
 | `defs` | list definitions and bindings |
@@ -83,9 +89,9 @@ A definition body assembles under the bindings current at `def`
 time, so definitions snapshot: redefining a dependency later does
 not rewrite what an earlier definition captured.
 
-A line whose head is `defun` or `defconstant` is a language
-declaration, `language.md` syntax exactly, and adds to the
-session's compiler definitions. Declarations and `def` bindings
+A line whose head is `defun`, `defun-inline`, `defconstant`, or
+`include` is a language declaration, `language.md` syntax exactly,
+and adds to the session's compiler definitions. Declarations and `def` bindings
 share one namespace with the reserved words and the condition
 constants, so one spelling can never mean two things, and `undef`
 removes a name from whichever space holds it.
@@ -183,7 +189,7 @@ bitlisp> exit
 ```
 bitlisp-asm [-T] [<file-or-literal>]      text to serialized hex
 bitlisp-disasm [-T] [<file-or-literal>]   serialized hex to text
-bitlisp-compile [--symbols <path>] [-T] [<file-or-literal>]
+bitlisp-compile [--symbols <path>] [-I <path>]... [-T] [<file-or-literal>]
                                           language source to serialized hex
 bitlisp-curry [-a <sexpr>]... [-T] [<file-or-literal>]
                                           fix values into a program
@@ -203,7 +209,10 @@ $ echo '(+ (q . 2) (q . 3))' | bitlisp-asm | bitlisp-disasm
 `language.md` syntax, and prints the serialized bytecode hex that
 `bitlisp-run --hex` and `bitlisp-disasm` accept. Its symbol table
 is written only under `--symbols`, never as a side effect, and the
-`sym` command loads the file.
+`sym` command loads the file. `-I` adds a directory to the include
+search path, repeatable, searched in flag order, and a program
+with `include` declarations compiles identically anywhere the
+search path is the same, the REPL's `-I` included.
 
 `bitlisp-curry` fixes each `-a` value, text s-expression syntax,
 into a hex program, and `bitlisp-uncurry` prints the inner
