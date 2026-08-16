@@ -158,6 +158,41 @@ def test_pin_condition_constant_inlines():
     assert disassemble(program) == "(q . 1)"
 
 
+def test_pin_assert_shapes():
+    # One operand has nothing to check and compiles bare. Each
+    # condition adds one lazy if level whose untaken branch is the
+    # raise.
+    program, _, _ = _run_program("(program (V) (assert V))", "(1)")
+    assert disassemble(program) == "2"
+    program, _, _ = _run_program("(program (C V) (assert C V))", "(1 7)")
+    assert disassemble(program) == "(a (i 2 (q . 5) (q 8)) 1)"
+    program, _, _ = _run_program("(program (C1 C2 V) (assert C1 C2 V))", "(1 1 7)")
+    assert disassemble(program) == "(a (i 2 (q 2 (i 5 (q . 11) (q 8)) 1) (q 8)) 1)"
+
+
+def test_pin_and_shapes():
+    # Empty and is the constant 1. Single-operand and and or emit
+    # the identical boolean-normalizing tree, pinned in both tests
+    # so a value-returning regression fails loudly.
+    program, _, _ = _run_program("(program (A) (and))", "(1)")
+    assert disassemble(program) == "(q . 1)"
+    program, _, _ = _run_program("(program (A) (and A))", "(1)")
+    assert disassemble(program) == "(a (i 2 (q 1 . 1) (q)) 1)"
+    program, _, _ = _run_program("(program (A B) (and A B))", "(1 1)")
+    assert disassemble(program) == "(a (i 2 (q 2 (i 5 (q 1 . 1) (q)) 1) (q)) 1)"
+
+
+def test_pin_or_shapes():
+    # Empty or is bare nil, the one-byte emission every nil literal
+    # gets.
+    program, _, _ = _run_program("(program (A) (or))", "(1)")
+    assert disassemble(program) == "()"
+    program, _, _ = _run_program("(program (A) (or A))", "(1)")
+    assert disassemble(program) == "(a (i 2 (q 1 . 1) (q)) 1)"
+    program, _, _ = _run_program("(program (A B) (or A B))", "(1 1)")
+    assert disassemble(program) == "(a (i 2 (q 1 . 1) (q 2 (i 5 (q 1 . 1) (q)) 1)) 1)"
+
+
 # Compile-and-run: language constructs against the reference VM.
 
 
@@ -187,6 +222,29 @@ def test_if_is_lazy():
     assert result == int_to_atom(7)
     _, _, result = _run_program("(program (X) (if X (x) 9))", "(())")
     assert result == int_to_atom(9)
+
+
+def test_assert_passes_its_value_and_raises_on_falsy():
+    _, _, result = _run_program("(program (X) (assert X (* X 3)))", "(14)")
+    assert result == int_to_atom(42)
+    program, _ = compile_program("(program (X) (assert X (* X 3)))")
+    with pytest.raises(BitLispError) as excinfo:
+        run(program, assemble("(())"), BUDGET)
+    assert excinfo.value.code == "user_raise"
+
+
+def test_and_or_are_boolean_and_lazy():
+    # The result is 1 or nil, never an operand value, and the
+    # guarded raise proves the short circuit: an eager reading
+    # would fail.
+    _, _, result = _run_program("(program () (and 1 2))")
+    assert result == int_to_atom(1)
+    _, _, result = _run_program("(program () (or () 3))")
+    assert result == int_to_atom(1)
+    _, _, result = _run_program("(program (X) (and X (x)))", "(())")
+    assert result == NIL
+    _, _, result = _run_program("(program (X) (or X (x)))", "(1)")
+    assert result == int_to_atom(1)
 
 
 def test_destructured_parameters():
@@ -349,6 +407,25 @@ def test_load_symbols_rejects(mutate):
         load_symbols(data)
 
 
+def test_load_symbols_tracks_the_reserved_words():
+    # The loader validates names against today's language, so the
+    # reserved-word set change is a compatibility break in both
+    # directions, recorded in the execution plan: a symbol file
+    # naming a function assert, and, or is rejected whole, and one
+    # naming a function qq, a spelling reserved before this unit,
+    # loads again.
+    _, table = compile_program("(program (X) (defun fun (N) (* 2 N)) (fun X))")
+    data = symbols_to_json(table)
+    (key,) = data["functions"]
+    for name in ("assert", "and", "or"):
+        data["functions"][key]["name"] = name
+        with pytest.raises(ValueError) as excinfo:
+            load_symbols(data)
+        assert "malformed function name" in str(excinfo.value)
+    data["functions"][key]["name"] = "qq"
+    assert load_symbols(data)[key][0] == "qq"
+
+
 def test_atom_bodies_stay_out_of_the_table():
     _, table = compile_program("(program (X) (defun own (N) N) (c (own X) X))")
     assert table["functions"] == {}
@@ -447,6 +524,10 @@ def test_variadic_call_binds_the_rest():
         ("(program (X) (defun SEAL (N) N) X)", "condition constant"),
         ("(program (X) (defun f N) X)", "defun takes 3 parts"),
         ("(program (X) (defconstant K) X)", "defconstant takes 2 parts"),
+        ("(program (X) (assert))", "assert takes conditions and a final value"),
+        ("(program (assert) 1)", "'assert' is a reserved word"),
+        ("(program (X) (defun and (N) N) X)", "'and' is a reserved word"),
+        ("(program (X) (defconstant or 1) X)", "'or' is a reserved word"),
     ],
 )
 def test_compile_errors(source, message):
@@ -492,6 +573,20 @@ def test_list_builds_the_literal_list(values):
     for value in reversed(values):
         expected = (int_to_atom(value), expected)
     assert result == expected
+
+
+@given(st.lists(st.integers(min_value=0, max_value=3), max_size=6))
+def test_and_or_match_all_and_any(values):
+    # The boolean value semantics against Python's own fold, empty
+    # lists included, pinning that no operand value ever leaks out.
+    defs = Definitions()
+    spelled = " ".join(str(value) for value in values)
+    program, _ = compile_expression(f"(and {spelled})", defs)
+    _, result = run(program, NIL, BUDGET)
+    assert result == (int_to_atom(1) if all(values) else NIL)
+    program, _ = compile_expression(f"(or {spelled})", defs)
+    _, result = run(program, NIL, BUDGET)
+    assert result == (int_to_atom(1) if any(values) else NIL)
 
 
 _node_trees = st.recursive(

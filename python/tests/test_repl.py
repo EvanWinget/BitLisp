@@ -559,6 +559,19 @@ def test_defun_line_and_call(shell, capsys):
     assert out.startswith("42\n")
 
 
+def test_new_forms_compile_at_the_prompt(shell, capsys):
+    # assert, and, and or are unknown to the raw reader, so a bare
+    # line reaches them only through the compiler retry, exactly
+    # like if and list.
+    shell.onecmd("(and 1 2)")
+    assert capsys.readouterr().out.startswith("1\n")
+    shell.onecmd("(defun safe-div (A B) (assert B (/ A B)))")
+    shell.onecmd("(safe-div 10 2)")
+    assert capsys.readouterr().out.startswith("5\n")
+    shell.onecmd("(safe-div 10 0)")
+    assert "invalid: user_raise" in capsys.readouterr().out
+
+
 def test_raw_meaning_is_unchanged(shell, capsys):
     # Numbers in raw VM text are environment paths, and a line that
     # parses raw never reaches the compiler, definitions or not.
@@ -619,6 +632,12 @@ def test_def_and_defun_share_one_namespace(shell, capsys):
     assert "reserved by the language" in capsys.readouterr().out
     shell.onecmd("def list (q . 1)")
     assert "reserved by the language" in capsys.readouterr().out
+    shell.onecmd("def and (q . 1)")
+    assert "reserved by the language" in capsys.readouterr().out
+    # qq left the reserved words with the macro system, so the
+    # spelling is an ordinary binding again.
+    shell.onecmd("def qq (q . 1)")
+    assert capsys.readouterr().out == ""
 
 
 def test_undef_removes_declarations(shell, capsys):
