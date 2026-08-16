@@ -177,7 +177,11 @@ then one fixed value per line as text, in currying order. A curry
 of zero values prints only the program line.
 
 The shape check is strict: input that decodes but is not exactly
-the curried shape is an error, never a partial answer.
+the curried shape is an error, never a partial answer. The check
+proves shape, not history: a compiled program that declares
+functions has the same shape, so it splits into its main body and
+its function tree, and a zero exit status is never evidence that
+currying happened.
 
 Exit status 0 on success, 2 when the hex does not decode, the tree
 is not a curried program, or the file does not open.
@@ -201,8 +205,16 @@ def _path_or_code(arg):
     return arg
 
 
+def _input_text(arg):
+    """The named file or the literal, or stdin when the argument
+    is omitted, one reading shared by every one-shot main."""
+    if arg is None:
+        return sys.stdin.read()
+    return _path_or_code(arg)
+
+
 def _node(source, as_hex):
-    return deserialize(bytes.fromhex(source)) if as_hex else assemble(source)
+    return deserialize(bytes.fromhex(source.strip())) if as_hex else assemble(source)
 
 
 def _tree_hash_flag(parser, usual):
@@ -307,11 +319,7 @@ def asm_main(argv=None):
     _tree_hash_flag(parser, "the hex")
     args = parser.parse_args(argv)
     try:
-        if args.program is None:
-            text = sys.stdin.read()
-        else:
-            text = _path_or_code(args.program)
-        node = assemble(text)
+        node = assemble(_input_text(args.program))
         line = tree_hash(node).hex() if args.tree_hash else serialize(node).hex()
     except BitLispError as exc:
         print(f"error: {exc.code}: {exc}", file=sys.stderr)
@@ -340,11 +348,7 @@ def disasm_main(argv=None):
     _tree_hash_flag(parser, "the text")
     args = parser.parse_args(argv)
     try:
-        if args.bytecode is None:
-            text = sys.stdin.read()
-        else:
-            text = _path_or_code(args.bytecode)
-        node = deserialize(bytes.fromhex(text.strip()))
+        node = _node(_input_text(args.bytecode), True)
         line = tree_hash(node).hex() if args.tree_hash else disassemble(node)
     except BitLispError as exc:
         print(f"error: {exc.code}: {exc}", file=sys.stderr)
@@ -376,11 +380,7 @@ def compile_main(argv=None):
     _tree_hash_flag(parser, "the hex")
     args = parser.parse_args(argv)
     try:
-        if args.source is None:
-            text = sys.stdin.read()
-        else:
-            text = _path_or_code(args.source)
-        program, table = compile_program(text)
+        program, table = compile_program(_input_text(args.source))
         line = tree_hash(program).hex() if args.tree_hash else serialize(program).hex()
         if args.symbols is not None:
             with open(args.symbols, "w") as handle:
@@ -421,11 +421,7 @@ def curry_main(argv=None):
     _tree_hash_flag(parser, "the hex")
     args = parser.parse_args(argv)
     try:
-        if args.program is None:
-            text = sys.stdin.read()
-        else:
-            text = _path_or_code(args.program)
-        program = deserialize(bytes.fromhex(text.strip()))
+        program = _node(_input_text(args.program), True)
         curried = curry(program, [assemble(value) for value in args.arg])
         line = tree_hash(curried).hex() if args.tree_hash else serialize(curried).hex()
     except BitLispError as exc:
@@ -452,11 +448,7 @@ def uncurry_main(argv=None):
     )
     args = parser.parse_args(argv)
     try:
-        if args.bytecode is None:
-            text = sys.stdin.read()
-        else:
-            text = _path_or_code(args.bytecode)
-        program, values = uncurry(deserialize(bytes.fromhex(text.strip())))
+        program, values = uncurry(_node(_input_text(args.bytecode), True))
         if values is None:
             print("error: not a curried program", file=sys.stderr)
             return 2

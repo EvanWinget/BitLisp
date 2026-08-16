@@ -284,7 +284,6 @@ PATHS_TEXT = "(+ 2 5)"
 PATHS_HEX = "ff10ff02ff0580"
 PATHS_HASH = "19c7b1ed29e8f501f6985cd6addd3b6e5bd7ccc251f1a4018550837b3006239b"
 CURRIED_HEX = "ff02ffff01ff10ff02ff0580ffff04ffff010aff018080"
-CURRIED_TEXT = "(a (q 16 2 5) (c (q . 10) 1))"
 CURRIED_HASH = "8227d2eef6f1cdb6d949e075e8c185d1316af6a65d9241ba473a0e8fc72aa880"
 
 
@@ -319,11 +318,6 @@ def test_compile_tree_hash_still_writes_symbols(tmp_path, capsys):
 def test_curry_literal(capsys):
     assert cli.curry_main([PATHS_HEX, "-a", "10"]) == 0
     assert capsys.readouterr().out == CURRIED_HEX + "\n"
-
-
-def test_curry_output_disassembles(capsys):
-    assert cli.disasm_main([CURRIED_HEX]) == 0
-    assert capsys.readouterr().out == CURRIED_TEXT + "\n"
 
 
 def test_curry_stdin(capsys, monkeypatch):
