@@ -164,7 +164,11 @@ with the incoming arguments consed behind the tree. A program whose
 body reaches no function skips all of this: its body is emitted
 bare and its parameters root at path 1. Functions and constants the
 body never mentions are pruned, so scratch definitions cost
-nothing.
+nothing. Only reachable definitions compile at all, so an error
+inside an unreached body surfaces the first time a program reaches
+it, not at the declaration. A body error names its function,
+because in the REPL the offset indexes the declaring line's text,
+not the line that triggered the compile.
 
 The compiler emits code directly and runs no rewriting passes. What
 the rules above produce is what serializes.

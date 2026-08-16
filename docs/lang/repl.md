@@ -85,6 +85,14 @@ share one namespace with the reserved words and the condition
 constants, so one spelling can never mean two things, and `undef`
 removes a name from whichever space holds it.
 
+The shared namespace narrows `def` from its original surface, a
+deliberate change with the compiler landing: a reserved word or a
+condition constant name can no longer be bound. Before the
+compiler, `def CREATE_OUTPUT` was an ordinary binding. Now that
+spelling belongs to the language, and allowing the binding would
+make the same text mean different things raw and compiled. The
+rejection is loud, an error line at the `def`.
+
 ## Running language source
 
 `eval`, `spend`, and `debug` read their text as raw VM syntax
@@ -92,10 +100,12 @@ first, and its meaning never changes. If and only if the reader
 rejects the text on an unknown name, the expression compiles as
 language source against the session's declarations, so `(fact 5)`
 works the moment `fact` is defined, and a full `(program ...)` form
-runs anywhere a program is accepted. The rule is decided by the
-text alone: raw text stays raw whatever is defined, because a
-declaration can never occupy text that already parses. A solution
-is always data and never compiles: a name inside one is an error.
+runs anywhere a program is accepted. Raw text stays raw whatever
+is declared, because a declaration can never occupy text that
+already parses. A `def` binding participates in raw parsing, so
+which reading applies follows from the text and the session's
+bindings, never from a mode. A solution is always data and never
+compiles: a name inside one is an error.
 
 Every in-REPL compile registers the compiled functions in the
 session symbol map, and `sym` loads the JSON table
@@ -168,16 +178,24 @@ bitlisp> exit
 ```
 bitlisp-asm  [<file-or-literal>]     text to serialized hex
 bitlisp-disasm [<file-or-literal>]   serialized hex to text
+bitlisp-compile [<file-or-literal>] [--symbols <path>]
+                                     language source to serialized hex
 ```
 
-Both take one argument, a file when one exists at that path and the
-literal otherwise, the `bitlisp-run` convention, or read stdin when
-the argument is omitted, so the two compose in a pipeline:
+All three take one argument, a file when one exists at that path
+and the literal otherwise, the `bitlisp-run` convention, or read
+stdin when the argument is omitted, so they compose in pipelines:
 
 ```
 $ echo '(+ (q . 2) (q . 3))' | bitlisp-asm | bitlisp-disasm
 (+ (q . 2) (q . 3))
 ```
+
+`bitlisp-compile` takes one self-contained `(program ...)` form,
+`language.md` syntax, and prints the serialized bytecode hex that
+`bitlisp-run --hex` and `bitlisp-disasm` accept. Its symbol table
+is written only under `--symbols`, never as a side effect, and the
+`sym` command loads the file.
 
 `bitlisp-disasm` deserializes strictly, accepting only the unique
 canonical encoding. Exit status is 0 on success and 2 on every
