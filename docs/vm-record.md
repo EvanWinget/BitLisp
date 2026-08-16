@@ -224,6 +224,12 @@ marked open name the phase that owes the answer.
    on the shape. None of this changes the pre-registered deciding
    test, which remains about redundancy against the reserved tier,
    not about the guard's soundness.
+
+   Deferral (decision by Evan, 2026-08-16). The end-of-Phase-2
+   deadline set on 2026-08-06 is lifted and the sub-decision is
+   deferred with no new deadline. The deciding test stands
+   unchanged, and until the decision is taken nothing in the tree
+   may assume a guard exists.
 2. **D2 (crypto family curation).** RATIFIED (decisions by Evan,
    2026-07-28). The crypto family is `sha256` plus `secp_verify`,
    nothing else, and `secp_verify` is BIP340 only. The family
