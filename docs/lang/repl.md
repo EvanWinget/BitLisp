@@ -3,11 +3,13 @@
 The interactive front end over the reference VM, the spend runner,
 the compiler, and the debug machine, all in `python/bitlisp_tools/`.
 This is tooling, not consensus. The REPL is the `bitlisp` command,
-and three one-shot commands ship beside it: `bitlisp-asm` assembles
+and five one-shot commands ship beside it: `bitlisp-asm` assembles
 text to serialized bytecode hex, `bitlisp-disasm` renders hex back
-as text, and `bitlisp-compile` compiles a source program to
-serialized bytecode hex. The text syntax is defined in `syntax.md`
-and the authoring language in `language.md`.
+as text, `bitlisp-compile` compiles a source program to serialized
+bytecode hex, and `bitlisp-curry` and `bitlisp-uncurry` fix values
+into a program and split them back out. The text syntax is defined
+in `syntax.md`, the authoring language in `language.md`, and the
+currying and tree-hash surfaces in `curry.md`.
 
 ## Starting the REPL
 
@@ -48,6 +50,9 @@ lines.
 | `defs` | list definitions and bindings |
 | `compile <expr>` | show an expression's compiled tree as canonical text |
 | `sym <path>` | load a symbol file written by bitlisp-compile |
+| `curry <program> <value> ...` | fix the values into the program, printing the curried program |
+| `uncurry <program>` | split a curried program back into program and fixed values |
+| `treehash <program>` | the program's tree hash |
 | `debug <program> [<solution>]` | open a stepping session |
 | `step` | execute one task, show the stacks |
 | `next` | step over: the pending task and its whole subtree |
@@ -176,13 +181,16 @@ bitlisp> exit
 ## The converter commands
 
 ```
-bitlisp-asm  [<file-or-literal>]     text to serialized hex
-bitlisp-disasm [<file-or-literal>]   serialized hex to text
-bitlisp-compile [<file-or-literal>] [--symbols <path>]
-                                     language source to serialized hex
+bitlisp-asm [-T] [<file-or-literal>]      text to serialized hex
+bitlisp-disasm [-T] [<file-or-literal>]   serialized hex to text
+bitlisp-compile [--symbols <path>] [-T] [<file-or-literal>]
+                                          language source to serialized hex
+bitlisp-curry [-a <sexpr>]... [-T] [<file-or-literal>]
+                                          fix values into a program
+bitlisp-uncurry [<file-or-literal>]       split a curried program back
 ```
 
-All three take one argument, a file when one exists at that path
+All five take one argument, a file when one exists at that path
 and the literal otherwise, the `bitlisp-run` convention, or read
 stdin when the argument is omitted, so they compose in pipelines:
 
@@ -196,6 +204,17 @@ $ echo '(+ (q . 2) (q . 3))' | bitlisp-asm | bitlisp-disasm
 `bitlisp-run --hex` and `bitlisp-disasm` accept. Its symbol table
 is written only under `--symbols`, never as a side effect, and the
 `sym` command loads the file.
+
+`bitlisp-curry` fixes each `-a` value, text s-expression syntax,
+into a hex program, and `bitlisp-uncurry` prints the inner
+program's hex and then one fixed value per line as text. The
+curried shape and its contract are defined in `curry.md`.
+
+`bitlisp-asm`, `bitlisp-disasm`, `bitlisp-compile`, and
+`bitlisp-curry` take `-T`, printing the program's tree hash
+instead of their usual output. The digest names the tree, not the
+encoding, so every command prints the same hash for the same
+program, the in-REPL `treehash` command included.
 
 `bitlisp-disasm` deserializes strictly, accepting only the unique
 canonical encoding. Exit status is 0 on success and 2 on every

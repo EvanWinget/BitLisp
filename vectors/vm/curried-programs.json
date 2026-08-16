@@ -1,0 +1,52 @@
+{
+ "schema": "bitlisp-vector-v0",
+ "suite": "vm",
+ "spec": "VM.md sections 3 and 4: curried-program pins, the apply-over-quoted-program shape with fixed values consed ahead of the environment, and the sha256tree identity of a curried tree",
+ "cases": [
+  {
+   "name": "curried_value_lands_first",
+   "program": "ff02ffff01ff10ff02ff0580ffff04ffff010aff018080",
+   "env": "ff2080",
+   "expect": {
+    "result": "2a",
+    "cost": 1082
+   }
+  },
+  {
+   "name": "zero_value_curry_passes_env_through",
+   "program": "ff02ffff01ff10ff02ff0580ff0180",
+   "env": "ff07ff2380",
+   "expect": {
+    "result": "2a",
+    "cost": 1011
+   }
+  },
+  {
+   "name": "nested_curry_orders_inner_values_first",
+   "program": "ff02ffff01ff02ffff01ff11ff02ff0580ffff04ffff0132ff018080ffff04ffff0108ff018080",
+   "env": "80",
+   "expect": {
+    "result": "2a",
+    "cost": 1308
+   }
+  },
+  {
+   "name": "curried_compiled_program_takes_remaining_parameters",
+   "program": "ff02ffff01ff12ff02ff0580ffff04ffff0106ff018080",
+   "env": "ff0780",
+   "expect": {
+    "result": "2a",
+    "cost": 1326
+   }
+  },
+  {
+   "name": "sha256tree_names_the_curried_program",
+   "program": "ff3fffff01ff02ffff01ff10ff02ff0580ffff04ffff010aff01808080",
+   "env": "80",
+   "expect": {
+    "result": "a08227d2eef6f1cdb6d949e075e8c185d1316af6a65d9241ba473a0e8fc72aa880",
+    "cost": 5713
+   }
+  }
+ ]
+}

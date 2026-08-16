@@ -230,8 +230,9 @@ nothing forces a change. The deliberate differences:
 - Unknown bare operator atoms in call position are rejected at
   compile time rather than at run time.
 - `if` and `list` are compiler forms, not macros, and there is no
-  macro system, no include mechanism, no inline functions, and no
-  currying helper in v0.
+  macro system, no include mechanism, and no inline functions in
+  v0. Currying is not a language form either: it operates on
+  compiled programs, through the surfaces defined in `curry.md`.
 
 ## A worked session
 

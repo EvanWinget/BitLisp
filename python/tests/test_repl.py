@@ -720,3 +720,112 @@ def test_deferred_body_error_names_its_function(shell, capsys):
     out = capsys.readouterr().out
     assert "in 'broken':" in out
     assert "unknown name 'MISSING'" in out
+
+
+# Currying and identity.
+
+PATHS_HASH = "19c7b1ed29e8f501f6985cd6addd3b6e5bd7ccc251f1a4018550837b3006239b"
+
+
+def test_curry_prints_canonical_text(shell, capsys):
+    shell.onecmd("curry (+ 2 5) 10")
+    assert capsys.readouterr().out == "(a (q 16 2 5) (c (q . 10) 1))\n"
+
+
+def test_curry_zero_values(shell, capsys):
+    shell.onecmd("curry (+ 2 5)")
+    assert capsys.readouterr().out == "(a (q 16 2 5) 1)\n"
+
+
+def test_curry_takes_at_least_a_program(shell, capsys):
+    shell.onecmd("curry")
+    assert capsys.readouterr().out.startswith("error: curry takes a program")
+
+
+def test_curry_compiles_language_source(shell, capsys):
+    shell.onecmd("curry (program (X Y) (* X Y)) 6")
+    out = capsys.readouterr().out
+    shell.onecmd(f"eval {out.strip()} (7)")
+    assert capsys.readouterr().out == f"42\ncost: 1326 of {BUDGET}\n"
+
+
+def test_curry_values_stay_data(shell, capsys):
+    # The program half compiles, so the whole line takes the
+    # language reading, where a value is data exactly as a
+    # solution is: a name inside one is an error.
+    shell.onecmd("(defconstant FEE 400)")
+    shell.onecmd("curry (program (X) (- X FEE)) FEE")
+    out = capsys.readouterr().out
+    assert out.startswith("error: ")
+    assert "'FEE' in a fixed value" in out
+
+
+def test_curry_def_binding_participates_raw(shell, capsys):
+    # Under a def binding the line parses raw, so the bound name
+    # splices into program and value alike.
+    shell.onecmd("def ten (q . 10)")
+    shell.onecmd("curry (+ 2 5) ten")
+    assert capsys.readouterr().out == "(a (q 16 2 5) (c (q 1 . 10) 1))\n"
+
+
+def test_uncurry_round_trips(shell, capsys):
+    shell.onecmd("uncurry (a (q 16 2 5) (c (q . 10) 1))")
+    assert capsys.readouterr().out == "program: (+ 2 5)\nvalue: 10\n"
+
+
+def test_uncurry_zero_value_curry(shell, capsys):
+    shell.onecmd("uncurry (a (q 16 2 5) 1)")
+    assert capsys.readouterr().out == "program: (+ 2 5)\n"
+
+
+def test_uncurry_not_curried_prints_error(shell, capsys):
+    shell.onecmd("uncurry (+ 2 5)")
+    assert capsys.readouterr().out == "error: not a curried program\n"
+
+
+def test_uncurry_takes_one_program(shell, capsys):
+    shell.onecmd("uncurry (+ 2 5) (+ 2 5)")
+    assert capsys.readouterr().out.startswith("error: uncurry takes one program")
+
+
+def test_uncurry_arity_error_matches_on_the_language_path(shell, capsys):
+    # The same mistake through the compiled fallback must print the
+    # same arity error the raw path prints, not a parser message.
+    shell.onecmd("uncurry (program (X) (* X X)) ()")
+    assert capsys.readouterr().out.startswith("error: uncurry takes one program")
+
+
+def test_treehash_prints_the_tree_hash(shell, capsys):
+    shell.onecmd("treehash (+ 2 5)")
+    assert capsys.readouterr().out == PATHS_HASH + "\n"
+
+
+def test_treehash_of_compiled_source_matches_compile_flag(shell, capsys):
+    # The same digest bitlisp-compile -T prints for this program,
+    # so identity does not depend on the entry point.
+    shell.onecmd("treehash (program (X Y) (* X Y))")
+    out = capsys.readouterr().out.strip()
+    from bitlisp_tools import cli
+
+    assert cli.compile_main(["(program (X Y) (* X Y))", "-T"]) == 0
+    assert capsys.readouterr().out.strip() == out
+
+
+def test_treehash_takes_one_program(shell, capsys):
+    shell.onecmd("treehash")
+    assert capsys.readouterr().out.startswith("error: ")
+
+
+def test_curry_then_debug_keeps_symbol_names(shell, capsys):
+    # Currying wraps the compiled tree without touching the
+    # function bodies inside, so the in-REPL compile registers
+    # double and the debugger still renames it in the curried tree.
+    source = "(program (X Y) (defun double (N) (* 2 N)) (double (* X Y)))"
+    shell.onecmd(f"curry {source} 3")
+    curried = capsys.readouterr().out.strip()
+    shell.onecmd(f"debug {curried} (7)")
+    capsys.readouterr()
+    shell.onecmd("trace")
+    out = capsys.readouterr().out
+    assert "result: 42" in out
+    assert "double" in out

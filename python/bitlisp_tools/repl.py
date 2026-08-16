@@ -22,6 +22,13 @@ Definitions:
     compile <expr>                 show an expression's compiled tree
     sym <path>                     load a bitlisp-compile symbol file
 
+Currying and identity:
+    curry <program> <value> ...    fix the values into the program,
+                                   printing the curried program
+    uncurry <program>              split a curried program back into
+                                   program and fixed values
+    treehash <program>             the program's tree hash
+
 Debugger:
     debug <program> [<solution>]   open a stepping session
     step                           execute one task, show the stacks
@@ -75,6 +82,7 @@ from .compiler import (
     source_text,
     tree_hash,
 )
+from .curry import curry, uncurry
 from .keywords import ATOM_TO_NAME
 from .printer import disassemble
 from .reader import (
@@ -185,8 +193,10 @@ class BitLispShell(cmd.Cmd):
         print(f"error: unknown command {word!r}, type help for the list")
         return None
 
-    def _programs(self, arg, what):
-        """The program and optional solution one argument line holds.
+    def _forms(self, arg, what, wants, least, most, data_noun):
+        """The program and trailing data forms one argument line
+        holds, the one parse seam behind every command that takes a
+        program.
 
         Raw VM text first, its meaning unchanged forever. Only text
         the reader rejects on an unknown name retries as language
@@ -194,33 +204,41 @@ class BitLispShell(cmd.Cmd):
         change meaning. The reader's verdict decides which reading
         applies, under the session's def bindings, and never a mode:
         a declaration cannot flip a line to the compiler because it
-        can never occupy text that already parses.
+        can never occupy text that already parses. On the language
+        reading only the first form compiles: every trailing form
+        is data and cannot hold names.
         """
         try:
             nodes = assemble_many(arg, self.names)
+            compiled = False
         except UnknownSymbol:
-            return self._compiled_programs(arg, what)
-        if len(nodes) not in (1, 2):
-            raise ValueError(f"{what} takes a program and an optional solution")
+            nodes = parse_source_many(arg)
+            compiled = True
+        if len(nodes) < least or (most is not None and len(nodes) > most):
+            raise ValueError(f"{what} takes {wants}")
+        if compiled:
+            for tree in nodes[1:]:
+                symbol = first_symbol(tree)
+                if symbol is not None:
+                    raise CompileError(
+                        f"{symbol.name!r} in {data_noun}, "
+                        "which is data and cannot hold names",
+                        symbol.offset,
+                    )
+            program, table = compile_expression(nodes[0], self.defs)
+            self._register_symbols(table)
+            nodes = [program, *nodes[1:]]
+        return nodes
+
+    def _programs(self, arg, what):
+        nodes = self._forms(
+            arg, what, "a program and an optional solution", 1, 2, "the solution"
+        )
         return nodes[0], nodes[1] if len(nodes) == 2 else NIL
 
-    def _compiled_programs(self, arg, what):
-        trees = parse_source_many(arg)
-        if len(trees) not in (1, 2):
-            raise ValueError(f"{what} takes a program and an optional solution")
-        solution = NIL
-        if len(trees) == 2:
-            symbol = first_symbol(trees[1])
-            if symbol is not None:
-                raise CompileError(
-                    f"{symbol.name!r} in the solution, "
-                    "which is data and cannot hold names",
-                    symbol.offset,
-                )
-            solution = trees[1]
-        program, table = compile_expression(trees[0], self.defs)
-        self._register_symbols(table)
-        return program, solution
+    def _one_program(self, arg, what):
+        (program,) = self._forms(arg, what, "one program", 1, 1, "the argument")
+        return program
 
     def _register_symbols(self, table):
         for key, entry in table["functions"].items():
@@ -422,6 +440,35 @@ class BitLispShell(cmd.Cmd):
         loaded = load_symbols(data)
         self.symbols.update(loaded)
         print(f"{len(loaded)} function name(s) loaded")
+
+    # Currying and identity.
+
+    @_survives
+    def do_curry(self, arg):
+        """curry <program> <value> ...: fix the values into the
+        program, printing the curried program."""
+        nodes = self._forms(
+            arg, "curry", "a program and optional values", 1, None, "a fixed value"
+        )
+        print(self._node_text(curry(nodes[0], nodes[1:])))
+
+    @_survives
+    def do_uncurry(self, arg):
+        """uncurry <program>: split a curried program back into
+        the inner program and its fixed values."""
+        program, values = uncurry(self._one_program(arg, "uncurry"))
+        if values is None:
+            print("error: not a curried program")
+            return
+        print(f"program: {self._node_text(program)}")
+        for value in values:
+            print(f"value: {self._node_text(value)}")
+
+    @_survives
+    def do_treehash(self, arg):
+        """treehash <program>: the program's tree hash, the identity
+        an output would commit to."""
+        print(tree_hash(self._one_program(arg, "treehash")).hex())
 
     # The debugger.
 

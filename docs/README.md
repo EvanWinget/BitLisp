@@ -27,4 +27,7 @@
   compiled environment shape, and the symbol table format.
 - [lang/repl.md](lang/repl.md): the bitlisp REPL, its debugger, and
   the one-shot converter and compiler commands beside it.
+- [lang/curry.md](lang/curry.md): currying and program identity,
+  the curried shape, the uncurry contract, the tree hash as the
+  program's name, and the command surfaces over them.
 - Essay drafts land here in Phase 5.
