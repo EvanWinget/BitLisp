@@ -16,6 +16,7 @@ Transaction context:
 Definitions:
     (defun <name> <params> <body>)   define a named function
     (defconstant <name> <value>)     define a constant
+    (defmacro <name> <params> <body>)   define a macro
     def <name> <sexpr>             bind a name to a parsed node
     undef <name>                   remove a definition or binding
     defs                           list definitions and bindings
@@ -51,9 +52,9 @@ never change the meaning of text that already parses.
 The same rule shapes the compiler surface: eval, spend, and debug
 read their text as raw VM syntax first, and only text the reader
 rejects on an unknown name retries as language source against the
-session's defun and defconstant definitions, the condition
-constants included. A program's solution is always data and never
-compiles.
+session's defun, defconstant, and defmacro definitions, the
+condition constants included. A program's solution is always data
+and never compiles.
 """
 
 import argparse
@@ -119,7 +120,7 @@ def _declaration_line(stripped):
     return (
         len(tokens) >= 2
         and tokens[0][0] == "("
-        and tokens[1][0] in ("defun", "defconstant")
+        and tokens[1][0] in ("defun", "defconstant", "defmacro")
     )
 
 
@@ -362,14 +363,18 @@ class BitLispShell(cmd.Cmd):
 
     @_survives
     def _declare(self, line):
-        """A (defun ...) or (defconstant ...) line adds to the
-        compiler definitions space. Names are claimed once across
-        this space and the def bindings, so one spelling can never
-        mean two things."""
+        """A (defun ...), (defconstant ...), or (defmacro ...) line
+        adds to the compiler definitions space. Names are claimed
+        once across this space and the def bindings, so one
+        spelling can never mean two things. A defmacro's body
+        compiles here, on this line, so its errors print now."""
         tree = parse_source(line)
         taken = set(self.names)
-        if declaration_keyword(tree) == "defun":
+        keyword = declaration_keyword(tree)
+        if keyword == "defun":
             self.defs.add_defun(tree, taken)
+        elif keyword == "defmacro":
+            self.defs.add_defmacro(tree, taken)
         else:
             self.defs.add_defconstant(tree, taken)
 
@@ -393,7 +398,11 @@ class BitLispShell(cmd.Cmd):
         if name in RESERVED_WORDS or name in CONDITION_CONSTANTS:
             print(f"error: {name!r} is reserved by the language")
             return
-        if name in self.defs.functions or name in self.defs.constants:
+        if (
+            name in self.defs.functions
+            or name in self.defs.constants
+            or name in self.defs.macros
+        ):
             print(f"error: {name!r} is already defined")
             return
         nodes = assemble_many(body, self.names)
@@ -406,8 +415,17 @@ class BitLispShell(cmd.Cmd):
     def do_undef(self, arg):
         """undef <name>: remove a definition or binding."""
         name = arg.strip()
-        for space in (self.names, self.defs.functions, self.defs.constants):
+        spaces = (
+            self.names,
+            self.defs.functions,
+            self.defs.constants,
+            self.defs.macros,
+        )
+        for space in spaces:
             if name in space:
+                # A macro already compiled into another macro's
+                # program stays compiled: removal changes what
+                # later lines mean, never what earlier ones built.
                 del space[name]
                 return
         print(f"error: {name!r} is not defined")
@@ -422,6 +440,9 @@ class BitLispShell(cmd.Cmd):
         for name in sorted(self.defs.functions):
             params, body, _ = self.defs.functions[name]
             print(f"(defun {name} {source_text(params)} {source_text(body)})")
+        for name in sorted(self.defs.macros):
+            params, body, _, _ = self.defs.macros[name]
+            print(f"(defmacro {name} {source_text(params)} {source_text(body)})")
 
     @_survives
     def do_compile(self, arg):

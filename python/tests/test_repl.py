@@ -638,6 +638,57 @@ def test_defs_lists_all_three_kinds(shell, capsys):
     )
 
 
+def test_defmacro_line_and_call(shell, capsys):
+    shell.onecmd("(defmacro inc (e) (qq (+ (unquote e) 1)))")
+    assert capsys.readouterr().out == ""
+    shell.onecmd("(inc 41)")
+    assert capsys.readouterr().out.startswith("42\n")
+
+
+def test_defmacro_body_errors_print_on_its_line(shell, capsys):
+    # A macro body compiles at its declaration, in the macro world,
+    # where the session's functions are invisible. The failed line
+    # claims nothing, so the name stays free.
+    shell.onecmd("(defun dbl (N) (* 2 N))")
+    shell.onecmd("(defmacro m (e) (dbl e))")
+    assert "unknown name 'dbl'" in capsys.readouterr().out
+    shell.onecmd("(defmacro m (e) e)")
+    assert capsys.readouterr().out == ""
+
+
+def test_def_and_defmacro_share_one_namespace(shell, capsys):
+    shell.onecmd("def m (q . 1)")
+    shell.onecmd("(defmacro m (e) e)")
+    assert "'m' is already defined" in capsys.readouterr().out
+    shell.onecmd("(defmacro held (e) e)")
+    shell.onecmd("def held (q . 1)")
+    assert "'held' is already defined" in capsys.readouterr().out
+
+
+def test_undef_removes_a_macro(shell, capsys):
+    shell.onecmd("(defmacro m (e) e)")
+    shell.onecmd("undef m")
+    shell.onecmd("(m 1)")
+    assert "unknown name 'm'" in capsys.readouterr().out
+
+
+def test_defs_lists_macros_after_functions(shell, capsys):
+    shell.onecmd("(defun double (N) (* 2 N))")
+    shell.onecmd("(defmacro inc (e) (qq (+ (unquote e) 1)))")
+    shell.onecmd("defs")
+    assert capsys.readouterr().out == (
+        "(defun double (N) (* 2 N))\n(defmacro inc (e) (qq (+ (unquote e) 1)))\n"
+    )
+
+
+def test_program_form_ignores_session_macros(shell, capsys):
+    # Self-containment: a pasted program form compiles against its
+    # own declarations only, exactly as it would from a file.
+    shell.onecmd("(defmacro inc (e) (qq (+ (unquote e) 1)))")
+    shell.onecmd("eval (program (X) (inc X)) (1)")
+    assert "unknown name 'inc'" in capsys.readouterr().out
+
+
 def test_compile_command_shows_canonical_text(shell, capsys):
     shell.onecmd("(defun double (N) (* 2 N))")
     shell.onecmd("compile (double 3)")
