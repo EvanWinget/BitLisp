@@ -5,9 +5,9 @@ the reader would reject as an unknown symbol, so strings, hex,
 operator names, and decimals keep exactly their raw meaning and the
 language occupies only text that previously errored. Atoms quote
 themselves, names resolve to environment paths or inline constant
-values, and the special forms are program, defun, defconstant, if,
-list, assert, and, and or. Everything else a source expression can
-say is an operator application.
+values, and the special forms are program, defun, defconstant,
+include, if, list, assert, and, and or. Everything else a source
+expression can say is an operator application.
 
 A compiled program's environment is the pair (function tree . args).
 The function tree holds every reachable function body, balanced in
@@ -37,6 +37,7 @@ is not distinguishable from ordinary data by its hash.
 """
 
 import hashlib
+import os
 
 from bitlisp import conditions
 from bitlisp.operators import OPERATORS
@@ -56,10 +57,11 @@ _RAISE = b"\x08"
 # VM's path lookup numbers them.
 _TOP, _LEFT, _RIGHT = 1, 2, 3
 
-_PROGRAM, _DEFUN, _DEFCONSTANT, _IF, _LIST, _ASSERT, _AND, _OR = (
+_PROGRAM, _DEFUN, _DEFCONSTANT, _INCLUDE, _IF, _LIST, _ASSERT, _AND, _OR = (
     "program",
     "defun",
     "defconstant",
+    "include",
     "if",
     "list",
     "assert",
@@ -67,12 +69,12 @@ _PROGRAM, _DEFUN, _DEFCONSTANT, _IF, _LIST, _ASSERT, _AND, _OR = (
     "or",
 )
 RESERVED_WORDS = frozenset(
-    {_PROGRAM, _DEFUN, _DEFCONSTANT, _IF, _LIST, _ASSERT, _AND, _OR}
+    {_PROGRAM, _DEFUN, _DEFCONSTANT, _INCLUDE, _IF, _LIST, _ASSERT, _AND, _OR}
 )
 
 # The declaration heads a program form accepts, the one tuple the
 # REPL's line dispatch reads too, so the two surfaces cannot drift.
-DECLARATION_KEYWORDS = (_DEFUN, _DEFCONSTANT)
+DECLARATION_KEYWORDS = (_DEFUN, _DEFCONSTANT, _INCLUDE)
 
 
 # The condition vocabulary, one name per assigned opcode, written
@@ -318,6 +320,7 @@ def _form_items(form, keyword, count):
 _FORM_SHAPES = {
     _DEFUN: "(defun name params body)",
     _DEFCONSTANT: "(defconstant name value)",
+    _INCLUDE: '(include "file")',
 }
 
 
@@ -519,7 +522,7 @@ class _Compilation:
             return self._and(head, tail, bindings)
         if name == _OR:
             return self._or(head, tail, bindings)
-        if name in (_PROGRAM, _DEFUN, _DEFCONSTANT):
+        if name in (_PROGRAM, _DEFUN, _DEFCONSTANT, _INCLUDE):
             raise CompileError(f"{name} form is not an expression", head.offset)
         if name in bindings:
             raise CompileError(f"{name!r} is a parameter, not a function", head.offset)
@@ -676,11 +679,119 @@ def program_form(tree):
     return is_pair(tree) and isinstance(tree[0], Symbol) and tree[0].name == _PROGRAM
 
 
-def compile_program(source):
+def _include_name(form):
+    """The file name one (include "file") form names. The name is a
+    string atom: a bare name would answer to the namespace rules,
+    and nothing else spells a file."""
+    items = _form_items(form, _INCLUDE, 2)
+    atom = items[1]
+    if isinstance(atom, Symbol):
+        raise CompileError(
+            f"include takes a quoted file name, got the bare name {atom.name!r}",
+            atom.offset,
+        )
+    if is_pair(atom):
+        raise CompileError("include takes a quoted file name")
+    try:
+        name = atom.decode()
+    except UnicodeDecodeError:
+        raise CompileError("include takes a quoted file name") from None
+    if not name or not name.isprintable():
+        raise CompileError("include takes a quoted file name")
+    return name
+
+
+def _resolve_include(name, include_paths, offset):
+    """The first include directory holding name, in search-path
+    order. The search path is explicit: no implicit current
+    directory, so where a program compiles never changes what it
+    includes."""
+    for directory in include_paths:
+        path = os.path.join(directory, name)
+        if os.path.isfile(path):
+            return path
+    raise CompileError(f'include file "{name}" not found on the include path', offset)
+
+
+def _include_items(path, name):
+    """The declaration items of one include file: exactly one
+    parenthesized list of declarations and nothing after it, so a
+    file reads whole or not at all."""
+    try:
+        with open(path, encoding="utf-8") as handle:
+            text = handle.read()
+    except (OSError, UnicodeDecodeError) as exc:
+        raise CompileError(f'include file "{name}": {exc}') from None
+    try:
+        forms = parse_source_many(text)
+    except ParseError as exc:
+        raise CompileError(f'in include "{name}": {exc}') from None
+    if len(forms) != 1 or not (is_pair(forms[0]) or forms[0] == NIL):
+        raise CompileError(f'include file "{name}" must hold one declaration list')
+    return _proper_items(forms[0], f'include file "{name}"')
+
+
+# The splice stack's marker for a finished file, popping its chain
+# entry.
+_INCLUDE_END = object()
+
+
+def _spliced(declarations, include_paths):
+    """Declaration and origin pairs with every include resolved
+    depth first in place, origin naming the include file a
+    declaration came from, None for the program's own text. A file
+    loads once per compile: a repeat include is skipped where the
+    names would otherwise collide, and an include chain reaching a
+    file still being spliced is a cycle, an error naming the
+    chain."""
+    result = []
+    loaded = set()
+    chain = []
+    stack = [(declaration, None) for declaration in reversed(declarations)]
+    while stack:
+        declaration, origin = stack.pop()
+        if declaration is _INCLUDE_END:
+            chain.pop()
+            continue
+        if declaration_keyword(declaration) != _INCLUDE:
+            result.append((declaration, origin))
+            continue
+        try:
+            name = _include_name(declaration)
+            offset = declaration[0].offset if origin is None else None
+            path = os.path.realpath(_resolve_include(name, include_paths, offset))
+        except CompileError as exc:
+            if origin is None:
+                raise
+            raise CompileError(f'in include "{origin}": {exc}') from None
+        if any(path == seen for seen, _ in chain):
+            names = [seen_name for _, seen_name in chain]
+            names = names[next(i for i, (p, _) in enumerate(chain) if p == path) :]
+            raise CompileError("include cycle: " + " includes ".join([*names, name]))
+        if path in loaded:
+            continue
+        loaded.add(path)
+        chain.append((path, name))
+        stack.append((_INCLUDE_END, None))
+        for item in reversed(_include_items(path, name)):
+            stack.append((item, name))
+    return result
+
+
+def included_declarations(form, include_paths):
+    """The declaration and origin pairs one (include "file") form
+    splices, nested includes resolved, for a caller that holds its
+    own namespace, the REPL's session declarations."""
+    return _spliced([form], include_paths)
+
+
+def compile_program(source, include_paths=()):
     """The program node and symbol table for one self-contained
     (program params declaration* body) form, given as text or as a
     parsed source tree. Session definitions are invisible on
-    purpose: what compiles from a file compiles identically pasted."""
+    purpose, and include files resolve only through include_paths,
+    first match winning: what compiles from a file compiles
+    identically pasted anywhere the search path is the same."""
     tree = parse_source(source) if isinstance(source, str) else source
     if not program_form(tree):
         raise CompileError("input must be a (program ...) form")
@@ -693,25 +804,34 @@ def compile_program(source):
     params = items[0]
     _check_params(params)
     defs = Definitions()
-    for declaration in items[1:-1]:
+    for declaration, origin in _spliced(items[1:-1], include_paths):
         keyword = declaration_keyword(declaration)
-        if keyword == _DEFUN:
-            defs.add_defun(declaration)
-        elif keyword == _DEFCONSTANT:
-            defs.add_defconstant(declaration)
-        else:
-            raise CompileError("expected defun or defconstant")
+        try:
+            if keyword == _DEFUN:
+                defs.add_defun(declaration)
+            elif keyword == _DEFCONSTANT:
+                defs.add_defconstant(declaration)
+            else:
+                raise CompileError("expected defun, defconstant, or include")
+        except CompileError as exc:
+            # An included declaration's offsets index its own file's
+            # text, so the error names the file, as a function body's
+            # error names the function.
+            if origin is None:
+                raise
+            raise CompileError(f'in include "{origin}": {exc}') from None
     return _compile(defs, params, items[-1])
 
 
-def compile_expression(source, defs):
+def compile_expression(source, defs, include_paths=()):
     """The program node and symbol table for one bare expression
     against a definitions space. The expression has no parameters,
     so the compiled program ignores its environment. A program form
-    ignores the definitions, staying self-contained."""
+    ignores the definitions, staying self-contained, its includes
+    resolving through include_paths."""
     tree = parse_source(source) if isinstance(source, str) else source
     if program_form(tree):
-        return compile_program(tree)
+        return compile_program(tree, include_paths)
     return _compile(defs, None, tree)
 
 

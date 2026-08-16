@@ -642,10 +642,41 @@ def test_def_and_defun_share_one_namespace(shell, capsys):
     assert "reserved by the language" in capsys.readouterr().out
     shell.onecmd("def and (q . 1)")
     assert "reserved by the language" in capsys.readouterr().out
+    shell.onecmd("def include (q . 1)")
+    assert "reserved by the language" in capsys.readouterr().out
     # qq left the reserved words with the macro system, so the
     # spelling is an ordinary binding again.
     shell.onecmd("def qq (q . 1)")
     assert capsys.readouterr().out == ""
+
+
+def test_include_line_loads_declarations(shell, capsys, tmp_path):
+    (tmp_path / "lib.blib").write_text("((defun double (N) (* 2 N)))")
+    shell.include_paths = (str(tmp_path),)
+    shell.onecmd('(include "lib.blib")')
+    assert capsys.readouterr().out == ""
+    shell.onecmd("(double (q . 4))")
+    assert "8" in capsys.readouterr().out
+
+
+def test_include_line_without_path_errors(shell, capsys):
+    shell.onecmd('(include "lib.blib")')
+    assert "not found on the include path" in capsys.readouterr().out
+
+
+def test_include_line_collision_names_the_file(shell, capsys, tmp_path):
+    (tmp_path / "lib.blib").write_text("((defconstant K 1))")
+    shell.include_paths = (str(tmp_path),)
+    shell.onecmd("(defconstant K 2)")
+    shell.onecmd('(include "lib.blib")')
+    assert "in include \"lib.blib\": 'K' is already defined" in capsys.readouterr().out
+
+
+def test_program_form_includes_resolve_in_eval(shell, capsys, tmp_path):
+    (tmp_path / "lib.blib").write_text("((defun double (N) (* 2 N)))")
+    shell.include_paths = (str(tmp_path),)
+    shell.onecmd('eval (program (X) (include "lib.blib") (double X)) (21)')
+    assert "42" in capsys.readouterr().out
 
 
 def test_undef_removes_declarations(shell, capsys):

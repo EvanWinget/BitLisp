@@ -121,6 +121,12 @@ authoring language. The argument names a file when one exists at
 that path and reads as literal text otherwise. With no argument the
 text is read from stdin. Prints one line of lowercase hex.
 
+-I adds a directory to the include search path, repeatable and
+searched in flag order, first match winning. A program's (include
+"file") declarations resolve only through this path, never an
+implicit current directory, so what a program compiles to never
+depends on where the command runs.
+
 --symbols writes the program's symbol table, a JSON object mapping
 the tree hash of each compiled function body to its name and
 parameter names. The REPL's sym command loads it, so bytecode
@@ -136,7 +142,7 @@ file does not open, or the symbol file does not write.
 Usage:
     bitlisp-compile "(program (X) (defun double (N) (* 2 N)) (double X))"
     bitlisp-compile puzzle.bl --symbols puzzle.sym
-    bitlisp-compile puzzle.bl | bitlisp-disasm
+    bitlisp-compile puzzle.bl -I lib | bitlisp-disasm
     bitlisp-compile -T puzzle.bl
 """
 
@@ -377,10 +383,19 @@ def compile_main(argv=None):
         metavar="PATH",
         help="write the symbol table as JSON to this path",
     )
+    parser.add_argument(
+        "-I",
+        "--include",
+        action="append",
+        default=[],
+        metavar="PATH",
+        help="add a directory to the include search path, repeatable, "
+        "searched in order",
+    )
     _tree_hash_flag(parser, "the hex")
     args = parser.parse_args(argv)
     try:
-        program, table = compile_program(_input_text(args.source))
+        program, table = compile_program(_input_text(args.source), tuple(args.include))
         line = tree_hash(program).hex() if args.tree_hash else serialize(program).hex()
         if args.symbols is not None:
             with open(args.symbols, "w") as handle:

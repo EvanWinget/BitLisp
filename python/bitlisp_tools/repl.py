@@ -15,7 +15,10 @@ Transaction context:
 
 Definitions:
     (defun <name> <params> <body>)   define a named function
-    (defconstant <name> <value>)     define a constant
+    (defconstant <name> <value>)     define a constant, its value
+                                   evaluated at declaration
+    (include "<file>")             splice a declaration file from
+                                   the include search path
     def <name> <sexpr>             bind a name to a parsed node
     undef <name>                   remove a definition or binding
     defs                           list definitions and bindings
@@ -77,6 +80,7 @@ from .compiler import (
     compile_expression,
     declaration_keyword,
     first_symbol,
+    included_declarations,
     load_symbols,
     parse_source,
     parse_source_many,
@@ -172,6 +176,7 @@ class BitLispShell(cmd.Cmd):
         self.context_path = None
         self.input_index = 0
         self.max_cost = DEFAULT_MAX_COST
+        self.include_paths = ()
         self.session = None
 
     # Line handling.
@@ -226,7 +231,7 @@ class BitLispShell(cmd.Cmd):
                         "which is data and cannot hold names",
                         symbol.offset,
                     )
-            program, table = compile_expression(nodes[0], self.defs)
+            program, table = compile_expression(nodes[0], self.defs, self.include_paths)
             self._register_symbols(table)
             nodes = [program, *nodes[1:]]
         return nodes
@@ -363,16 +368,29 @@ class BitLispShell(cmd.Cmd):
 
     @_survives
     def _declare(self, line):
-        """A (defun ...) or (defconstant ...) line adds to the
-        compiler definitions space. Names are claimed once across
-        this space and the def bindings, so one spelling can never
-        mean two things."""
+        """A declaration line adds to the compiler definitions
+        space, an include line splicing its file's declarations one
+        by one. Names are claimed once across this space and the
+        def bindings, so one spelling can never mean two things."""
         tree = parse_source(line)
+        if declaration_keyword(tree) == "include":
+            for declaration, origin in included_declarations(tree, self.include_paths):
+                try:
+                    self._add_declaration(declaration)
+                except CompileError as exc:
+                    raise CompileError(f'in include "{origin}": {exc}') from None
+            return
+        self._add_declaration(tree)
+
+    def _add_declaration(self, tree):
         taken = set(self.names)
-        if declaration_keyword(tree) == "defun":
+        keyword = declaration_keyword(tree)
+        if keyword == "defun":
             self.defs.add_defun(tree, taken)
-        else:
+        elif keyword == "defconstant":
             self.defs.add_defconstant(tree, taken)
+        else:
+            raise CompileError("expected defun, defconstant, or include")
 
     @_survives
     def do_def(self, arg):
@@ -429,7 +447,9 @@ class BitLispShell(cmd.Cmd):
     def do_compile(self, arg):
         """compile <expr-or-program>: show the compiled tree as
         canonical text, the artifact itself, never renamed."""
-        program, table = compile_expression(parse_source(arg), self.defs)
+        program, table = compile_expression(
+            parse_source(arg), self.defs, self.include_paths
+        )
         self._register_symbols(table)
         print(self._node_text(program))
 
@@ -671,10 +691,20 @@ def main(argv=None):
         metavar="N",
         help="inclusive cost budget for evaluation and condition parsing",
     )
+    parser.add_argument(
+        "-I",
+        "--include",
+        action="append",
+        default=[],
+        metavar="PATH",
+        help="add a directory to the include search path, repeatable, "
+        "searched in order",
+    )
     args = parser.parse_args(argv)
 
     shell = BitLispShell()
     shell.max_cost = args.max_cost
+    shell.include_paths = tuple(args.include)
     if args.context is not None:
         try:
             shell._load_context(args.context)

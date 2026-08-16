@@ -417,7 +417,7 @@ def test_load_symbols_tracks_the_reserved_words():
     _, table = compile_program("(program (X) (defun fun (N) (* 2 N)) (fun X))")
     data = symbols_to_json(table)
     (key,) = data["functions"]
-    for name in ("assert", "and", "or"):
+    for name in ("assert", "and", "or", "include"):
         data["functions"][key]["name"] = name
         with pytest.raises(ValueError) as excinfo:
             load_symbols(data)
@@ -471,6 +471,100 @@ def test_variadic_call_binds_the_rest():
     source = "(program (X) (defun spread (A . REST) REST) (spread X))"
     _, _, result = _run_program(source, "(1)")
     assert result == NIL
+
+
+# Includes.
+
+
+def test_include_splices_identically_to_pasted_source(tmp_path):
+    (tmp_path / "pay.blib").write_text(
+        "((defconstant FEE 400)\n (defun pay (AMT) (- AMT FEE)))\n"
+    )
+    included, _ = compile_program(
+        '(program (X) (include "pay.blib") (pay X))', (str(tmp_path),)
+    )
+    pasted, _ = compile_program(
+        "(program (X) (defconstant FEE 400) (defun pay (AMT) (- AMT FEE)) (pay X))"
+    )
+    assert serialize(included) == serialize(pasted)
+
+
+def test_nested_and_diamond_includes_load_once(tmp_path):
+    (tmp_path / "base.blib").write_text("((defconstant K 7))")
+    (tmp_path / "a.blib").write_text('((include "base.blib") (defun fa (N) (+ N K)))')
+    (tmp_path / "b.blib").write_text('((include "base.blib") (defun fb (N) (* N K)))')
+    program, _ = compile_program(
+        '(program (X) (include "a.blib") (include "b.blib") (fa (fb X)))',
+        (str(tmp_path),),
+    )
+    _, result = run(program, assemble("(2)"), BUDGET)
+    assert result == int_to_atom(21)
+
+
+def test_repeat_include_is_skipped(tmp_path):
+    (tmp_path / "k.blib").write_text("((defconstant K 7))")
+    program, _ = compile_program(
+        '(program () (include "k.blib") (include "k.blib") K)', (str(tmp_path),)
+    )
+    _, result = run(program, NIL, BUDGET)
+    assert result == int_to_atom(7)
+
+
+def test_include_cycle_is_an_error(tmp_path):
+    (tmp_path / "a.blib").write_text('((include "b.blib"))')
+    (tmp_path / "b.blib").write_text('((include "a.blib"))')
+    with pytest.raises(CompileError) as excinfo:
+        compile_program('(program (X) (include "a.blib") X)', (str(tmp_path),))
+    assert "include cycle: a.blib includes b.blib includes a.blib" in str(excinfo.value)
+    (tmp_path / "self.blib").write_text('((include "self.blib"))')
+    with pytest.raises(CompileError) as excinfo:
+        compile_program('(program (X) (include "self.blib") X)', (str(tmp_path),))
+    assert "include cycle: self.blib includes self.blib" in str(excinfo.value)
+
+
+def test_include_search_order_first_match_wins(tmp_path):
+    first = tmp_path / "first"
+    second = tmp_path / "second"
+    first.mkdir()
+    second.mkdir()
+    (first / "k.blib").write_text("((defconstant K 1))")
+    (second / "k.blib").write_text("((defconstant K 2))")
+    program, _ = compile_program(
+        '(program () (include "k.blib") K)', (str(second), str(first))
+    )
+    _, result = run(program, NIL, BUDGET)
+    assert result == int_to_atom(2)
+
+
+def test_include_file_must_hold_one_declaration_list(tmp_path):
+    (tmp_path / "two.blib").write_text("((defconstant K 1)) ((defconstant J 2))")
+    (tmp_path / "atom.blib").write_text("7")
+    for name in ("two.blib", "atom.blib"):
+        with pytest.raises(CompileError) as excinfo:
+            compile_program(f'(program (X) (include "{name}") X)', (str(tmp_path),))
+        assert "must hold one declaration list" in str(excinfo.value)
+    (tmp_path / "garbage.blib").write_text("((+ 1 2))")
+    with pytest.raises(CompileError) as excinfo:
+        compile_program('(program (X) (include "garbage.blib") X)', (str(tmp_path),))
+    assert 'in include "garbage.blib": expected defun' in str(excinfo.value)
+
+
+def test_included_collision_names_the_file(tmp_path):
+    (tmp_path / "k.blib").write_text("((defconstant K 1))")
+    with pytest.raises(CompileError) as excinfo:
+        compile_program(
+            '(program () (defconstant K 2) (include "k.blib") K)', (str(tmp_path),)
+        )
+    assert "in include \"k.blib\": 'K' is already defined" in str(excinfo.value)
+
+
+def test_included_body_error_names_function_and_file(tmp_path):
+    (tmp_path / "bad.blib").write_text("((defun broken (N) MISSING))")
+    with pytest.raises(CompileError) as excinfo:
+        compile_program(
+            '(program (X) (include "bad.blib") (broken X))', (str(tmp_path),)
+        )
+    assert "in 'broken': unknown name 'MISSING'" in str(excinfo.value)
 
 
 # Error paths.
@@ -528,6 +622,18 @@ def test_variadic_call_binds_the_rest():
         ("(program (assert) 1)", "'assert' is a reserved word"),
         ("(program (X) (defun and (N) N) X)", "'and' is a reserved word"),
         ("(program (X) (defconstant or 1) X)", "'or' is a reserved word"),
+        ("(program (X) (defun include (N) N) X)", "'include' is a reserved word"),
+        (
+            "(program (X) (include lib.blib) X)",
+            "include takes a quoted file name, got the bare name 'lib.blib'",
+        ),
+        ("(program (X) (include (q . 1)) X)", "include takes a quoted file name"),
+        ('(program (X) (include "a" "b") X)', "include takes 1 parts"),
+        (
+            '(program (X) (include "nowhere.blib") X)',
+            'include file "nowhere.blib" not found on the include path',
+        ),
+        ("(program (X) (include))", "include form is not an expression"),
     ],
 )
 def test_compile_errors(source, message):
@@ -557,7 +663,17 @@ def test_reserved_words_are_pinned_and_all_dispatch():
     # spelling be claimed as a definition and hijacked at its call
     # sites, one spelling meaning two things.
     assert RESERVED_WORDS == frozenset(
-        {"program", "defun", "defconstant", "if", "list", "assert", "and", "or"}
+        {
+            "program",
+            "defun",
+            "defconstant",
+            "include",
+            "if",
+            "list",
+            "assert",
+            "and",
+            "or",
+        }
     )
     for word in sorted(RESERVED_WORDS):
         try:
