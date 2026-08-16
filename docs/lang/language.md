@@ -143,8 +143,13 @@ takes conditions and a final value".
 Yields 1 when every operand is truthy and nil at the first falsy
 operand, whose successors never evaluate. The result is boolean, 1
 or nil, never an operand's value, exactly as Chialisp's `and` macro
-behaves. `(and)` is 1. Each level compiles to a lazy `if` whose
-untaken branch is the remaining chain.
+behaves. `(and)` is 1. Each level compiles through the same idiom
+as `assert`, the remaining chain as the taken branch and nil as
+the fallback, so `(and A B)` compiles as
+
+```
+(a (i A (q 2 (i B (q 1 . 1) (q)) 1) (q)) 1)
+```
 
 ## or
 
