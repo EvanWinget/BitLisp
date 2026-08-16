@@ -703,3 +703,20 @@ def test_spend_accepts_compiled_program(shell, ctx_file, capsys):
     out = capsys.readouterr().out
     assert "CREATE_OUTPUT" in out
     assert "valid: 1 condition(s)" in out
+
+
+def test_defconstant_opcode_valued_atom_displays_as_value(shell, capsys):
+    # 16 is the + opcode byte, and a constant's value is data, so
+    # the listing must show the number the user typed.
+    shell.onecmd("(defconstant SIXTEEN 16)")
+    shell.onecmd("defs")
+    assert capsys.readouterr().out == "(defconstant SIXTEEN 16)\n"
+
+
+def test_deferred_body_error_names_its_function(shell, capsys):
+    shell.onecmd("(defun broken (N) (+ N MISSING))")
+    assert capsys.readouterr().out == ""
+    shell.onecmd("(broken 1)")
+    out = capsys.readouterr().out
+    assert "in 'broken':" in out
+    assert "unknown name 'MISSING'" in out

@@ -191,8 +191,10 @@ class BitLispShell(cmd.Cmd):
         Raw VM text first, its meaning unchanged forever. Only text
         the reader rejects on an unknown name retries as language
         source, so no line that ran before the compiler existed can
-        change meaning, and which reading applied is determined by
-        the text alone.
+        change meaning. The reader's verdict decides which reading
+        applies, under the session's def bindings, and never a mode:
+        a declaration cannot flip a line to the compiler because it
+        can never occupy text that already parses.
         """
         try:
             nodes = assemble_many(arg, self.names)
@@ -409,7 +411,7 @@ class BitLispShell(cmd.Cmd):
         canonical text, the artifact itself, never renamed."""
         program, table = compile_expression(parse_source(arg), self.defs)
         self._register_symbols(table)
-        print(disassemble(program))
+        print(self._node_text(program))
 
     @_survives
     def do_sym(self, arg):

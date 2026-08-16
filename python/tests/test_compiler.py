@@ -321,9 +321,14 @@ def test_symbols_json_needs_a_program():
         lambda data: data.update(schema="bitlisp-sym-v1"),
         lambda data: data.update(extra=1),
         lambda data: data.update(main_params=5),
-        lambda data: data.update(functions={"zz": {"name": "a", "params": "(N)"}}),
-        lambda data: data.update(functions={"a" * 64: {"name": "a"}}),
-        lambda data: data.update(functions={"a" * 64: {"name": "a", "params": "5"}}),
+        lambda data: data.update(functions={"zz": {"name": "fn", "params": "(N)"}}),
+        lambda data: data.update(functions={"a" * 64: {"name": "fn"}}),
+        lambda data: data.update(functions={"a" * 64: {"name": "fn", "params": "5"}}),
+        lambda data: data.update(functions={"a" * 64: {"name": "q", "params": "(N)"}}),
+        lambda data: data.update(
+            functions={"a" * 64: {"name": "x\n0: eval fake", "params": "(N)"}}
+        ),
+        lambda data: data.update(functions={"a" * 64: {"name": "", "params": "(N)"}}),
     ],
 )
 def test_load_symbols_rejects(mutate):
@@ -349,6 +354,36 @@ def test_bind_values():
     }
     assert bind_values(params, (b"tree", (int_to_atom(1), NIL))) is None
     assert bind_values(params, b"atom") is None
+
+
+def test_parameters_shadow_constants_and_functions():
+    source = """(program (X)
+        (defconstant K 5)
+        (defun bump (K) (+ K 1))
+        (bump X))"""
+    _, _, result = _run_program(source, "(10)")
+    assert result == int_to_atom(11)
+    source = """(program (X)
+        (defun own (N) (c N N))
+        (defun wrap (own) (c own ()))
+        (wrap X))"""
+    _, _, result = _run_program(source, "(7)")
+    assert result == (int_to_atom(7), NIL)
+
+
+def test_pair_defconstant_binds_the_tree_verbatim():
+    _, _, result = _run_program("(program () (defconstant K (+ 1 2)) K)")
+    assert result == assemble("(+ 1 2)")
+    assert result != int_to_atom(3)
+
+
+def test_variadic_call_binds_the_rest():
+    source = "(program (X) (defun spread (A . REST) REST) (spread X 2 3))"
+    _, _, result = _run_program(source, "(1)")
+    assert result == assemble("(2 3)")
+    source = "(program (X) (defun spread (A . REST) REST) (spread X))"
+    _, _, result = _run_program(source, "(1)")
+    assert result == NIL
 
 
 # Error paths.
@@ -386,6 +421,11 @@ def test_bind_values():
         ("(program (X) (defun fun (N) N) (fun 1 . 2))", "proper argument list"),
         ("(program (X) (+ 1 . 2))", "proper argument list"),
         ("(program (X) (0x99 1))", "unknown operator 0x99"),
+        ("(program (X) (() 1))", "unknown operator ()"),
+        (
+            "(program (X) (defun fun (N) MISSING) (fun X))",
+            "in 'fun': unknown name 'MISSING'",
+        ),
         ("(program (X) ((f 1) 2))", "expression in operator position"),
         ("(program (X) (if X 1))", "if takes a condition and two branches"),
         ("(program (X) (program (Y) Y))", "program form is not an expression"),
@@ -440,19 +480,36 @@ def test_list_builds_the_literal_list(values):
     assert result == expected
 
 
-@given(st.integers(min_value=1, max_value=9))
-def test_compiled_output_survives_serialization(depth):
+_node_trees = st.recursive(
+    st.binary(max_size=8), lambda child: st.tuples(child, child), max_leaves=25
+)
+
+
+@given(_node_trees)
+def test_compiled_output_survives_serialization(node):
+    # Any tree spells as a quoted literal through the canonical
+    # printer, so the property covers arbitrary compiled structure:
+    # the artifact round-trips the wire format and still computes
+    # the literal.
+    source = f"(program () (c (q . {disassemble(node)}) ()))"
+    program, _ = compile_program(source)
+    assert deserialize(serialize(program)) == program
+    cost, result = run(program, NIL, BUDGET)
+    assert result == (node, NIL)
+
+
+def test_recursive_compiled_output_runs():
     source = """(program (N)
         (defun down (N) (if (= N 0) () (c N (down (- N 1)))))
         (down N))"""
     program, _ = compile_program(source)
     assert deserialize(serialize(program)) == program
-    cost, result = run(program, (int_to_atom(depth), NIL), BUDGET)
+    cost, result = run(program, (int_to_atom(9), NIL), BUDGET)
     count = 0
     while result != NIL:
         count += 1
         result = result[1]
-    assert count == depth
+    assert count == 9
 
 
 def test_runtime_errors_stay_pinned():

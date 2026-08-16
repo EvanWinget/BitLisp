@@ -23,6 +23,12 @@ size-only exception: a nil literal is emitted as the nil atom, whose
 path lookup yields nil, one byte instead of the two a quoted nil
 takes.
 
+Parsing and every tree walk here are iterative. Code emission alone
+recurses with the source's nesting depth, a bound accepted because
+source is authored rather than attacker-supplied: past the
+interpreter's limit every surface reports unusable input, exit 2,
+never a crash or a wrong artifact.
+
 The compiler also builds a symbol table for the debugger: the tree
 hash of each compiled function body, keyed exactly as the VM's
 sha256tree operator hashes, mapped to the function's name and
@@ -38,7 +44,7 @@ from bitlisp.sexp import NIL, int_to_atom, is_atom, is_pair
 
 from .keywords import ATOM_TO_NAME
 from .printer import _atom_text
-from .reader import ParseError, _known_token, _parse, tokenize
+from .reader import ParseError, _known_token, _parse, definable, tokenize
 
 _QUOTE = b"\x01"
 _APPLY = b"\x02"
@@ -58,10 +64,10 @@ _PROGRAM, _DEFUN, _DEFCONSTANT, _IF, _LIST = (
 )
 RESERVED_WORDS = frozenset({_PROGRAM, _DEFUN, _DEFCONSTANT, _IF, _LIST})
 
-# The condition vocabulary, one name per CONDITIONS.md section 2
-# entry, written out literally so a reviewer can check it against
-# the spec table by eye. A test pins the set against CONDITION_COSTS
-# so a vocabulary change fails loudly here.
+# The condition vocabulary, one name per assigned opcode, written
+# out literally so a reviewer can check it by eye. A test pins the
+# set against CONDITION_COSTS so a vocabulary change fails loudly
+# here.
 CONDITION_NAMES = (
     "CREATE_OUTPUT",
     "CREATE_OUTPUT_TAPROOT",
@@ -139,9 +145,12 @@ def parse_source_many(text):
 
 
 def source_text(tree):
-    """The text spelling of a source tree, names rendered as written."""
+    """The text spelling of a source tree, names rendered as
+    written. A root atom is data, never operator position, so a
+    constant whose bytes happen to be an opcode prints as its
+    value, not as the operator's name."""
     pieces = []
-    stack = [(0, tree, True)]
+    stack = [(0, tree, False)]
     while stack:
         kind, current, operator_position = stack.pop()
         if kind == 1:
@@ -509,7 +518,8 @@ class _Compilation:
         # by design, so accepting one here would compile a program
         # that can never do anything but fail.
         if op != _APPLY and op not in OPERATORS:
-            raise CompileError(f"unknown operator 0x{op.hex()}")
+            label = "0x" + op.hex() if op else "()"
+            raise CompileError(f"unknown operator {label}")
         name = ATOM_TO_NAME[op]
         arguments = _proper_items(tail, name)
         compiled = [self.expression(argument, bindings) for argument in arguments]
@@ -555,7 +565,13 @@ def _compile(defs, params, body):
     bodies = []
     for name in fn_names:
         fn_params, fn_body, _ = defs.functions[name]
-        compiled = compilation.expression(fn_body, _bind_params(fn_params, _RIGHT))
+        try:
+            compiled = compilation.expression(fn_body, _bind_params(fn_params, _RIGHT))
+        except CompileError as exc:
+            # A body compiles when a program reaches it, which in
+            # the REPL is a later line than the one that declared
+            # it, so the error names whose text the offset indexes.
+            raise CompileError(f"in {name!r}: {exc}") from None
         bodies.append(compiled)
         if is_pair(compiled):
             table["functions"].setdefault(tree_hash(compiled).hex(), (name, fn_params))
@@ -678,6 +694,12 @@ def load_symbols(data):
             raise ValueError("a function entry holds name and params")
         if not isinstance(entry["name"], str) or not isinstance(entry["params"], str):
             raise ValueError("a function entry holds two strings")
+        if not definable(entry["name"]):
+            # The file is untrusted input and its names land in the
+            # debugger display, so a name must be a spelling the
+            # compiler could have produced, which shuts out control
+            # characters, whitespace, and empty strings.
+            raise ValueError(f"malformed function name {entry['name']!r}")
         functions[key] = (entry["name"], _loaded_params(entry["params"]))
     return functions
 

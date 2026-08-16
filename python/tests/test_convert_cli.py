@@ -235,11 +235,14 @@ def test_compile_output_disassembles(capsys):
     )
 
 
-def test_compile_writes_symbols_only_when_asked(tmp_path, capsys):
-    sym_path = tmp_path / "double.sym"
+def test_compile_writes_symbols_only_when_asked(tmp_path, capsys, monkeypatch):
+    # Without the flag, nothing lands in the working directory, the
+    # clvm_tools always-write-main.sym behavior being declined.
+    monkeypatch.chdir(tmp_path)
     assert cli.compile_main([DOUBLE_SOURCE]) == 0
     capsys.readouterr()
-    assert not sym_path.exists()
+    assert list(tmp_path.iterdir()) == []
+    sym_path = tmp_path / "double.sym"
     assert cli.compile_main([DOUBLE_SOURCE, "--symbols", str(sym_path)]) == 0
     capsys.readouterr()
     data = json.loads(sym_path.read_text())
