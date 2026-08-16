@@ -5,9 +5,9 @@ the reader would reject as an unknown symbol, so strings, hex,
 operator names, and decimals keep exactly their raw meaning and the
 language occupies only text that previously errored. Atoms quote
 themselves, names resolve to environment paths or inline constant
-values, and the special forms are program, defun, defconstant, if,
-and list. Everything else a source expression can say is an
-operator application.
+values, and the special forms are program, defun, defconstant,
+defmacro, if, list, and qq with unquote. Everything else a source
+expression can say is an operator application.
 
 A compiled program's environment is the pair (function tree . args).
 The function tree holds every reachable function body, balanced in
@@ -18,16 +18,19 @@ reaches no function is emitted bare with its arguments at the
 environment root. Constants never enter the tree: a constant
 reference inlines its value as a quoted literal at the use site.
 
-Code is emitted directly, with no rewriting passes. The one
-size-only exception: a nil literal is emitted as the nil atom, whose
-path lookup yields nil, one byte instead of the two a quoted nil
-takes.
+Macro expansion is the one source-to-source rewrite: before
+anything compiles, every macro call is replaced by the value its
+compiled body computes over the raw argument source, repeatedly,
+until no macro call remains. Emission after expansion is direct,
+with one size-only exception: a nil literal is emitted as the nil
+atom, whose path lookup yields nil, one byte instead of the two a
+quoted nil takes.
 
-Parsing and every tree walk here are iterative. Code emission alone
-recurses with the source's nesting depth, a bound accepted because
-source is authored rather than attacker-supplied: past the
-interpreter's limit every surface reports unusable input, exit 2,
-never a crash or a wrong artifact.
+Parsing and every other tree walk here are iterative. Code
+emission and macro expansion recurse with the source's nesting
+depth, a bound accepted because source is authored rather than
+attacker-supplied: past the interpreter's limit every surface
+reports unusable input, exit 2, never a crash or a wrong artifact.
 
 The compiler also builds a symbol table for the debugger: the tree
 hash of each compiled function body, keyed exactly as the VM's
@@ -39,6 +42,8 @@ is not distinguishable from ordinary data by its hash.
 import hashlib
 
 from bitlisp import conditions
+from bitlisp.errors import BitLispError
+from bitlisp.machine import run
 from bitlisp.operators import OPERATORS
 from bitlisp.sexp import NIL, int_to_atom, is_atom, is_pair
 
@@ -55,14 +60,36 @@ _CONS = b"\x04"
 # VM's path lookup numbers them.
 _TOP, _LEFT, _RIGHT = 1, 2, 3
 
-_PROGRAM, _DEFUN, _DEFCONSTANT, _IF, _LIST = (
+_PROGRAM, _DEFUN, _DEFCONSTANT, _DEFMACRO, _IF, _LIST, _QQ, _UNQUOTE = (
     "program",
     "defun",
     "defconstant",
+    "defmacro",
     "if",
     "list",
+    "qq",
+    "unquote",
 )
-RESERVED_WORDS = frozenset({_PROGRAM, _DEFUN, _DEFCONSTANT, _IF, _LIST})
+RESERVED_WORDS = frozenset(
+    {_PROGRAM, _DEFUN, _DEFCONSTANT, _DEFMACRO, _IF, _LIST, _QQ, _UNQUOTE}
+)
+
+# The names a macro's returned atoms may resolve to besides the
+# caller's own definitions: the expression forms the compiler
+# provides everywhere.
+_EXPRESSION_FORMS = frozenset({_IF, _LIST, _QQ, _UNQUOTE})
+
+# One macro execution's compile-time budget on the reference VM,
+# the same inclusive cost the spend runner applies when the caller
+# names none.
+MACRO_COST_BUDGET = 11_000_000_000
+
+# How many times a macro's output may itself expand before the
+# compiler rejects the chain. A self-splicing macro spends one
+# level per argument plus one for the final empty round, so this
+# bounds such calls at 99 arguments while staying far inside the
+# interpreter's recursion limit.
+MACRO_DEPTH_LIMIT = 100
 
 # The condition vocabulary, one name per assigned opcode, written
 # out literally so a reviewer can check it by eye. A test pins the
@@ -246,9 +273,10 @@ def _check_params(tree):
 
 
 class Definitions:
-    """The compile-time namespace: functions and constants by name.
+    """The compile-time namespace: functions, constants, and macros
+    by name.
 
-    A name is claimed once across functions, constants, the
+    A name is claimed once across functions, constants, macros, the
     condition constants, the reserved words, and any caller-supplied
     taken set, so one spelling can never mean two things.
     """
@@ -256,10 +284,16 @@ class Definitions:
     def __init__(self):
         self.functions = {}
         self.constants = {}
+        self.macros = {}
 
     def _claim(self, symbol, taken):
         name = _check_name(symbol, "definition")
-        if name in self.functions or name in self.constants or name in taken:
+        if (
+            name in self.functions
+            or name in self.constants
+            or name in self.macros
+            or name in taken
+        ):
             raise CompileError(f"{name!r} is already defined", symbol.offset)
         return name
 
@@ -289,6 +323,26 @@ class Definitions:
         self.constants[name] = items[2]
         return name
 
+    def add_defmacro(self, form, taken=frozenset()):
+        """Adds one (defmacro name params body) source form. The
+        body compiles here, at declaration, in the macro world: its
+        parameters, the macros declared before it, the operators,
+        and the expression forms, but never the program's functions
+        or constants, so each macro is a self-contained program.
+        Later macros can therefore use earlier ones in their
+        bodies, while calls in function bodies and the main body
+        expand against every macro regardless of order."""
+        items = _form_items(form, _DEFMACRO, 4)
+        name = self._claim(items[1], taken)
+        arity = _check_params(items[2])
+        macro_defs = Definitions()
+        macro_defs.macros = dict(self.macros)
+        expanded = _expand(items[3], macro_defs, _symbol_names(items[2]), 0)
+        compilation = _Compilation(macro_defs, {}, macro_name=name)
+        program = compilation.expression(expanded, _bind_params(items[2], _TOP))
+        self.macros[name] = (items[2], items[3], arity, program)
+        return name
+
 
 def _form_items(form, keyword, count):
     """The exactly-count items of a special form, head included."""
@@ -307,13 +361,14 @@ def _form_items(form, keyword, count):
 _FORM_SHAPES = {
     _DEFUN: "(defun name params body)",
     _DEFCONSTANT: "(defconstant name value)",
+    _DEFMACRO: "(defmacro name params body)",
 }
 
 
 def declaration_keyword(tree):
     """The declaration keyword heading a source tree, or None."""
     if is_pair(tree) and isinstance(tree[0], Symbol):
-        if tree[0].name in (_DEFUN, _DEFCONSTANT):
+        if tree[0].name in (_DEFUN, _DEFCONSTANT, _DEFMACRO):
             return tree[0].name
     return None
 
@@ -339,19 +394,183 @@ def _bind_params(tree, root):
     return bindings
 
 
-def _reachable(defs, body):
-    """The function names reachable from a body, conservatively:
-    every mentioned name counts, shadowing ignored, so the set can
-    only be too large, never too small."""
-    reached = set()
+def _lower_symbols(tree):
+    """The argument source as the value a macro runs over: every
+    name becomes its spelling as an atom, exactly how the macro's
+    own compiled body expects to read it."""
+    if isinstance(tree, Symbol):
+        return tree.name.encode()
+    if is_pair(tree):
+        return (_lower_symbols(tree[0]), _lower_symbols(tree[1]))
+    return tree
+
+
+def _lift(value, defs, shadowed, offset):
+    """The value a macro returned, read back as one expression. An
+    expression headed by the quote opcode passes through whole, its
+    content data by construction, and the walk is expression
+    directed so only a head position can mean quote: an argument
+    whose value merely starts with the quote byte, like the number
+    one, stays an ordinary argument. Any other atom becomes a name
+    exactly when its bytes spell one name the reader would accept
+    and that name resolves where the expansion sits: a parameter of
+    the enclosing body, a definition, a condition constant, or an
+    expression form. Every other atom stays data, so a computed
+    number whose bytes happen to spell an out-of-scope name (110 is
+    the letter n) never turns into a reference behind the author's
+    back. The lifted names carry the macro call's offset, so a
+    downstream error points at the call site."""
+    if is_pair(value):
+        if is_atom(value[0]) and value[0] == _QUOTE:
+            return value
+        return (
+            _lift(value[0], defs, shadowed, offset),
+            _lift_tail(value[1], defs, shadowed, offset),
+        )
+    if value == NIL:
+        return value
+    try:
+        text = value.decode()
+    except UnicodeDecodeError:
+        return value
+    if not text.isprintable() or not definable(text):
+        return value
+    if (
+        text in shadowed
+        or text in defs.functions
+        or text in defs.constants
+        or text in defs.macros
+        or text in CONDITION_CONSTANTS
+        or text in _EXPRESSION_FORMS
+    ):
+        return Symbol(text, offset)
+    return value
+
+
+def _lift_tail(node, defs, shadowed, offset):
+    """An argument spine of a macro's returned value, each element
+    lifted as an expression. The spine's own pairs never mean
+    quote, whatever their first bytes are."""
+    if not is_pair(node):
+        return node
+    return (
+        _lift(node[0], defs, shadowed, offset),
+        _lift_tail(node[1], defs, shadowed, offset),
+    )
+
+
+def _expand(tree, defs, shadowed, depth):
+    """The source tree with every macro call replaced by what the
+    macro's program computes over the raw, unevaluated argument
+    source. The returned value is read back as source and expanded
+    again, one depth level deeper, so a macro may emit calls to
+    other macros or splice its own name back in, terminating by
+    consuming its argument list. Quoted content is data and is
+    never entered. A qq template is entered only through its
+    unquote escapes."""
+    if not is_pair(tree):
+        return tree
+    head, tail = tree
+    if is_atom(head) and head == _QUOTE:
+        return tree
+    if isinstance(head, Symbol):
+        if head.name == _QQ:
+            return (head, _expand_template(tail, defs, shadowed, depth, 1))
+        if head.name in defs.macros and head.name not in shadowed:
+            return _expand_call(head, tail, defs, shadowed, depth)
+    return (
+        _expand(head, defs, shadowed, depth),
+        _expand_tail(tail, defs, shadowed, depth),
+    )
+
+
+def _expand_tail(node, defs, shadowed, depth):
+    """The argument spine of a form, each element expanded as an
+    expression. The spine itself is never mistaken for a call, so
+    a bare macro name sitting as an argument stays a name and gets
+    the value-position error at emission."""
+    if not is_pair(node):
+        return node
+    return (
+        _expand(node[0], defs, shadowed, depth),
+        _expand_tail(node[1], defs, shadowed, depth),
+    )
+
+
+def _expand_template(node, defs, shadowed, depth, level):
+    """A qq template with its level-one unquote escapes expanded.
+    A nested qq deepens the level, an unquote raises it back, and
+    both are walked as data otherwise, mirroring how the template
+    emits. Malformed escape arities pass through untouched here
+    and are rejected once, at emission."""
+    if not is_pair(node):
+        return node
+    head, tail = node
+    if isinstance(head, Symbol):
+        if head.name == _QQ:
+            return (head, _expand_template(tail, defs, shadowed, depth, level + 1))
+        if head.name == _UNQUOTE:
+            if level == 1:
+                return (head, _expand_tail(tail, defs, shadowed, depth))
+            return (head, _expand_template(tail, defs, shadowed, depth, level - 1))
+    return (
+        _expand_template(head, defs, shadowed, depth, level),
+        _expand_template(tail, defs, shadowed, depth, level),
+    )
+
+
+def _expand_call(head, tail, defs, shadowed, depth):
+    """One macro call replaced by its expansion."""
+    name = head.name
+    if depth == MACRO_DEPTH_LIMIT:
+        raise CompileError(
+            f"macro expansion depth exceeded {MACRO_DEPTH_LIMIT} levels",
+            head.offset,
+        )
+    arguments = _proper_items(tail, name, head.offset)
+    exact, count = defs.macros[name][2]
+    if exact and len(arguments) != count:
+        raise CompileError(
+            f"{name!r} takes {count} argument(s), got {len(arguments)}",
+            head.offset,
+        )
+    if not exact and len(arguments) < count:
+        raise CompileError(
+            f"{name!r} takes at least {count} argument(s), got {len(arguments)}",
+            head.offset,
+        )
+    program = defs.macros[name][3]
+    try:
+        _, value = run(program, _lower_symbols(tail), MACRO_COST_BUDGET)
+    except BitLispError as exc:
+        raise CompileError(
+            f"macro {name!r} failed: {exc.code}: {exc}", head.offset
+        ) from None
+    lifted = _lift(value, defs, shadowed, head.offset)
+    return _expand(lifted, defs, shadowed, depth + 1)
+
+
+def _expanded_bodies(defs, body):
+    """The reachable function bodies, expanded, conservatively:
+    every name a post-expansion body mentions counts, shadowing
+    ignored, so the set can only be too large, never too small.
+    Expansion must come first because a macro may emit a call to a
+    function its source never names. An unreached body never
+    expands and never compiles."""
+    bodies = {}
     pending = list(_symbol_names(body))
     while pending:
         name = pending.pop()
-        if name in reached or name not in defs.functions:
+        if name in bodies or name not in defs.functions:
             continue
-        reached.add(name)
-        pending.extend(_symbol_names(defs.functions[name][1]))
-    return reached
+        fn_params, fn_body, _ = defs.functions[name]
+        try:
+            expanded = _expand(fn_body, defs, _symbol_names(fn_params), 0)
+        except CompileError as exc:
+            raise CompileError(f"in {name!r}: {exc}") from None
+        bodies[name] = expanded
+        pending.extend(_symbol_names(expanded))
+    return bodies
 
 
 def _tree_paths(names, root):
@@ -404,11 +623,15 @@ def _proper_list(*nodes):
 
 class _Compilation:
     """One compile: the definitions, the function paths, and the
-    reachable set, shared by the main body and every function body."""
+    reachable set, shared by the main body and every function body.
+    macro_name is set only when the body being compiled is a
+    macro's own, where macro names quote themselves as spellings so
+    a template can splice them back into emitted source."""
 
-    def __init__(self, defs, fn_paths):
+    def __init__(self, defs, fn_paths, macro_name=None):
         self.defs = defs
         self.fn_paths = fn_paths
+        self.macro_name = macro_name
 
     def expression(self, expr, bindings):
         if isinstance(expr, Symbol):
@@ -448,6 +671,14 @@ class _Compilation:
             return _quote(CONDITION_CONSTANTS[name])
         if name in self.defs.functions:
             raise CompileError(f"function {name!r} used as a value", symbol.offset)
+        if name in self.defs.macros or name == self.macro_name:
+            if self.macro_name is not None:
+                # In a macro body a macro's name is its spelling,
+                # so a template can cons it onto a shortened
+                # argument list and splice the call back into the
+                # emitted source, its own name included.
+                return _quote(name.encode())
+            raise CompileError(f"macro {name!r} used as a value", symbol.offset)
         raise CompileError(f"unknown name {name!r}", symbol.offset)
 
     def _named_form(self, head, tail, bindings):
@@ -456,12 +687,20 @@ class _Compilation:
             return self._if(head, tail, bindings)
         if name == _LIST:
             return self._list(head, tail, bindings)
-        if name in (_PROGRAM, _DEFUN, _DEFCONSTANT):
+        if name == _QQ:
+            return self._qq(head, tail, bindings)
+        if name == _UNQUOTE:
+            raise CompileError("unquote outside a qq template", head.offset)
+        if name in (_PROGRAM, _DEFUN, _DEFCONSTANT, _DEFMACRO):
             raise CompileError(f"{name} form is not an expression", head.offset)
         if name in bindings:
             raise CompileError(f"{name!r} is a parameter, not a function", head.offset)
         if name in self.defs.functions:
             return self._call(head, tail, bindings)
+        if name == self.macro_name:
+            raise CompileError(
+                f"macro {name!r} cannot be called inside its own body", head.offset
+            )
         if name in self.defs.constants or name in CONDITION_CONSTANTS:
             raise CompileError(f"{name!r} is a constant, not a function", head.offset)
         raise CompileError(f"unknown name {name!r}", head.offset)
@@ -487,6 +726,50 @@ class _Compilation:
         for item in reversed(items):
             result = _proper_list(_CONS, self.expression(item, bindings), result)
         return result
+
+    def _qq(self, head, tail, bindings):
+        items = _proper_items(tail, _QQ, head.offset)
+        if len(items) != 1:
+            raise CompileError("qq takes 1 part: (qq template)", head.offset)
+        return self._template(items[0], bindings, 1)
+
+    def _template(self, node, bindings, level):
+        # A template emits code that builds itself as data: names
+        # become their spellings, atoms quote, pairs cons. A nested
+        # qq deepens the level and is rebuilt as data, an unquote
+        # raises it back, and only a level-one unquote escapes to
+        # an ordinary compiled expression.
+        if isinstance(node, Symbol):
+            return _quote(node.name.encode())
+        if is_atom(node):
+            if node == NIL:
+                return NIL
+            return _quote(node)
+        nhead, ntail = node
+        if isinstance(nhead, Symbol) and nhead.name == _QQ:
+            return _proper_list(
+                _CONS,
+                _quote(nhead.name.encode()),
+                self._template(ntail, bindings, level + 1),
+            )
+        if isinstance(nhead, Symbol) and nhead.name == _UNQUOTE:
+            if level == 1:
+                items = _proper_items(ntail, _UNQUOTE, nhead.offset)
+                if len(items) != 1:
+                    raise CompileError(
+                        "unquote takes 1 part: (unquote expression)", nhead.offset
+                    )
+                return self.expression(items[0], bindings)
+            return _proper_list(
+                _CONS,
+                _quote(nhead.name.encode()),
+                self._template(ntail, bindings, level - 1),
+            )
+        return _proper_list(
+            _CONS,
+            self._template(nhead, bindings, level),
+            self._template(ntail, bindings, level),
+        )
 
     def _call(self, head, tail, bindings):
         name = head.name
@@ -550,8 +833,10 @@ def tree_hash(node):
 def _compile(defs, params, body):
     """The program node and symbol table for one body against one
     definitions space, params None for a bare expression."""
-    reached = _reachable(defs, body)
-    fn_names = [name for name in defs.functions if name in reached]
+    shadow = _symbol_names(params) if params is not None else frozenset()
+    body = _expand(body, defs, shadow, 0)
+    expanded = _expanded_bodies(defs, body)
+    fn_names = [name for name in defs.functions if name in expanded]
     has_tree = bool(fn_names)
     fn_paths = _tree_paths(fn_names, _LEFT) if has_tree else {}
     compilation = _Compilation(defs, fn_paths)
@@ -564,9 +849,11 @@ def _compile(defs, params, body):
     table = {"functions": {}, "main_params": params}
     bodies = []
     for name in fn_names:
-        fn_params, fn_body, _ = defs.functions[name]
+        fn_params, _, _ = defs.functions[name]
         try:
-            compiled = compilation.expression(fn_body, _bind_params(fn_params, _RIGHT))
+            compiled = compilation.expression(
+                expanded[name], _bind_params(fn_params, _RIGHT)
+            )
         except CompileError as exc:
             # A body compiles when a program reaches it, which in
             # the REPL is a later line than the one that declared
@@ -614,8 +901,10 @@ def compile_program(source):
             defs.add_defun(declaration)
         elif keyword == _DEFCONSTANT:
             defs.add_defconstant(declaration)
+        elif keyword == _DEFMACRO:
+            defs.add_defmacro(declaration)
         else:
-            raise CompileError("expected defun or defconstant")
+            raise CompileError("expected defun, defconstant, or defmacro")
     return _compile(defs, params, items[-1])
 
 

@@ -20,8 +20,10 @@ from bitlisp.sexp import NIL, int_to_atom  # noqa: E402
 from bitlisp_tools import assemble, disassemble  # noqa: E402
 from bitlisp_tools.compiler import (  # noqa: E402
     CONDITION_CONSTANTS,
+    MACRO_DEPTH_LIMIT,
     CompileError,
     Definitions,
+    Symbol,
     bind_values,
     compile_expression,
     compile_program,
@@ -46,11 +48,23 @@ def _defs(*declarations):
     defs = Definitions()
     for declaration in declarations:
         tree = parse_source(declaration)
-        if declaration.startswith("(defun"):
+        if declaration.startswith("(defmacro"):
+            defs.add_defmacro(tree)
+        elif declaration.startswith("(defun"):
             defs.add_defun(tree)
         else:
             defs.add_defconstant(tree)
     return defs
+
+
+# The Chialisp self-splicing idiom, verbatim from the clvm_tools
+# regression corpus: the template conses the macro's own name onto
+# the shortened argument list, so each expansion round consumes one
+# element and the recursion terminates at nil.
+LIST1 = (
+    "(defmacro list1 args (if args "
+    "(qq (c (unquote (f args)) (unquote (c list1 (r args))))) ()))"
+)
 
 
 # The CONDITIONS.md section 2 table, transcribed row by row so a
@@ -399,6 +413,128 @@ def test_variadic_call_binds_the_rest():
 # Error paths.
 
 
+# Macros: expansion runs at compile time on the reference VM over
+# the raw unevaluated argument source, classic Chialisp semantics.
+
+
+def test_pin_macro_constant_folds():
+    program, _ = compile_program(
+        "(program () (defmacro add (n1 n2) (+ n1 n2)) (add 50 60))"
+    )
+    assert disassemble(program) == "(q . 110)"
+
+
+def test_pin_macro_capture_is_unhygienic():
+    # 110 spells the letter n, and with a caller parameter named n
+    # in scope the folded atom becomes a reference to it: the
+    # documented positional unhygiene, pinned bug for bug against
+    # classic Chialisp.
+    program, _ = compile_program(
+        "(program (n) (defmacro add (n1 n2) (+ n1 n2)) (add 50 60))"
+    )
+    assert disassemble(program) == "2"
+
+
+def test_pin_qq_escapes_compile_in_place():
+    program, _ = compile_program(
+        "(program (X) (defmacro inc (e) (qq (+ (unquote e) 1))) (inc X))"
+    )
+    assert disassemble(program) == "(+ 2 (q . 1))"
+
+
+def test_pin_nested_qq_rebuilds_heads_as_data():
+    # A nested qq deepens the level, so its unquote does not escape
+    # and both heads come back as spellings in the built data.
+    _, _, result = _run_program("(program () (qq (qq (unquote (+ 1 2)))))")
+    assert result == (
+        b"qq",
+        ((b"unquote", ((b"\x10", (b"\x01", (b"\x02", NIL))), NIL)), NIL),
+    )
+
+
+def test_pin_list1_macro_matches_builtin_list():
+    macro_program, _, macro_result = _run_program(
+        f"(program () {LIST1} (list1 300 40 50))"
+    )
+    builtin_program, _, builtin_result = _run_program("(program () (list 300 40 50))")
+    assert macro_program == builtin_program
+    assert macro_result == builtin_result
+
+
+def test_list1_of_nothing_is_nil():
+    _, _, result = _run_program(f"(program () {LIST1} (list1))")
+    assert result == NIL
+
+
+def test_macro_depth_boundary_is_exact():
+    # A self-splicing call spends one level per argument plus one
+    # for the final empty round, so 99 arguments is the last count
+    # that compiles under the cap.
+    spelled = " ".join("1" for _ in range(99))
+    compile_program(f"(program () {LIST1} (list1 {spelled}))")
+    with pytest.raises(CompileError) as excinfo:
+        compile_program(f"(program () {LIST1} (list1 {spelled} 1))")
+    assert f"depth exceeded {MACRO_DEPTH_LIMIT} levels" in str(excinfo.value)
+
+
+def test_macro_expansion_reaches_a_function():
+    # The expansion calls a defun the pre-expansion source never
+    # names, so reachability has to run over expanded bodies.
+    program, table, result = _run_program(
+        "(program (X) (defun dbl (v) (* v 2)) "
+        "(defmacro twice (e) (qq (dbl (unquote e)))) (twice X))",
+        "(21)",
+    )
+    assert result == int_to_atom(42)
+    assert {name for name, _ in table["functions"].values()} == {"dbl"}
+
+
+def test_macro_uses_earlier_macro():
+    _, _, result = _run_program(
+        "(program (X) (defmacro inc (e) (qq (+ (unquote e) 1))) "
+        "(defmacro inc2 (e) (qq (inc (inc (unquote e))))) (inc2 X))",
+        "(40)",
+    )
+    assert result == int_to_atom(42)
+
+
+def test_macro_in_function_body_ignores_declaration_order():
+    # A macro body sees only macros declared before it, but a defun
+    # body expands when the program compiles, against every macro.
+    _, _, result = _run_program(
+        "(program (X) (defun bump (v) (inc v)) "
+        "(defmacro inc (e) (qq (+ (unquote e) 1))) (bump X))",
+        "(41)",
+    )
+    assert result == int_to_atom(42)
+
+
+def test_macro_body_sees_condition_constants():
+    _, _, result = _run_program("(program () (defmacro seal () SEAL) (seal))")
+    assert result == CONDITION_CONSTANTS["SEAL"]
+
+
+def test_macro_quoted_output_passes_verbatim():
+    # The expansion is (q . "X"): quote-headed output stays data
+    # even though its bytes spell an in-scope parameter name.
+    _, _, result = _run_program(
+        "(program (X) (defmacro lit () (c (q . 1) 'X')) (lit))", "(7)"
+    )
+    assert result == b"X"
+
+
+def test_qq_in_ordinary_code_builds_data():
+    _, _, result = _run_program("(program (X) (qq (foo (unquote X))))", "(7)")
+    assert result == (b"foo", (int_to_atom(7), NIL))
+
+
+def test_expression_compiles_against_session_macros():
+    defs = _defs("(defmacro inc (e) (qq (+ (unquote e) 1)))")
+    program, _ = compile_expression("(inc 41)", defs)
+    cost, result = run(program, NIL, BUDGET)
+    assert result == int_to_atom(42)
+
+
 @pytest.mark.parametrize(
     ("source", "message"),
     [
@@ -447,6 +583,49 @@ def test_variadic_call_binds_the_rest():
         ("(program (X) (defun SEAL (N) N) X)", "condition constant"),
         ("(program (X) (defun f N) X)", "defun takes 3 parts"),
         ("(program (X) (defconstant K) X)", "defconstant takes 2 parts"),
+        ("(program (X) (defmacro m N) X)", "defmacro takes 3 parts"),
+        ("(program (qq) 1)", "'qq' is a reserved word"),
+        ("(program (unquote) 1)", "'unquote' is a reserved word"),
+        ("(program (X) (defmacro list (N) N) X)", "'list' is a reserved word"),
+        (
+            "(program (X) (defmacro m (N) N) (defun m (N) N) X)",
+            "already defined",
+        ),
+        (
+            "(program (X) (defun m (N) N) (defmacro m (N) N) X)",
+            "already defined",
+        ),
+        ("(program (X) (defmacro m (N) N) (c m X))", "macro 'm' used as a value"),
+        ("(program (X) (defmacro m (N) N) (m 1 2))", "'m' takes 1 argument(s)"),
+        ("(program (X) (defmacro m (N . R) N) (m))", "at least 1 argument(s)"),
+        ("(program (X) (defmacro m (N) N) (m 1 . 2))", "proper argument list"),
+        ("(program (X) (unquote X))", "unquote outside a qq template"),
+        ("(program (X) (qq X X))", "qq takes 1 part"),
+        ("(program (X) (qq (unquote X X)))", "unquote takes 1 part"),
+        (
+            "(program (X) (defmacro m (N) (x)) (m X))",
+            "macro 'm' failed: user_raise",
+        ),
+        (
+            "(program (X) (defun dbl (v) v) (defmacro m (N) (dbl N)) (m X))",
+            "unknown name 'dbl'",
+        ),
+        (
+            "(program (X) (defconstant K 1) (defmacro m (N) K) (m X))",
+            "unknown name 'K'",
+        ),
+        (
+            "(program (X) (defmacro m (N) (uses N)) (defmacro uses (N) N) X)",
+            "unknown name 'uses'",
+        ),
+        (
+            "(program (X) (defmacro m (N) (m N)) (m X))",
+            "macro 'm' cannot be called inside its own body",
+        ),
+        (
+            "(program () (defmacro m args (qq (m 1 (unquote args)))) (m 1))",
+            f"macro expansion depth exceeded {MACRO_DEPTH_LIMIT} levels",
+        ),
     ],
 )
 def test_compile_errors(source, message):
@@ -531,3 +710,29 @@ def test_runtime_errors_stay_pinned():
     with pytest.raises(BitLispError) as excinfo:
         run(program, (int_to_atom(4), NIL), BUDGET)
     assert excinfo.value.code == "div_by_zero"
+
+
+@given(_node_trees)
+def test_macro_quoted_output_survives_arbitrary_trees(node):
+    # A macro whose value is (q . tree) expands to exactly that
+    # quoted tree for any tree: the lift never enters quote-headed
+    # output, whatever the content's bytes spell. The form is built
+    # as a tree because arbitrary bytes have no source spelling.
+    body = (b"\x04", ((b"\x01", b"\x01"), ((b"\x01", node), NIL)))
+    form = (
+        Symbol("defmacro", 0),
+        (Symbol("m", 0), (NIL, (body, NIL))),
+    )
+    defs = Definitions()
+    defs.add_defmacro(form)
+    program, _ = compile_expression("(m)", defs)
+    cost, result = run(program, NIL, BUDGET)
+    assert result == node
+
+
+@given(st.lists(st.integers(min_value=0, max_value=2**63 - 1), max_size=6))
+def test_list1_matches_builtin_list(values):
+    spelled = " ".join(str(value) for value in values)
+    macro_program, _ = compile_program(f"(program () {LIST1} (list1 {spelled}))")
+    builtin_program, _ = compile_program(f"(program () (list {spelled}))")
+    assert macro_program == builtin_program
