@@ -16,7 +16,6 @@ Transaction context:
 Definitions:
     (defun <name> <params> <body>)   define a named function
     (defconstant <name> <value>)     define a constant
-    (defmacro <name> <params> <body>)   define a macro
     def <name> <sexpr>             bind a name to a parsed node
     undef <name>                   remove a definition or binding
     defs                           list definitions and bindings
@@ -52,9 +51,9 @@ never change the meaning of text that already parses.
 The same rule shapes the compiler surface: eval, spend, and debug
 read their text as raw VM syntax first, and only text the reader
 rejects on an unknown name retries as language source against the
-session's defun, defconstant, and defmacro definitions, the
-condition constants included. A program's solution is always data
-and never compiles.
+session's defun and defconstant definitions, the condition
+constants included. A program's solution is always data and never
+compiles.
 """
 
 import argparse
@@ -70,6 +69,7 @@ from bitlisp.sexp import NIL, is_pair
 
 from .compiler import (
     CONDITION_CONSTANTS,
+    DECLARATION_KEYWORDS,
     RESERVED_WORDS,
     CompileError,
     Definitions,
@@ -120,7 +120,7 @@ def _declaration_line(stripped):
     return (
         len(tokens) >= 2
         and tokens[0][0] == "("
-        and tokens[1][0] in ("defun", "defconstant", "defmacro")
+        and tokens[1][0] in DECLARATION_KEYWORDS
     )
 
 
@@ -226,9 +226,7 @@ class BitLispShell(cmd.Cmd):
                         "which is data and cannot hold names",
                         symbol.offset,
                     )
-            program, table = compile_expression(
-                nodes[0], self.defs, frozenset(self.names)
-            )
+            program, table = compile_expression(nodes[0], self.defs)
             self._register_symbols(table)
             nodes = [program, *nodes[1:]]
         return nodes
@@ -365,18 +363,14 @@ class BitLispShell(cmd.Cmd):
 
     @_survives
     def _declare(self, line):
-        """A (defun ...), (defconstant ...), or (defmacro ...) line
-        adds to the compiler definitions space. Names are claimed
-        once across this space and the def bindings, so one
-        spelling can never mean two things. A defmacro's body
-        compiles here, on this line, so its errors print now."""
+        """A (defun ...) or (defconstant ...) line adds to the
+        compiler definitions space. Names are claimed once across
+        this space and the def bindings, so one spelling can never
+        mean two things."""
         tree = parse_source(line)
         taken = set(self.names)
-        keyword = declaration_keyword(tree)
-        if keyword == "defun":
+        if declaration_keyword(tree) == "defun":
             self.defs.add_defun(tree, taken)
-        elif keyword == "defmacro":
-            self.defs.add_defmacro(tree, taken)
         else:
             self.defs.add_defconstant(tree, taken)
 
@@ -400,11 +394,7 @@ class BitLispShell(cmd.Cmd):
         if name in RESERVED_WORDS or name in CONDITION_CONSTANTS:
             print(f"error: {name!r} is reserved by the language")
             return
-        if (
-            name in self.defs.functions
-            or name in self.defs.constants
-            or name in self.defs.macros
-        ):
+        if name in self.defs.functions or name in self.defs.constants:
             print(f"error: {name!r} is already defined")
             return
         nodes = assemble_many(body, self.names)
@@ -417,19 +407,9 @@ class BitLispShell(cmd.Cmd):
     def do_undef(self, arg):
         """undef <name>: remove a definition or binding."""
         name = arg.strip()
-        spaces = (
-            self.names,
-            self.defs.functions,
-            self.defs.constants,
-            self.defs.macros,
-        )
+        spaces = (self.names, self.defs.functions, self.defs.constants)
         for space in spaces:
             if name in space:
-                # Removal changes what later lines mean. A macro
-                # whose expansion splices this name back out needs
-                # it again at every later call, so those calls now
-                # fail. Only a direct call, already run at the
-                # later macro's declaration, stays baked in.
                 del space[name]
                 return
         print(f"error: {name!r} is not defined")
@@ -444,17 +424,12 @@ class BitLispShell(cmd.Cmd):
         for name in sorted(self.defs.functions):
             params, body, _ = self.defs.functions[name]
             print(f"(defun {name} {source_text(params)} {source_text(body)})")
-        for name in sorted(self.defs.macros):
-            params, body = self.defs.macros[name][:2]
-            print(f"(defmacro {name} {source_text(params)} {source_text(body)})")
 
     @_survives
     def do_compile(self, arg):
         """compile <expr-or-program>: show the compiled tree as
         canonical text, the artifact itself, never renamed."""
-        program, table = compile_expression(
-            parse_source(arg), self.defs, frozenset(self.names)
-        )
+        program, table = compile_expression(parse_source(arg), self.defs)
         self._register_symbols(table)
         print(self._node_text(program))
 

@@ -559,6 +559,19 @@ def test_defun_line_and_call(shell, capsys):
     assert out.startswith("42\n")
 
 
+def test_new_forms_compile_at_the_prompt(shell, capsys):
+    # assert, and, and or are unknown to the raw reader, so a bare
+    # line reaches them only through the compiler retry, exactly
+    # like if and list.
+    shell.onecmd("(and 1 2)")
+    assert capsys.readouterr().out.startswith("1\n")
+    shell.onecmd("(defun safe-div (A B) (assert B (/ A B)))")
+    shell.onecmd("(safe-div 10 2)")
+    assert capsys.readouterr().out.startswith("5\n")
+    shell.onecmd("(safe-div 10 0)")
+    assert "invalid: user_raise" in capsys.readouterr().out
+
+
 def test_raw_meaning_is_unchanged(shell, capsys):
     # Numbers in raw VM text are environment paths, and a line that
     # parses raw never reaches the compiler, definitions or not.
@@ -594,6 +607,14 @@ def test_conditions_and_list_at_the_prompt(shell, capsys):
     assert out.splitlines()[0] == f"((q 0x{SPK_P2WPKH} 600))"
 
 
+def test_program_form_ignores_session_definitions(shell, capsys):
+    # Self-containment: a pasted program form compiles against its
+    # own declarations only, exactly as it would from a file.
+    shell.onecmd("(defun inc (N) (+ N 1))")
+    shell.onecmd("eval (program (X) (inc X)) (1)")
+    assert "unknown name 'inc'" in capsys.readouterr().out
+
+
 def test_declaration_errors_print(shell, capsys):
     # An operator name resolves before the compiler sees it, so it
     # can never name a function.
@@ -619,6 +640,12 @@ def test_def_and_defun_share_one_namespace(shell, capsys):
     assert "reserved by the language" in capsys.readouterr().out
     shell.onecmd("def list (q . 1)")
     assert "reserved by the language" in capsys.readouterr().out
+    shell.onecmd("def and (q . 1)")
+    assert "reserved by the language" in capsys.readouterr().out
+    # qq left the reserved words with the macro system, so the
+    # spelling is an ordinary binding again.
+    shell.onecmd("def qq (q . 1)")
+    assert capsys.readouterr().out == ""
 
 
 def test_undef_removes_declarations(shell, capsys):
@@ -636,97 +663,6 @@ def test_defs_lists_all_three_kinds(shell, capsys):
     assert capsys.readouterr().out == (
         "raw = (q . 1)\n(defconstant FEE 500)\n(defun double (N) (* 2 N))\n"
     )
-
-
-def test_defmacro_line_and_call(shell, capsys):
-    shell.onecmd("(defmacro inc (e) (qq (+ (unquote e) 1)))")
-    assert capsys.readouterr().out == ""
-    shell.onecmd("(inc 41)")
-    assert capsys.readouterr().out.startswith("42\n")
-
-
-def test_defmacro_body_errors_print_on_its_line(shell, capsys):
-    # A macro body compiles at its declaration, in the macro world,
-    # where the session's functions are invisible. The failed line
-    # claims nothing, so the name stays free.
-    shell.onecmd("(defun dbl (N) (* 2 N))")
-    shell.onecmd("(defmacro m (e) (dbl e))")
-    assert "unknown name 'dbl'" in capsys.readouterr().out
-    shell.onecmd("(defmacro m (e) e)")
-    assert capsys.readouterr().out == ""
-
-
-def test_def_and_defmacro_share_one_namespace(shell, capsys):
-    shell.onecmd("def m (q . 1)")
-    shell.onecmd("(defmacro m (e) e)")
-    assert "'m' is already defined" in capsys.readouterr().out
-    shell.onecmd("(defmacro held (e) e)")
-    shell.onecmd("def held (q . 1)")
-    assert "'held' is already defined" in capsys.readouterr().out
-
-
-def test_undef_removes_a_macro(shell, capsys):
-    shell.onecmd("(defmacro m (e) e)")
-    shell.onecmd("undef m")
-    shell.onecmd("(m 1)")
-    assert "unknown name 'm'" in capsys.readouterr().out
-
-
-def test_defs_lists_macros_after_functions(shell, capsys):
-    shell.onecmd("(defun double (N) (* 2 N))")
-    shell.onecmd("(defmacro inc (e) (qq (+ (unquote e) 1)))")
-    shell.onecmd("defs")
-    assert capsys.readouterr().out == (
-        "(defun double (N) (* 2 N))\n(defmacro inc (e) (qq (+ (unquote e) 1)))\n"
-    )
-
-
-def test_macro_cannot_reach_def_bindings(shell, capsys):
-    # The raw path reads val as its binding, but def names are not
-    # language names: through a macro the caller-written spelling
-    # is evidence that resolves nowhere, so the general unknown
-    # name rule rejects it, one spelling never meaning two things.
-    shell.onecmd("def val (q . 5)")
-    shell.onecmd("(defmacro inc (e) (qq (+ (unquote e) 1)))")
-    shell.onecmd("(inc val)")
-    assert "unknown name 'val'" in capsys.readouterr().out
-
-
-def test_computed_def_spelling_is_rejected(shell, capsys):
-    # Any macro output atom spelling a def name is rejected,
-    # written or computed, because the raw path reads that
-    # spelling as the binding and one spelling must never mean
-    # two things. Resolution-side, the rule survives macro
-    # composition, which per-call evidence cannot.
-    shell.onecmd("def n (q . 5)")
-    shell.onecmd("(defmacro add (n1 n2) (+ n1 n2))")
-    shell.onecmd("(add 50 60)")
-    assert "unknown name 'n'" in capsys.readouterr().out
-    shell.onecmd("def val (q . 7)")
-    shell.onecmd("(defmacro getval () (qq val))")
-    shell.onecmd("(defmacro use2 () (getval))")
-    shell.onecmd("(use2)")
-    assert "unknown name 'val'" in capsys.readouterr().out
-
-
-def test_undef_breaks_template_spliced_macros(shell, capsys):
-    # inc2's template splices the spelling of inc back out, so
-    # every inc2 call needs inc again, and after undef the stale
-    # spelling is rejected with the name in the error.
-    shell.onecmd("(defmacro inc (e) (qq (+ (unquote e) 1)))")
-    shell.onecmd("(defmacro inc2 (e) (qq (inc (inc (unquote e)))))")
-    shell.onecmd("undef inc")
-    shell.onecmd("(inc2 40)")
-    out = capsys.readouterr().out
-    assert "unknown operator 0x696e63, which spells 'inc'" in out
-
-
-def test_program_form_ignores_session_macros(shell, capsys):
-    # Self-containment: a pasted program form compiles against its
-    # own declarations only, exactly as it would from a file.
-    shell.onecmd("(defmacro inc (e) (qq (+ (unquote e) 1)))")
-    shell.onecmd("eval (program (X) (inc X)) (1)")
-    assert "unknown name 'inc'" in capsys.readouterr().out
 
 
 def test_compile_command_shows_canonical_text(shell, capsys):

@@ -74,6 +74,50 @@
     "result": "07",
     "cost": 277
    }
+  },
+  {
+   "name": "empty_and_or_fold_to_constants",
+   "program": "ff04ffff0101ffff04ff80ff808080",
+   "env": "80",
+   "expect": {
+    "result": "ff01ff8080",
+    "cost": 210
+   }
+  },
+  {
+   "name": "and_short_circuits_before_a_raise",
+   "program": "ff02ffff03ff02ffff01ff02ffff03ffff0880ffff01ff0101ffff018080ff0180ffff018080ff0180",
+   "env": "ff8080",
+   "expect": {
+    "result": "80",
+    "cost": 301
+   }
+  },
+  {
+   "name": "or_short_circuits_before_a_raise",
+   "program": "ff02ffff03ff02ffff01ff0101ffff01ff02ffff03ffff0880ffff01ff0101ffff018080ff018080ff0180",
+   "env": "ff0180",
+   "expect": {
+    "result": "01",
+    "cost": 277
+   }
+  },
+  {
+   "name": "assert_passes_its_value",
+   "program": "ff02ffff03ff02ffff01ff12ff02ffff010380ffff01ff088080ff0180",
+   "env": "ff0e80",
+   "expect": {
+    "result": "2a",
+    "cost": 1325
+   }
+  },
+  {
+   "name": "failed_assert_raises",
+   "program": "ff02ffff03ff02ffff01ff12ff02ffff010380ffff01ff088080ff0180",
+   "env": "ff8080",
+   "expect": {
+    "error": "user_raise"
+   }
   }
  ]
 }
