@@ -441,14 +441,17 @@ def test_pin_macro_constant_folds():
     assert disassemble(program) == "(q . 110)"
 
 
-def test_computed_name_collision_is_rejected():
-    # 110 spells the letter n. Classic Chialisp would capture: the
-    # folded atom becomes a reference to the caller's parameter n.
-    # BitLisp's recorded divergence rejects it instead, because the
-    # spelling is in scope but the macro never wrote it.
-    with pytest.raises(CompileError) as excinfo:
-        compile_program("(program (n) (defmacro add (n1 n2) (+ n1 n2)) (add 50 60))")
-    assert "0x6e spells 'n', a name the macro never wrote" in str(excinfo.value)
+def test_pin_capture_matches_chialisp():
+    # 110 spells the letter n, and with a caller parameter named n
+    # in scope the folded atom becomes a reference to it: the
+    # classic capture, kept deliberately because no static
+    # evidence can tell written bytes from computed bytes once the
+    # reader's token kinds are gone. The doc teaches the remedy,
+    # quote data that must stay data.
+    program, _ = compile_program(
+        "(program (n) (defmacro add (n1 n2) (+ n1 n2)) (add 50 60))"
+    )
+    assert disassemble(program) == "2"
 
 
 def test_written_names_lift_computed_data_stays():
@@ -614,10 +617,11 @@ def test_stale_template_name_is_an_unknown_name():
     assert "unknown name 'gone'" in str(excinfo.value)
 
 
-def test_string_written_names_are_evidence():
-    # A string literal in the body is a spelling the macro wrote,
-    # so it lifts: resolving, it calls the function, and
-    # unresolving, it gets the resolver's unknown-name error.
+def test_string_built_names_resolve_like_chialisp():
+    # A string-built spelling is computed bytes to the reader, so
+    # the classic rule judges it: resolving, it calls the
+    # function, and unresolving, it stays data and the head
+    # position rejects it with the spelling in the hex.
     defs = _defs(
         "(defun dbl (v) (* v 2))",
         "(defmacro m (v) (c 'dbl' (c v ())))",
@@ -628,7 +632,7 @@ def test_string_written_names_are_evidence():
     defs = _defs("(defmacro bad () (c 'zzz' ()))")
     with pytest.raises(CompileError) as excinfo:
         compile_expression("(bad)", defs)
-    assert "unknown name 'zzz'" in str(excinfo.value)
+    assert "unknown operator 0x7a7a7a, which spells 'zzz'" in str(excinfo.value)
 
 
 def test_computed_operator_bytes_error_with_their_spelling():
@@ -641,25 +645,29 @@ def test_computed_operator_bytes_error_with_their_spelling():
     assert "unknown operator 0x7a, which spells 'z'" in str(excinfo.value)
 
 
-def test_macro_params_are_not_evidence():
+def test_macro_params_are_not_typo_evidence():
     # 28209 spells n1, the macro's own parameter. Parameters
-    # substitute at run time and never reach output as spellings,
-    # so the collision errors when a caller n1 is in scope and the
-    # fold stays data when nothing resolves, alpha-renaming safe.
-    with pytest.raises(CompileError) as excinfo:
-        compile_program("(program (n1) (defmacro add (n1 n2) (+ n1 n2)) (add 28209 0))")
-    assert "spells 'n1', a name the macro never wrote" in str(excinfo.value)
+    # substitute at expansion and never reach output as their own
+    # spelling, so they are not typo evidence: the computed fold
+    # stays data instead of dying as unknown name 'n1', and
+    # renaming a macro parameter never changes what a macro can
+    # compute. With a caller n1 in scope the bytes resolve and
+    # capture, the pinned Chialisp edge.
     program, _ = compile_program(
         "(program (m1) (defmacro add (n1 n2) (+ n1 n2)) (add 28000 209))"
     )
     assert disassemble(program) == "(q . 28209)"
+    program, _ = compile_program(
+        "(program (n1) (defmacro add (n1 n2) (+ n1 n2)) (add 28209 0))"
+    )
+    assert disassemble(program) == "2"
 
 
-def test_macro_composition_carries_spellings():
-    # An earlier macro's template contributes spellings at
-    # declaration time, and the later macro's evidence is read off
-    # its expanded body, so composition that splices program-world
-    # names works and judgment waits for the call site.
+def test_macro_composition_defers_judgment():
+    # An earlier macro's output stays data inside the declaring
+    # macro's world when it resolves nowhere there, so composition
+    # that splices program-world names works and the spelling is
+    # judged where the program finally uses it.
     program, _, result = _run_program(
         "(program (X) (defconstant G 7) (defmacro getg () (qq G)) "
         "(defmacro passg () (getg)) (+ X (passg)))",
@@ -677,23 +685,17 @@ def test_generated_template_keeps_deliberate_spellings():
     assert result == b"foo"
 
 
-def test_caller_handed_names_are_evidence_residue():
-    # The documented residue: handing a macro a name as an
-    # argument is evidence for that spelling anywhere in the
-    # expansion, so a computed collision with a handed-in spelling
-    # still captures, narrower than Chialisp but not gone.
-    program, _ = compile_program(
-        "(program (n) (defmacro add3 (p1 p2 p3) (+ p1 p2)) (add3 50 60 n))"
+def test_spliced_names_survive_quote_bytes_in_arguments():
+    # A literal 1 is the quote opcode's byte, and it must not
+    # disturb the evidence walk over the argument spine: the
+    # spliced name n still lifts and the typo variant still errs.
+    _, _, result = _run_program(
+        "(program (n) (defmacro second (u v) v) (second 1 n))", "(9)"
     )
-    assert disassemble(program) == "2"
-
-
-def test_quoted_argument_content_is_not_evidence():
-    # (q . n) in an argument is data there as everywhere, so it
-    # cannot whitelist the spelling for computed output.
+    assert result == int_to_atom(9)
     with pytest.raises(CompileError) as excinfo:
-        compile_program("(program (n) (defmacro payload (e) (r e)) (payload (q . n)))")
-    assert "spells 'n', a name the macro never wrote" in str(excinfo.value)
+        compile_program("(program (w) (defmacro second (u v) v) (second 1 typo))")
+    assert "unknown name 'typo'" in str(excinfo.value)
 
 
 def test_qq_levels_agree_between_expansion_and_emission():
