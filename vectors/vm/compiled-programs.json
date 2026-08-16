@@ -1,0 +1,79 @@
+{
+ "schema": "bitlisp-vector-v0",
+ "suite": "vm",
+ "spec": "VM.md sections 3 and 4: compiled-program pins exercising path lookup, apply, and the operator set through bitlisp-compile output",
+ "cases": [
+  {
+   "name": "single_function_call",
+   "program": "ff02ffff01ff02ff02ffff04ff02ffff04ff05ff80808080ffff04ffff01ff12ffff0102ff0580ff018080",
+   "env": "ff1580",
+   "expect": {
+    "result": "2a",
+    "cost": 1683
+   }
+  },
+  {
+   "name": "recursion_terminates_through_if",
+   "program": "ff02ffff01ff02ff02ffff04ff02ffff04ff05ff80808080ffff04ffff01ff02ffff03ffff09ff05ffff010180ffff01ff0101ffff01ff12ff05ffff02ff02ffff04ff02ffff04ffff11ff05ffff010180ff808080808080ff0180ff018080",
+   "env": "ff0580",
+   "expect": {
+    "result": "78",
+    "cost": 11488
+   }
+  },
+  {
+   "name": "mutual_recursion_shares_the_tree",
+   "program": "ff02ffff01ff02ff04ffff04ff02ffff04ff05ff80808080ffff04ffff01ffff02ffff03ffff09ff05ff8080ffff01ff0101ffff01ff02ff06ffff04ff02ffff04ffff11ff05ffff010180ff8080808080ff0180ff02ffff03ffff09ff05ff8080ffff0180ffff01ff02ff04ffff04ff02ffff04ffff11ff05ffff010180ff8080808080ff0180ff018080",
+   "env": "ff0880",
+   "expect": {
+    "result": "01",
+    "cost": 13760
+   }
+  },
+  {
+   "name": "no_functions_emit_bare",
+   "program": "ff10ff02ff0580",
+   "env": "ff02ff0380",
+   "expect": {
+    "result": "05",
+    "cost": 856
+   }
+  },
+  {
+   "name": "condition_constants_and_list",
+   "program": "ff04ffff04ffff0101ffff04ff02ffff04ffff11ff05ffff0182019080ff80808080ff8080",
+   "env": "ff9600149999999999999999999999999999999999999999ff8203e880",
+   "expect": {
+    "result": "ffff01ff9600149999999999999999999999999999999999999999ff8202588080",
+    "cost": 1204
+   }
+  },
+  {
+   "name": "destructured_parameters",
+   "program": "ff04ffff10ff04ff0a80ff0380",
+   "env": "ffff02ff0380ff09ff0880",
+   "expect": {
+    "result": "ff05ff09ff0880",
+    "cost": 963
+   }
+  },
+  {
+   "name": "native_sha256tree_call",
+   "program": "ff3fffff04ff02ff028080",
+   "env": "ff0780",
+   "expect": {
+    "result": "a00a2163e8cc99492f8be388c7fe026932d30de28eb785c9cedd94cf3f1af12cd8",
+    "cost": 1206
+   }
+  },
+  {
+   "name": "untaken_if_branch_never_runs",
+   "program": "ff02ffff03ff02ffff01ff0107ffff01ff088080ff0180",
+   "env": "ff0180",
+   "expect": {
+    "result": "07",
+    "cost": 277
+   }
+  }
+ ]
+}

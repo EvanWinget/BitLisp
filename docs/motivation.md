@@ -23,8 +23,8 @@ closer to a scalable, self-custodial solution include:
   (LN-Symmetry), replacing penalty-based enforcement and shrinking
   what channel partners must watch for.
 - **Non-interactive protocols.** Oracle contracts that one party can
-publish and another can take later, with no signing ceremony that
-requires interactivity.
+  publish and another can take later, with no signing ceremony that
+  requires interactivity.
 
 ## What the contract layer must support
 

@@ -1,11 +1,13 @@
 # The REPL and the converter commands
 
 The interactive front end over the reference VM, the spend runner,
-and the debug machine, all in `python/bitlisp_tools/`. This is
-tooling, not consensus. The REPL is the `bitlisp` command, and two
-one-shot converters ship beside it: `bitlisp-asm` assembles text to
-serialized bytecode hex, `bitlisp-disasm` renders hex back as text.
-The text syntax is defined in `syntax.md`.
+the compiler, and the debug machine, all in `python/bitlisp_tools/`.
+This is tooling, not consensus. The REPL is the `bitlisp` command,
+and three one-shot commands ship beside it: `bitlisp-asm` assembles
+text to serialized bytecode hex, `bitlisp-disasm` renders hex back
+as text, and `bitlisp-compile` compiles a source program to
+serialized bytecode hex. The text syntax is defined in `syntax.md`
+and the authoring language in `language.md`.
 
 ## Starting the REPL
 
@@ -39,9 +41,13 @@ lines.
 | `tx [<path>]` | load a JSON transaction context, or show the loaded one |
 | `input <n>` | select the transaction input being spent |
 | `maxcost [<n>]` | show or set the cost budget for eval, spend, and debug |
+| `(defun <name> <params> <body>)` | define a named function |
+| `(defconstant <name> <value>)` | define a constant |
 | `def <name> <sexpr>` | bind a name to a parsed node |
-| `undef <name>` | remove a binding |
-| `defs` | list the bindings |
+| `undef <name>` | remove a definition or binding |
+| `defs` | list definitions and bindings |
+| `compile <expr>` | show an expression's compiled tree as canonical text |
+| `sym <path>` | load a symbol file written by bitlisp-compile |
 | `debug <program> [<solution>]` | open a stepping session |
 | `step` | execute one task, show the stacks |
 | `next` | step over: the pending task and its whole subtree |
@@ -70,9 +76,46 @@ dotted tails included.
 
 A definition body assembles under the bindings current at `def`
 time, so definitions snapshot: redefining a dependency later does
-not rewrite what an earlier definition captured. Named functions
-with parameters are not definitions, they arrive with the compiler
-unit that owns call semantics.
+not rewrite what an earlier definition captured.
+
+A line whose head is `defun` or `defconstant` is a language
+declaration, `language.md` syntax exactly, and adds to the
+session's compiler definitions. Declarations and `def` bindings
+share one namespace with the reserved words and the condition
+constants, so one spelling can never mean two things, and `undef`
+removes a name from whichever space holds it.
+
+The shared namespace narrows `def` from its original surface, a
+deliberate change with the compiler landing: a reserved word or a
+condition constant name can no longer be bound. Before the
+compiler, `def CREATE_OUTPUT` was an ordinary binding. Now that
+spelling belongs to the language, and allowing the binding would
+make the same text mean different things raw and compiled. The
+rejection is loud, an error line at the `def`.
+
+## Running language source
+
+`eval`, `spend`, and `debug` read their text as raw VM syntax
+first, and its meaning never changes. If and only if the reader
+rejects the text on an unknown name, the expression compiles as
+language source against the session's declarations, so `(fact 5)`
+works the moment `fact` is defined, and a full `(program ...)` form
+runs anywhere a program is accepted. Raw text stays raw whatever
+is declared, because a declaration can never occupy text that
+already parses. A `def` binding participates in raw parsing, so
+which reading applies follows from the text and the session's
+bindings, never from a mode. A solution is always data and never
+compiles: a name inside one is an error.
+
+Every in-REPL compile registers the compiled functions in the
+session symbol map, and `sym` loads the JSON table
+`bitlisp-compile --symbols` writes, so foreign bytecode debugs with
+names too. The debugger display consults the map: a pair matching a
+compiled function body prints as its source name, and an eval task
+whose environment has the call shape shows the live arguments by
+parameter name, `eval fact [N=3]`. Every other surface, `disasm`
+and `compile` output included, prints canonical text untouched, so
+what round-trips stays round-trippable.
 
 ## The debugger
 
@@ -135,16 +178,24 @@ bitlisp> exit
 ```
 bitlisp-asm  [<file-or-literal>]     text to serialized hex
 bitlisp-disasm [<file-or-literal>]   serialized hex to text
+bitlisp-compile [<file-or-literal>] [--symbols <path>]
+                                     language source to serialized hex
 ```
 
-Both take one argument, a file when one exists at that path and the
-literal otherwise, the `bitlisp-run` convention, or read stdin when
-the argument is omitted, so the two compose in a pipeline:
+All three take one argument, a file when one exists at that path
+and the literal otherwise, the `bitlisp-run` convention, or read
+stdin when the argument is omitted, so they compose in pipelines:
 
 ```
 $ echo '(+ (q . 2) (q . 3))' | bitlisp-asm | bitlisp-disasm
 (+ (q . 2) (q . 3))
 ```
+
+`bitlisp-compile` takes one self-contained `(program ...)` form,
+`language.md` syntax, and prints the serialized bytecode hex that
+`bitlisp-run --hex` and `bitlisp-disasm` accept. Its symbol table
+is written only under `--symbols`, never as a side effect, and the
+`sym` command loads the file.
 
 `bitlisp-disasm` deserializes strictly, accepting only the unique
 canonical encoding. Exit status is 0 on success and 2 on every

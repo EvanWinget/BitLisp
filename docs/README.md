@@ -21,6 +21,10 @@
   v0 vocabulary, plus the validation-layer architecture comparison.
 - [lang/syntax.md](lang/syntax.md): the text s-expression syntax
   read and written by the Phase 3 front end, with the printer normal
-  form and the round-trip guarantee. The language reference grows in
-  `lang/` alongside it.
+  form and the round-trip guarantee.
+- [lang/language.md](lang/language.md): the v0 authoring language,
+  the program form, its declarations and special forms, the
+  compiled environment shape, and the symbol table format.
+- [lang/repl.md](lang/repl.md): the bitlisp REPL, its debugger, and
+  the one-shot converter and compiler commands beside it.
 - Essay drafts land here in Phase 5.

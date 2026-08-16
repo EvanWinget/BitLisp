@@ -142,6 +142,7 @@ python3 -m venv .venv && .venv/bin/pip install -e ".[dev,oracles]"
 .venv/bin/bitlisp [tx.json]              # REPL with stepping debugger
 .venv/bin/bitlisp-asm [text]             # text to serialized bytecode hex
 .venv/bin/bitlisp-disasm [hex]           # serialized bytecode hex to text
+.venv/bin/bitlisp-compile [source]       # v0 language source to bytecode hex
 .venv/bin/python tools/run_vectors.py    # full vector corpus
 .venv/bin/python tools/diff_clvm.py --count 10000 --seed 1   # diff harness
 ci/lint/lint.sh                          # codespell, ruff, whitespace, prose

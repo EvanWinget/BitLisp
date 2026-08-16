@@ -59,8 +59,15 @@ def _atom_text(atom, operator_position):
     return "0x" + atom.hex()
 
 
-def disassemble(node):
-    """The canonical text spelling of a node, ValueError on a non-node."""
+def disassemble(node, rename=None):
+    """The canonical text spelling of a node, ValueError on a non-node.
+
+    The round-trip guarantee holds for the default spelling only.
+    rename, when given, is consulted on every pair and its non-None
+    answer prints in the pair's place: the debugger passes the
+    symbol table's name lookup, so a compiled function body reads as
+    its source name instead of its bytecode.
+    """
     pieces = []
     stack = [(_NODE, node, False)]
     while stack:
@@ -69,6 +76,10 @@ def disassemble(node):
             if isinstance(current, bytes):
                 pieces.append(_atom_text(current, operator_position))
             elif isinstance(current, tuple) and len(current) == 2:
+                name = rename(current) if rename is not None else None
+                if name is not None:
+                    pieces.append(name)
+                    continue
                 pieces.append("(")
                 stack.append((_TAIL, current[1], False))
                 stack.append((_NODE, current[0], True))
@@ -82,6 +93,12 @@ def disassemble(node):
                 pieces.append(_atom_text(current, False))
                 pieces.append(")")
         elif isinstance(current, tuple) and len(current) == 2:
+            name = rename(current) if rename is not None else None
+            if name is not None:
+                pieces.append(" . ")
+                pieces.append(name)
+                pieces.append(")")
+                continue
             pieces.append(" ")
             stack.append((_TAIL, current[1], False))
             stack.append((_NODE, current[0], False))
