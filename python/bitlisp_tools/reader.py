@@ -43,6 +43,12 @@ class ParseError(Exception):
         self.offset = offset
 
 
+class UnknownSymbol(ParseError):
+    """A bare token no resolution accepts, the one rejection a
+    caller may claim: definitions splice here, and the REPL retries
+    a program through the compiler on exactly this error."""
+
+
 def tokenize(text):
     """The (token, offset) list for text, comments and whitespace dropped.
 
@@ -121,7 +127,7 @@ def _node_from_token(token, offset, names):
         bound = names.get(token)
         if bound is not None:
             return bound
-    raise ParseError(f"unknown symbol {token!r}", offset)
+    raise UnknownSymbol(f"unknown symbol {token!r}", offset)
 
 
 def definable(text):
@@ -146,8 +152,10 @@ def definable(text):
         return False
 
 
-def _parse(tokens, names, single):
-    """The node list for a token stream.
+def _parse(tokens, resolve, single):
+    """The node list for a token stream, bare tokens resolved by the
+    caller: the assembler resolves against its bindings and rejects
+    the rest, the compiler's source parser keeps unknown names.
 
     Each stack frame is one open list: its elements so far, the node
     after the dot if one has been seen, whether the dot has been seen,
@@ -181,7 +189,7 @@ def _parse(tokens, names, single):
             for item in reversed(items):
                 node = (item, node)
         else:
-            node = _node_from_token(token, offset, names)
+            node = resolve(token, offset)
         if stack:
             frame = stack[-1]
             if not frame[2]:
@@ -197,9 +205,13 @@ def _parse(tokens, names, single):
     return results
 
 
+def _resolver(names):
+    return lambda token, offset: _node_from_token(token, offset, names)
+
+
 def assemble(text, names=None):
     """The node for exactly one text s-expression, ParseError on failure."""
-    nodes = _parse(tokenize(text), names, single=True)
+    nodes = _parse(tokenize(text), _resolver(names), single=True)
     if not nodes:
         raise ParseError("empty input", len(text))
     return nodes[0]
@@ -207,4 +219,4 @@ def assemble(text, names=None):
 
 def assemble_many(text, names=None):
     """The node list for zero or more text s-expressions."""
-    return _parse(tokenize(text), names, single=False)
+    return _parse(tokenize(text), _resolver(names), single=False)
