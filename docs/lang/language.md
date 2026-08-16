@@ -11,7 +11,7 @@ name is exactly a token the raw reader rejects as an unknown symbol,
 so strings, hex, operator names, and decimals keep their raw
 spelling rules, and the language occupies only text that previously
 errored. The reserved words are `program`, `defun`, `defconstant`,
-`defmacro`, `if`, `list`, `qq`, and `unquote`.
+`if`, `list`, `assert`, `and`, and `or`.
 
 ## The program form
 
@@ -21,9 +21,8 @@ errored. The reserved words are `program`, `defun`, `defconstant`,
 
 A source program is one self-contained form: a parameter tree, any
 number of declarations in any order, and exactly one body
-expression. The declarations are `defun`, `defconstant`, and
-`defmacro`, and nothing else may appear in declaration position.
-Compiling a
+expression. The declarations are `defun` and `defconstant`, and
+nothing else may appear in declaration position. Compiling a
 program uses nothing outside the form, so a program that compiles
 in a file compiles identically pasted into the REPL.
 
@@ -72,7 +71,7 @@ compiles to its quoted value at the use site. `(defconstant K
 (+ 1 2))` therefore binds the three-element tree whose head is the
 byte 0x10, not 3, exactly as `(q . (+ 1 2))` would read it.
 
-A name is defined once: functions, constants, macros, condition
+A name is defined once: functions, constants, condition
 constants, and reserved words share one namespace, and
 redefinition is an error.
 
@@ -115,16 +114,48 @@ Builds a proper list of its evaluated arguments, folding into `c`
 calls: `(list A B)` compiles as `(c A (c B ()))`, and `(list)` is
 nil. Condition output is written with it.
 
-## defmacro, qq, and unquote
+## assert
 
 ```
-(defmacro <name> <params> <body>)
+(assert <condition>* <value>)
 ```
 
-Declares a macro, a compile-time program whose calls expand into
-source before anything else compiles, with `qq` and `unquote` as
-its template forms. The system, its visibility rules, its limits,
-and its sharp edges are `macros.md`.
+Evaluates each condition in order and yields the final operand once
+every condition holds. A falsy condition raises, failing the spend,
+and nothing after it evaluates. Each level compiles to the same
+apply-a-quoted-branch idiom as `if`, with the raise operator as the
+untaken branch, so `(assert C V)` compiles as
+
+```
+(a (i C (q . V) (q 8)) 1)
+```
+
+With a single operand there is nothing to check and the value
+compiles bare. `(assert)` is rejected at compile time: "assert
+takes conditions and a final value".
+
+## and
+
+```
+(and <expr>*)
+```
+
+Yields 1 when every operand is truthy and nil at the first falsy
+operand, whose successors never evaluate. The result is boolean, 1
+or nil, never an operand's value, exactly as Chialisp's `and` macro
+behaves. `(and)` is 1. Each level compiles to a lazy `if` whose
+untaken branch is the remaining chain.
+
+## or
+
+```
+(or <expr>*)
+```
+
+Yields 1 at the first truthy operand, whose successors never
+evaluate, and nil when every operand is falsy. `(or)` is nil.
+`(and X)` and `(or X)` compile to the same tree, both meaning X as
+a boolean.
 
 ## Expressions and quoting
 
@@ -182,11 +213,8 @@ it, not at the declaration. A body error names its function,
 because in the REPL the offset indexes the declaring line's text,
 not the line that triggered the compile.
 
-Macro expansion is the compiler's one source rewrite, finished
-before reachability is computed and anything emits, which is why a
-macro's expansion may call a function its source never names.
-Emission itself is direct: what the rules above produce is what
-serializes.
+The compiler performs no source rewrites. Emission is direct: what
+the rules above produce is what serializes.
 
 The worked example, `bitlisp-compile` output disassembled:
 
@@ -239,32 +267,27 @@ nothing forces a change. The deliberate differences:
   environment tree, so no optimizer is needed to collapse them and
   the symbol table holds only function bodies.
 - The function tree is ordered by declaration, not alphabetically.
-- Call arity is checked at compile time, macro calls included.
+- Call arity is checked at compile time.
 - `defconstant` is literal-only. There is no compile-time-evaluated
   constant form.
 - Unknown bare operator atoms in call position are rejected at
   compile time rather than at run time.
-- `if` and `list` are compiler forms, not macros, with the same
-  emitted semantics. Macros therefore cannot shadow them, or
-  anything else: where Chialisp's newest macro silently wins, the
-  one-namespace rule makes redefinition an error.
-- Macro expansion is bounded, by the depth cap, the total
-  execution cap, and the execution budget `macros.md` states,
-  where Chialisp expands until the interpreter dies. A macro name
-  used as a value is an error in ordinary code, as a function
-  name is.
-- Macro read-back catches caller-side typos. Chialisp reads an
-  unresolving output atom back as data, so a misspelled macro
-  argument silently compiles. BitLisp additionally lifts names
-  the caller wrote in the call's own arguments, so those fail as
-  unknown names, a deliberately one-hop guarantee: the call's
-  argument source is the only place provenance survives the VM
-  boundary. Capture and stale template spellings are kept as
-  Chialisp has them, documented sharp edges in `macros.md`.
-- There is no `function` or `com` reflection form. Macro output
-  cannot carry names into quoted data, so a user macro cannot
-  introduce laziness, and lazy branching exists only through the
-  built-in `if`.
+- `if`, `list`, `assert`, `and`, and `or` are compiler forms, not
+  macros, with the semantics Chialisp's stage-2 and utility_macros
+  macros give the same spellings. Nothing can shadow them: where
+  Chialisp's newest macro silently wins, the one-namespace rule
+  makes redefinition an error.
+- There is no macro system. Chialisp's `defmacro`, `qq`, and
+  `unquote` are omitted, a removal decided on production evidence:
+  across Chia's deployed puzzle corpus and its largest application
+  codebases, the only macros in production use are short-circuit
+  `assert`, `and`, and `or`, which ship here as fixed forms. The
+  cut removes the expansion machinery's audit surface, and it
+  means user code cannot rewrite source: what is written is what
+  compiles.
+- There is no `function` or `com` reflection form, and lazy
+  evaluation exists only through the built-in lazy forms, `if`,
+  `assert`, `and`, and `or`.
 - There is no include mechanism and no inline functions in v0.
   Currying is not a language form either: it operates on compiled
   programs, through the surfaces defined in `curry.md`.
