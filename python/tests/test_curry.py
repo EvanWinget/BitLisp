@@ -1,14 +1,18 @@
 """Curry tests: shape pins, compile-and-run behavior of curried
 programs, the strict uncurry contract, round-trip properties, and
-the differential check against the chia_rs wheel."""
+the differential checks against the chia_rs wheel."""
 
-import random
 import sys
 from pathlib import Path
 
 import pytest
 from hypothesis import given
 from hypothesis import strategies as st
+
+try:
+    import chia_rs
+except ImportError:
+    chia_rs = None
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(REPO_ROOT / "python"))
@@ -183,6 +187,8 @@ def test_curried_values_prefix_the_environment(values, env):
 
 # Differential against the pinned oracle wheel.
 
+_needs_wheel = pytest.mark.skipif(chia_rs is None, reason="chia_rs not installed")
+
 
 def _lazy_to_node(lazy):
     if lazy.pair is None:
@@ -191,29 +197,34 @@ def _lazy_to_node(lazy):
     return (_lazy_to_node(first), _lazy_to_node(rest))
 
 
-def _random_node(rng, depth=3):
-    if depth == 0 or rng.random() < 0.4:
-        return rng.randbytes(rng.randrange(0, 6))
-    return (_random_node(rng, depth - 1), _random_node(rng, depth - 1))
+@_needs_wheel
+@given(_node_trees, st.lists(_node_trees, max_size=4))
+def test_uncurry_matches_chia_rs(program, values):
+    curried = curry(program, values)
+    wheel = chia_rs.Program.from_bytes(serialize(curried))
+    mod, args = wheel.uncurry_rust()
+    assert _lazy_to_node(mod) == program
+    expected = NIL
+    for value in reversed(values):
+        expected = (value, expected)
+    assert _lazy_to_node(args) == expected
 
 
-def test_uncurry_matches_chia_rs():
-    chia_rs = pytest.importorskip("chia_rs")
-    rng = random.Random(4242)
-    for _ in range(50):
-        program = _random_node(rng)
-        values = [_random_node(rng) for _ in range(rng.randrange(0, 4))]
-        curried = curry(program, values)
-        wheel = chia_rs.Program.from_bytes(serialize(curried))
-        mod, args = wheel.uncurry_rust()
-        assert _lazy_to_node(mod) == program
-        expected = NIL
-        for value in reversed(values):
-            expected = (value, expected)
-        assert _lazy_to_node(args) == expected
+@_needs_wheel
+def test_uncurry_stricter_than_the_wheel():
+    # The wheel's uncurry never checks the chain terminator, so it
+    # accepts this near miss as a curry of one value. BitLisp
+    # returns the sentinel: the strictness is a deliberate,
+    # documented divergence from the deployed implementation, and
+    # this pin fails loudly if either side moves.
+    node = assemble("(a (q . 5) (c (q . 3) 2))")
+    assert uncurry(node) == (node, None)
+    mod, args = chia_rs.Program.from_bytes(serialize(node)).uncurry_rust()
+    assert _lazy_to_node(mod) == b"\x05"
+    assert _lazy_to_node(args) == (b"\x03", NIL)
 
 
+@_needs_wheel
 def test_curried_tree_hash_matches_chia_rs():
-    chia_rs = pytest.importorskip("chia_rs")
     curried = curry(assemble("(+ 2 5)"), [assemble("10"), assemble("0xdead")])
     assert tree_hash(curried) == chia_rs.tree_hash(serialize(curried))
