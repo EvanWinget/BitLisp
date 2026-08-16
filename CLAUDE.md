@@ -69,11 +69,20 @@ In practice this means:
 2. **Vectors are the source of truth between sessions.** Sessions are
    stateless, the vector corpus is not. Any behavior worth keeping becomes
    a vector in `vectors/` the same day.
-3. **Divergence is documented, never silent.** Anywhere BitLisp differs
-   from CLVM, the divergence table in `docs/vm-record.md` says so and
-   why. Anywhere the condition layer differs from Chia's deployed
-   condition semantics, the table in `docs/condition-record.md` says
-   so and why.
+3. **Chialisp is the default, deviation is a reasoned decision.**
+   BitLisp matches Chialisp and CLVM behavior by default: those
+   patterns are battle tested, and fidelity is a checkable claim
+   where a safer-looking variant invites divergence bugs of its
+   own. A deviation is taken when it is justified from first
+   principles, with both sides steelmanned and the call made by
+   Evan (standard ratified 2026-08-16). Divergence is documented,
+   never silent: anywhere BitLisp differs from CLVM, the
+   divergence table in `docs/vm-record.md` says so and why.
+   Anywhere the condition layer differs from Chia's deployed
+   condition semantics, the table in `docs/condition-record.md`
+   says so and why. Tooling-layer divergences (the language and
+   compiler) are recorded in the language docs and the execution
+   plan's unit bullets.
 4. **The novel layer gets adversarial treatment first.** The validation rules
    (`spec/VALIDATION.md`) have no external reference. They get
    property-based invariants and theft-bug regression vectors before any
