@@ -273,3 +273,27 @@ def test_compile_rejects_unparseable(capsys):
 def test_compile_console_script_resolves():
     (entry,) = metadata.entry_points(group="console_scripts", name="bitlisp-compile")
     assert entry.load() is cli.compile_main
+
+
+def test_asm_pipe_closed_before_write_keeps_exit_zero():
+    # The reader hangs up before the child prints, so the output
+    # sits in the stream buffer until the shield's closing flush.
+    # The failure must surface inside the shield, never at
+    # interpreter shutdown, whose failed flush exits 120.
+    env = dict(os.environ, PYTHONPATH=str(REPO_ROOT / "python"))
+    process = subprocess.Popen(
+        [
+            sys.executable,
+            "-c",
+            "import sys; from bitlisp_tools.cli import asm_main;"
+            " sys.exit(asm_main(['(q . 1)']))",
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=env,
+    )
+    process.stdout.close()
+    stderr = process.stderr.read()
+    process.stderr.close()
+    assert process.wait() == 0
+    assert stderr == b""

@@ -142,9 +142,16 @@ def _node(source, as_hex):
 def _pipe_shield():
     """On a broken pipe, points stdout at devnull so the interpreter's
     exit flush cannot raise a second time. A downstream reader that
-    stops listening does not change the exit status."""
+    stops listening does not change the exit status.
+
+    The flush inside the shield forces any buffered tail onto the
+    pipe here, where the except arm can catch the failure. Without
+    it, output small enough to sit in the stream buffer past the
+    last print would first touch a dead pipe during interpreter
+    shutdown, whose failed flush exits 120 outside any handler."""
     try:
         yield
+        sys.stdout.flush()
     except BrokenPipeError:
         os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
 
