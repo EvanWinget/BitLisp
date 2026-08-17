@@ -118,6 +118,41 @@
    "expect": {
     "error": "user_raise"
    }
+  },
+  {
+   "name": "include_splices_shared_declarations",
+   "program": "ff02ffff01ff02ff02ffff04ff02ffff04ff05ff80808080ffff04ffff01ff11ff05ffff0182019080ff018080",
+   "env": "ff8203e880",
+   "expect": {
+    "result": "820258",
+    "cost": 1455
+   }
+  },
+  {
+   "name": "computed_defconstant_holds_the_tree_hash",
+   "program": "ff01a047b84b887e3aa3adaabc104120d0c2d617b5e0c8d569932b5292a8ec359d0c28",
+   "env": "80",
+   "expect": {
+    "result": "a047b84b887e3aa3adaabc104120d0c2d617b5e0c8d569932b5292a8ec359d0c28",
+    "cost": 20
+   }
+  },
+  {
+   "name": "inline_unused_argument_never_evaluates",
+   "program": "ff0107",
+   "env": "ff0180",
+   "expect": {
+    "result": "07",
+    "cost": 20
+   }
+  },
+  {
+   "name": "inline_argument_used_twice_raises_twice_armed",
+   "program": "ff10ffff0880ffff088080",
+   "env": "ff0180",
+   "expect": {
+    "error": "user_raise"
+   }
   }
  ]
 }
