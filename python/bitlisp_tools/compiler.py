@@ -5,9 +5,9 @@ the reader would reject as an unknown symbol, so strings, hex,
 operator names, and decimals keep exactly their raw meaning and the
 language occupies only text that previously errored. Atoms quote
 themselves, names resolve to environment paths or inline constant
-values, and the special forms are program, defun, defconstant, if,
-list, assert, and, and or. Everything else a source expression can
-say is an operator application.
+values, and the special forms are program, defun, defun-inline,
+defconstant, include, if, list, assert, and, and or. Everything
+else a source expression can say is an operator application.
 
 A compiled program's environment is the pair (function tree . args).
 The function tree holds every reachable function body, balanced in
@@ -15,8 +15,10 @@ declaration order, and a call site rebuilds the layout by consing
 the tree it received onto its evaluated arguments, so recursion and
 mutual recursion need no further machinery. A program whose body
 reaches no function is emitted bare with its arguments at the
-environment root. Constants never enter the tree: a constant
-reference inlines its value as a quoted literal at the use site.
+environment root. Constants never enter the tree: a defconstant
+value compiles and runs on the reference VM at its declaration,
+budgeted, and a constant reference inlines the computed value as a
+quoted literal at the use site.
 
 There are no source-to-source rewrites. Emission is direct, with
 one size-only exception: a nil literal is emitted as the nil atom,
@@ -37,8 +39,11 @@ is not distinguishable from ordinary data by its hash.
 """
 
 import hashlib
+import os
 
 from bitlisp import conditions
+from bitlisp.errors import BitLispError
+from bitlisp.machine import run
 from bitlisp.operators import OPERATORS
 from bitlisp.sexp import NIL, int_to_atom, is_atom, is_pair
 
@@ -50,16 +55,31 @@ _QUOTE = b"\x01"
 _APPLY = b"\x02"
 _IF_OP = b"\x03"
 _CONS = b"\x04"
+_FIRST = b"\x05"
+_REST = b"\x06"
 _RAISE = b"\x08"
 
 # The environment root, its first child, and its rest child, as the
 # VM's path lookup numbers them.
 _TOP, _LEFT, _RIGHT = 1, 2, 3
 
-_PROGRAM, _DEFUN, _DEFCONSTANT, _IF, _LIST, _ASSERT, _AND, _OR = (
+(
+    _PROGRAM,
+    _DEFUN,
+    _DEFUN_INLINE,
+    _DEFCONSTANT,
+    _INCLUDE,
+    _IF,
+    _LIST,
+    _ASSERT,
+    _AND,
+    _OR,
+) = (
     "program",
     "defun",
+    "defun-inline",
     "defconstant",
+    "include",
     "if",
     "list",
     "assert",
@@ -67,12 +87,35 @@ _PROGRAM, _DEFUN, _DEFCONSTANT, _IF, _LIST, _ASSERT, _AND, _OR = (
     "or",
 )
 RESERVED_WORDS = frozenset(
-    {_PROGRAM, _DEFUN, _DEFCONSTANT, _IF, _LIST, _ASSERT, _AND, _OR}
+    {
+        _PROGRAM,
+        _DEFUN,
+        _DEFUN_INLINE,
+        _DEFCONSTANT,
+        _INCLUDE,
+        _IF,
+        _LIST,
+        _ASSERT,
+        _AND,
+        _OR,
+    }
 )
 
 # The declaration heads a program form accepts, the one tuple the
 # REPL's line dispatch reads too, so the two surfaces cannot drift.
-DECLARATION_KEYWORDS = (_DEFUN, _DEFCONSTANT)
+DECLARATION_KEYWORDS = (_DEFUN, _DEFUN_INLINE, _DEFCONSTANT, _INCLUDE)
+
+# How deep inline calls may nest inside inline bodies before the
+# compiler rejects the program: recursion needs the function tree,
+# which is what defun is for.
+INLINE_DEPTH_LIMIT = 100
+
+# How many structural nodes one inline expansion may emit. The
+# depth cap alone cannot bound size: a chain of doubling inlines
+# squares its tree per declaration while nesting only linearly, so
+# the size cap is what turns that into a compile error instead of
+# an artifact too large to serialize.
+INLINE_SIZE_LIMIT = 1_000_000
 
 
 # The condition vocabulary, one name per assigned opcode, written
@@ -113,6 +156,11 @@ CONDITION_CONSTANTS = {
 
 SYMBOLS_SCHEMA = "bitlisp-sym-v0"
 
+# The inclusive budget a defconstant value evaluates under, the
+# runner's default spend budget, so compile-time evaluation can
+# never outrun what a spend could.
+CONSTANT_COST_BUDGET = 11_000_000_000
+
 
 class CompileError(Exception):
     """Source that reads as an s-expression but is not a valid program."""
@@ -120,6 +168,9 @@ class CompileError(Exception):
     def __init__(self, message, offset=None):
         super().__init__(message if offset is None else f"{message} at offset {offset}")
         self.offset = offset
+        # True once an inline frame has named this error, so outer
+        # frames pass it through instead of stacking prefixes.
+        self.inline_named = False
 
 
 class Symbol:
@@ -153,6 +204,15 @@ def parse_source(text):
 def parse_source_many(text):
     """The source tree list for zero or more expressions."""
     return _parse(tokenize(text), _symbol_or_atom, single=False)
+
+
+def constant_text(value):
+    """The declaration spelling of a computed constant value: an
+    atom is its own spelling, a pair re-reads as the same value
+    only quoted."""
+    if is_pair(value):
+        return source_text((_QUOTE, value))
+    return source_text(value)
 
 
 def source_text(tree):
@@ -266,11 +326,17 @@ class Definitions:
 
     def __init__(self):
         self.functions = {}
+        self.inlines = {}
         self.constants = {}
 
     def _claim(self, symbol, taken):
         name = _check_name(symbol, "definition")
-        if name in self.functions or name in self.constants or name in taken:
+        if (
+            name in self.functions
+            or name in self.inlines
+            or name in self.constants
+            or name in taken
+        ):
             raise CompileError(f"{name!r} is already defined", symbol.offset)
         return name
 
@@ -284,20 +350,34 @@ class Definitions:
         self.functions[name] = (items[2], items[3], arity)
         return name
 
+    def add_defun_inline(self, form, taken=frozenset()):
+        """Adds one (defun-inline name params body) source form.
+        The body is stored as written and splices at each call site
+        a program reaches, never entering the function tree."""
+        items = _form_items(form, _DEFUN_INLINE, 4)
+        name = self._claim(items[1], taken)
+        arity = _check_params(items[2])
+        self.inlines[name] = (items[2], items[3], arity)
+        return name
+
     def add_defconstant(self, form, taken=frozenset()):
         """Adds one (defconstant name value) source form. The value
-        is data taken verbatim, never evaluated, so it cannot
-        mention names."""
+        compiles against the declarations already made and runs on
+        the reference VM now, under CONSTANT_COST_BUDGET, so a
+        constant holds computed data and sees only what is declared
+        above it. Declaration order matters for constants alone."""
         items = _form_items(form, _DEFCONSTANT, 3)
         name = self._claim(items[1], taken)
-        symbol = first_symbol(items[2])
-        if symbol is not None:
+        try:
+            program, _ = _compile(self, None, items[2])
+            _, value = run(program, NIL, CONSTANT_COST_BUDGET)
+        except CompileError as exc:
+            raise CompileError(f"in {name!r}: {exc}") from None
+        except BitLispError as exc:
             raise CompileError(
-                f"{symbol.name!r} in a defconstant value, "
-                "which is data and cannot hold names",
-                symbol.offset,
-            )
-        self.constants[name] = items[2]
+                f"in {name!r}: the value raised {exc.code}: {exc}"
+            ) from None
+        self.constants[name] = value
         return name
 
 
@@ -317,7 +397,9 @@ def _form_items(form, keyword, count):
 
 _FORM_SHAPES = {
     _DEFUN: "(defun name params body)",
+    _DEFUN_INLINE: "(defun-inline name params body)",
     _DEFCONSTANT: "(defconstant name value)",
+    _INCLUDE: '(include "file")',
 }
 
 
@@ -337,16 +419,48 @@ def _compose(parent, child):
 
 
 def _bind_params(tree, root):
-    """The name-to-path map a parameter tree induces at root."""
+    """The name-to-node map a parameter tree induces at root, each
+    name bound to its environment path atom."""
     bindings = {}
     stack = [(tree, root)]
     while stack:
         current, path = stack.pop()
         if isinstance(current, Symbol):
-            bindings[current.name] = path
+            bindings[current.name] = int_to_atom(path)
         elif is_pair(current):
             stack.append((current[0], _compose(path, _LEFT)))
             stack.append((current[1], _compose(path, _RIGHT)))
+    return bindings
+
+
+def _bind_inline_params(params, arguments):
+    """The name-to-node map an inline call induces: each parameter
+    name binds its argument's compiled expression, a destructured
+    name reaching its component through first and rest steps over
+    that expression, and a tail name binding the remaining
+    arguments as a built list. Every reference re-emits its node,
+    the call-by-name contract: used twice evaluates twice, unused
+    never evaluates."""
+    bindings = {}
+    stack = []
+    spine = params
+    index = 0
+    while is_pair(spine):
+        stack.append((spine[0], arguments[index]))
+        index += 1
+        spine = spine[1]
+    if isinstance(spine, Symbol):
+        rest = NIL
+        for argument in reversed(arguments[index:]):
+            rest = _proper_list(_CONS, argument, rest)
+        bindings[spine.name] = rest
+    while stack:
+        tree, node = stack.pop()
+        if isinstance(tree, Symbol):
+            bindings[tree.name] = node
+        elif is_pair(tree):
+            stack.append((tree[0], _proper_list(_FIRST, node)))
+            stack.append((tree[1], _proper_list(_REST, node)))
     return bindings
 
 
@@ -368,17 +482,21 @@ def _check_arity(name, arguments, arity, offset):
 def _reachable_names(defs, body):
     """The functions a body can reach, conservatively: every
     mentioned name counts, shadowing ignored, so the set can only
-    be too large, never too small. An unreached body never
-    compiles, so an error inside one surfaces the first time a
-    program reaches it."""
+    be too large, never too small. An inline body's mentions count
+    through the inline, because its splice will reference them. An
+    unreached body never compiles, so an error inside one surfaces
+    the first time a program reaches it."""
     reachable = set()
+    walked_inlines = set()
     pending = _symbol_names(body)
     while pending:
         name = pending.pop()
-        if name in reachable or name not in defs.functions:
-            continue
-        reachable.add(name)
-        pending |= _symbol_names(defs.functions[name][1])
+        if name in defs.functions and name not in reachable:
+            reachable.add(name)
+            pending |= _symbol_names(defs.functions[name][1])
+        elif name in defs.inlines and name not in walked_inlines:
+            walked_inlines.add(name)
+            pending |= _symbol_names(defs.inlines[name][1])
     return reachable
 
 
@@ -447,6 +565,14 @@ _TRUE = _quote(int_to_atom(1))
 _RAISE_CALL = _proper_list(_RAISE)
 
 
+def _inline_error(name, message, offset=None):
+    """A CompileError already carrying its inline frame's name, so
+    outer frames pass it through."""
+    error = CompileError(f"in {name!r}: {message}", offset)
+    error.inline_named = True
+    return error
+
+
 def _name_spelling(atom):
     """The name an atom's bytes spell, or None when they spell no
     single reader-accepted name."""
@@ -466,6 +592,37 @@ class _Compilation:
     def __init__(self, defs, fn_paths):
         self.defs = defs
         self.fn_paths = fn_paths
+        self.inline_depth = 0
+        # The size memo maps node ids to structural sizes, and the
+        # measured list keeps every memoized node alive so a
+        # recycled id can never alias a new node.
+        self.node_sizes = {}
+        self.measured_nodes = []
+
+    def _node_size(self, node):
+        """Structural node count of an emitted tree, memoized
+        across the shared subtrees splicing creates, so measuring
+        costs one visit per distinct node."""
+        sizes = self.node_sizes
+        stack = [node]
+        while stack:
+            current = stack.pop()
+            key = id(current)
+            if key in sizes:
+                continue
+            if not is_pair(current):
+                sizes[key] = 1
+                self.measured_nodes.append(current)
+                continue
+            left_key, right_key = id(current[0]), id(current[1])
+            if left_key in sizes and right_key in sizes:
+                sizes[key] = 1 + sizes[left_key] + sizes[right_key]
+                self.measured_nodes.append(current)
+            else:
+                stack.append(current)
+                stack.append(current[0])
+                stack.append(current[1])
+        return sizes[id(node)]
 
     def expression(self, expr, bindings):
         if isinstance(expr, Symbol):
@@ -496,14 +653,14 @@ class _Compilation:
     def _reference(self, symbol, bindings):
         name = symbol.name
         if name in bindings:
-            return int_to_atom(bindings[name])
+            return bindings[name]
         if name in self.defs.constants:
-            # A constant's value was checked symbol-free at its
-            # definition, so the stored tree is already a node.
+            # A constant's value was computed at its declaration,
+            # so the stored tree is a plain node.
             return _quote(self.defs.constants[name])
         if name in CONDITION_CONSTANTS:
             return _quote(CONDITION_CONSTANTS[name])
-        if name in self.defs.functions:
+        if name in self.defs.functions or name in self.defs.inlines:
             raise CompileError(f"function {name!r} used as a value", symbol.offset)
         raise CompileError(f"unknown name {name!r}", symbol.offset)
 
@@ -519,10 +676,12 @@ class _Compilation:
             return self._and(head, tail, bindings)
         if name == _OR:
             return self._or(head, tail, bindings)
-        if name in (_PROGRAM, _DEFUN, _DEFCONSTANT):
+        if name in (_PROGRAM, _DEFUN, _DEFUN_INLINE, _DEFCONSTANT, _INCLUDE):
             raise CompileError(f"{name} form is not an expression", head.offset)
         if name in bindings:
             raise CompileError(f"{name!r} is a parameter, not a function", head.offset)
+        if name in self.defs.inlines:
+            return self._inline_call(head, tail, bindings)
         if name in self.defs.functions:
             return self._call(head, tail, bindings)
         if name in self.defs.constants or name in CONDITION_CONSTANTS:
@@ -576,6 +735,47 @@ class _Compilation:
         for condition in reversed(compiled):
             result = _lazy_if(condition, _TRUE, result)
         return result
+
+    def _inline_call(self, head, tail, bindings):
+        """The body compiled at the call site, parameter references
+        replaced by the arguments' compiled expressions. Nothing
+        enters the function tree: an inline call pays no apply and
+        no path lookup. The depth cap makes an inline calling
+        itself a compile error rather than a hang, and the size cap
+        does the same for expansions that multiply a tree per level
+        while nesting only a little."""
+        name = head.name
+        arguments = _proper_items(tail, name, head.offset)
+        _check_arity(name, arguments, self.defs.inlines[name][2], head.offset)
+        params, body, _ = self.defs.inlines[name]
+        compiled = [self.expression(argument, bindings) for argument in arguments]
+        self.inline_depth += 1
+        try:
+            if self.inline_depth > INLINE_DEPTH_LIMIT:
+                raise _inline_error(
+                    name,
+                    f"inline expansion exceeds {INLINE_DEPTH_LIMIT} levels",
+                    head.offset,
+                )
+            try:
+                result = self.expression(body, _bind_inline_params(params, compiled))
+            except CompileError as exc:
+                # One wrap, at the innermost inline frame, so the
+                # error names the function whose declaring text the
+                # offset indexes, and every outer frame passes it
+                # through instead of stacking prefixes.
+                if exc.inline_named:
+                    raise
+                raise _inline_error(name, str(exc)) from None
+            if self._node_size(result) > INLINE_SIZE_LIMIT:
+                raise _inline_error(
+                    name,
+                    f"inline expansion exceeds {INLINE_SIZE_LIMIT} nodes",
+                    head.offset,
+                )
+            return result
+        finally:
+            self.inline_depth -= 1
 
     def _call(self, head, tail, bindings):
         name = head.name
@@ -676,11 +876,151 @@ def program_form(tree):
     return is_pair(tree) and isinstance(tree[0], Symbol) and tree[0].name == _PROGRAM
 
 
-def compile_program(source):
+def _include_name(form):
+    """The file name one (include "file") form names. The name is a
+    string atom: a bare name would answer to the namespace rules,
+    and nothing else spells a file. The name may carry subdirectory
+    components under an include directory, and a name that is
+    absolute or climbs out of its directory is rejected, so the
+    search path is the whole resolution story."""
+    items = _form_items(form, _INCLUDE, 2)
+    atom = items[1]
+    if isinstance(atom, Symbol):
+        raise CompileError(
+            f"include takes a quoted file name, got the bare name {atom.name!r}",
+            atom.offset,
+        )
+    if is_pair(atom):
+        raise CompileError("include takes a quoted file name")
+    try:
+        name = atom.decode()
+    except UnicodeDecodeError:
+        raise CompileError("include takes a quoted file name") from None
+    if not name or not name.isprintable():
+        raise CompileError("include takes a quoted file name")
+    if os.path.isabs(name) or os.path.normpath(name).split(os.sep)[0] == os.pardir:
+        raise CompileError(
+            f'include file "{name}" must be a relative path inside the include path'
+        )
+    return name
+
+
+def _resolve_include(name, include_paths, offset):
+    """The first include directory holding name, in search-path
+    order. The search path is explicit: no implicit current
+    directory, so where a program compiles never changes what it
+    includes."""
+    if not include_paths:
+        raise CompileError(
+            f'include file "{name}" not found: the include search path is empty',
+            offset,
+        )
+    for directory in include_paths:
+        path = os.path.join(directory, name)
+        if os.path.isfile(path):
+            return path
+    raise CompileError(f'include file "{name}" not found on the include path', offset)
+
+
+def _include_items(path, name):
+    """The declaration items of one include file: exactly one
+    parenthesized list of declarations and nothing after it, so a
+    file reads whole or not at all."""
+    try:
+        with open(path, encoding="utf-8") as handle:
+            text = handle.read()
+    except (OSError, UnicodeDecodeError) as exc:
+        raise CompileError(f'include file "{name}": {exc}') from None
+    if text.startswith("\ufeff"):
+        raise CompileError(f'include file "{name}" starts with a byte-order mark')
+    try:
+        forms = parse_source_many(text)
+    except ParseError as exc:
+        raise CompileError(f'in include "{name}": {exc}') from None
+    if len(forms) != 1 or not (is_pair(forms[0]) or forms[0] == NIL):
+        raise CompileError(f'include file "{name}" must hold one declaration list')
+    items = []
+    node = forms[0]
+    while is_pair(node):
+        items.append(node[0])
+        node = node[1]
+    if node != NIL:
+        raise CompileError(f'include file "{name}" must hold one declaration list')
+    return items
+
+
+# The splice stack's marker for a finished file, popping its chain
+# entry.
+_INCLUDE_END = object()
+
+
+def _spliced(declarations, include_paths, loaded=None):
+    """Declaration and origin pairs with every include resolved
+    depth first in place, origin naming the include file a
+    declaration came from, None for the program's own text. A file
+    loads once per loaded set, identified by its stat identity so
+    aliased spellings of one file cannot load it twice: a repeat
+    include is skipped where the names would otherwise collide, and
+    an include chain reaching a file still being spliced is a
+    cycle, an error naming the chain. A caller passing its own
+    loaded set widens the load-once scope, the REPL to its
+    session."""
+    result = []
+    if loaded is None:
+        loaded = set()
+    chain = []
+    stack = [(declaration, None) for declaration in reversed(declarations)]
+    while stack:
+        declaration, origin = stack.pop()
+        if declaration is _INCLUDE_END:
+            chain.pop()
+            continue
+        if declaration_keyword(declaration) != _INCLUDE:
+            result.append((declaration, origin))
+            continue
+        try:
+            name = _include_name(declaration)
+            offset = declaration[0].offset if origin is None else None
+            path = _resolve_include(name, include_paths, offset)
+            stat = os.stat(path)
+        except CompileError as exc:
+            if origin is None:
+                raise
+            raise CompileError(f'in include "{origin}": {exc}') from None
+        except OSError as exc:
+            raise CompileError(f'include file "{name}": {exc}') from None
+        identity = (stat.st_dev, stat.st_ino)
+        if any(identity == seen for seen, _ in chain):
+            names = [seen_name for _, seen_name in chain]
+            names = names[
+                next(i for i, (seen, _) in enumerate(chain) if seen == identity) :
+            ]
+            raise CompileError("include cycle: " + " includes ".join([*names, name]))
+        if identity in loaded:
+            continue
+        loaded.add(identity)
+        chain.append((identity, name))
+        stack.append((_INCLUDE_END, None))
+        for item in reversed(_include_items(path, name)):
+            stack.append((item, name))
+    return result
+
+
+def included_declarations(form, include_paths, loaded=None):
+    """The declaration and origin pairs one (include "file") form
+    splices, nested includes resolved, for a caller that holds its
+    own namespace, the REPL's session declarations. Passing a
+    loaded set carries the load-once scope across calls."""
+    return _spliced([form], include_paths, loaded)
+
+
+def compile_program(source, include_paths=()):
     """The program node and symbol table for one self-contained
     (program params declaration* body) form, given as text or as a
     parsed source tree. Session definitions are invisible on
-    purpose: what compiles from a file compiles identically pasted."""
+    purpose, and include files resolve only through include_paths,
+    first match winning: what compiles from a file compiles
+    identically pasted anywhere the search path is the same."""
     tree = parse_source(source) if isinstance(source, str) else source
     if not program_form(tree):
         raise CompileError("input must be a (program ...) form")
@@ -693,25 +1033,38 @@ def compile_program(source):
     params = items[0]
     _check_params(params)
     defs = Definitions()
-    for declaration in items[1:-1]:
+    for declaration, origin in _spliced(items[1:-1], include_paths):
         keyword = declaration_keyword(declaration)
-        if keyword == _DEFUN:
-            defs.add_defun(declaration)
-        elif keyword == _DEFCONSTANT:
-            defs.add_defconstant(declaration)
-        else:
-            raise CompileError("expected defun or defconstant")
+        try:
+            if keyword == _DEFUN:
+                defs.add_defun(declaration)
+            elif keyword == _DEFUN_INLINE:
+                defs.add_defun_inline(declaration)
+            elif keyword == _DEFCONSTANT:
+                defs.add_defconstant(declaration)
+            else:
+                raise CompileError(
+                    "expected defun, defun-inline, defconstant, or include"
+                )
+        except CompileError as exc:
+            # An included declaration's offsets index its own file's
+            # text, so the error names the file, as a function body's
+            # error names the function.
+            if origin is None:
+                raise
+            raise CompileError(f'in include "{origin}": {exc}') from None
     return _compile(defs, params, items[-1])
 
 
-def compile_expression(source, defs):
+def compile_expression(source, defs, include_paths=()):
     """The program node and symbol table for one bare expression
     against a definitions space. The expression has no parameters,
     so the compiled program ignores its environment. A program form
-    ignores the definitions, staying self-contained."""
+    ignores the definitions, staying self-contained, its includes
+    resolving through include_paths."""
     tree = parse_source(source) if isinstance(source, str) else source
     if program_form(tree):
-        return compile_program(tree)
+        return compile_program(tree, include_paths)
     return _compile(defs, None, tree)
 
 

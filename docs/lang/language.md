@@ -10,8 +10,8 @@ The language is the text syntax of `syntax.md` plus bare names. A
 name is exactly a token the raw reader rejects as an unknown symbol,
 so strings, hex, operator names, and decimals keep their raw
 spelling rules, and the language occupies only text that previously
-errored. The reserved words are `program`, `defun`, `defconstant`,
-`if`, `list`, `assert`, `and`, and `or`.
+errored. The reserved words are `program`, `defun`, `defun-inline`,
+`defconstant`, `include`, `if`, `list`, `assert`, `and`, and `or`.
 
 ## The program form
 
@@ -21,10 +21,13 @@ errored. The reserved words are `program`, `defun`, `defconstant`,
 
 A source program is one self-contained form: a parameter tree, any
 number of declarations in any order, and exactly one body
-expression. The declarations are `defun` and `defconstant`, and
-nothing else may appear in declaration position. Compiling a
-program uses nothing outside the form, so a program that compiles
-in a file compiles identically pasted into the REPL.
+expression. The declarations are `defun`, `defun-inline`,
+`defconstant`, and `include`, and nothing else may appear in
+declaration position. Compiling a program uses nothing outside the
+form and the include files it names, resolved through the same
+search path everywhere, so a program that compiles in a file
+compiles identically pasted into a REPL running with the same
+include path.
 
 The parameter tree names the program's arguments, which arrive as
 the environment at run time, the solution in a spend. A parameter
@@ -59,21 +62,104 @@ the remaining arguments as a list. Arity mismatches are rejected at
 compile time. A function name is only meaningful in call position:
 using one as a value is an error in v0.
 
+## defun-inline
+
+```
+(defun-inline <name> <params> <body>)
+```
+
+Defines an inline function. A call compiles by splicing: each
+argument expression compiles once, and the body compiles at the
+call site with every parameter reference replaced by its
+argument's compiled expression. Nothing enters the function tree,
+so an inline call pays no apply and no path lookup, and the
+compiled program is smaller wherever the body is short.
+
+Substitution is by name, not by value. An argument evaluates once
+per parameter reference in the body: a parameter used twice
+evaluates its argument twice, and a parameter the body never
+references leaves its argument unevaluated. That laziness is
+Chialisp's inline contract and programs may rely on it, but an
+expensive argument belongs in a `defun`, whose arguments evaluate
+exactly once.
+
+Parameters bind exactly as `defun` parameters do, shapes included.
+A destructured name reaches its component through first and rest
+steps applied to the argument expression, and a dotted or bare
+tail name binds the remaining arguments as a list, each occurrence
+paying its own evaluations. Arity is checked at compile time, the
+same rule as `defun`. Inline bodies may call functions of both
+kinds, and inline calls nested in inline bodies expand to a depth
+of 100 before the compiler rejects the program, so an inline
+function cannot call itself: recursion needs the function tree,
+which is what `defun` is for. Expansion is also capped at one
+million emitted nodes, because a chain of doubling inlines can
+square its tree per declaration while nesting only a little, and
+the cap turns that into a compile error instead of an artifact too
+large to serialize.
+
 ## defconstant
 
 ```
 (defconstant <name> <value>)
 ```
 
-Binds a name to a literal value, taken verbatim and never
-evaluated, so the value cannot contain names. A constant reference
-compiles to its quoted value at the use site. `(defconstant K
-(+ 1 2))` therefore binds the three-element tree whose head is the
-byte 0x10, not 3, exactly as `(q . (+ 1 2))` would read it.
+Binds a name to the value its expression computes at compile time.
+The value compiles against the declarations above it, earlier
+constants and functions included, and runs on the reference VM
+under the default cost budget of 11000000000, so a constant can
+hold a computed tree hash or a table a helper builds. The result
+is data: a constant reference compiles to its quoted value at the
+use site, and an evaluation that raises or exhausts the budget is
+a compile error naming the constant.
+
+An atom is its own value, so `(defconstant FEE 400)` binds 400.
+Structured data needs quoting: `(defconstant K (q 1 2 3))` binds
+the list, where `(defconstant K (+ 1 2))` binds 3. Declaration
+order matters for constants alone. A constant's value sees only
+what is declared above it, and so does everything the value
+reaches: a function it calls compiles at that moment, against the
+declarations made so far. Function bodies a constant never reaches
+may reference names in any order.
 
 A name is defined once: functions, constants, condition
 constants, and reserved words share one namespace, and
 redefinition is an error.
+
+## include
+
+```
+(include "<file>")
+```
+
+Splices a declaration file into the program. An include file holds
+exactly one parenthesized list of declarations, any mix of
+`defun`, `defun-inline`, `defconstant`, and nested `include`, and
+nothing else, no parameter tree and no body:
+
+```
+(
+  (defconstant FEE 400)
+  (defun pay (SCRIPT AMT) (list CREATE_OUTPUT SCRIPT (- AMT FEE)))
+)
+```
+
+The file name is a string, and since the compiler sees an atom,
+any atom spelling a printable name reads as one. It resolves
+through the include search path, the repeatable `-I` flag of
+`bitlisp-compile` and of the REPL, first match in flag order
+winning, never an implicit current directory. A name may reach a
+subdirectory of an include directory, and a name that is absolute
+or climbs out of its directory is rejected, so the search path is
+the whole resolution story. Spliced declarations join the one
+namespace exactly as if written in place, so a name collision
+across files is the ordinary redefinition error. A file already
+loaded in the same compile is skipped rather than reloaded, the
+file's identity not its spelling, so two libraries may include a
+common third, and a cycle of includes is a compile error naming
+the chain. In the REPL the session is the load-once scope, and a
+failed include line applies nothing. By convention library files
+end in `.blib`, though nothing enforces an extension.
 
 ## Condition constants
 
@@ -210,9 +296,9 @@ recursion fall out of the layout. The whole program is emitted as
 
 with the incoming arguments consed behind the tree. A program whose
 body reaches no function skips all of this: its body is emitted
-bare and its parameters root at path 1. Functions and constants the
-body never mentions are pruned, so scratch definitions cost
-nothing. Only reachable definitions compile at all, so an error
+bare and its parameters root at path 1. Functions, inline
+functions, and constants the body never mentions are pruned, so
+scratch definitions cost nothing. Only reachable definitions compile at all, so an error
 inside an unreached body surfaces the first time a program reaches
 it, not at the declaration. A body error names its function,
 because in the REPL the offset indexes the declaring line's text,
@@ -258,8 +344,9 @@ wherever it appears, in a freshly deserialized program included,
 and shows the source name and the live arguments by parameter name
 instead of raw bytecode. A function whose compiled body is a single
 atom stays out of the table, because an atom's hash cannot be told
-apart from ordinary data. `main_params` records the program's own
-parameter names for the reader.
+apart from ordinary data. Inline functions stay out too: spliced
+code has no one compiled body to hash. `main_params` records the
+program's own parameter names for the reader.
 
 ## Deviations from Chialisp
 
@@ -273,8 +360,10 @@ nothing forces a change. The deliberate differences:
   the symbol table holds only function bodies.
 - The function tree is ordered by declaration, not alphabetically.
 - Call arity is checked at compile time.
-- `defconstant` is literal-only. There is no compile-time-evaluated
-  constant form.
+- `defconstant` evaluates its value at compile time on the
+  reference VM, cost-budgeted, where classic Chialisp quotes the
+  value verbatim. This is the modern dialect's `defconst` behavior
+  under the classic keyword, and there is no second constant form.
 - Unknown bare operator atoms in call position are rejected at
   compile time rather than at run time.
 - `if`, `list`, `assert`, `and`, and `or` are compiler forms, not
@@ -293,8 +382,21 @@ nothing forces a change. The deliberate differences:
 - There is no `function` or `com` reflection form, and lazy
   evaluation exists only through the built-in lazy forms, `if`,
   `assert`, `and`, and `or`.
-- There is no include mechanism and no inline functions in v0.
-  Currying is not a language form either: it operates on compiled
+- `include` names its file with a string, not a bare symbol, and
+  takes exactly one declaration list per file, rejecting trailing
+  content where classic reads only the first form and ignores the
+  rest. A file already loaded is skipped where classic errors on
+  the collision a double include causes, and an include cycle is
+  an error where classic recurses without bound.
+- `defun-inline` keeps Chialisp's call-by-name substitution but
+  closes its sharp edges: arity is checked where classic silently
+  drops extra arguments, quoted content is never rewritten where
+  classic substitutes parameter names inside `(q . X)` data, a
+  parameter in operator position stays an error where classic
+  substitutes there too, an inline can never shadow an operator or
+  any other name, and expansion is depth-capped and size-capped
+  where a classic self-recursive inline hangs the compiler.
+- Currying is not a language form: it operates on compiled
   programs, through the surfaces defined in `curry.md`.
 
 ## A worked session

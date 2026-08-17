@@ -228,6 +228,33 @@ def test_compile_stdin(capsys, monkeypatch):
     assert capsys.readouterr().out == DOUBLE_HEX + "\n"
 
 
+def test_compile_include_flag_resolves_and_is_required(tmp_path, capsys):
+    (tmp_path / "lib.blib").write_text("((defun double (N) (* 2 N)))")
+    source = tmp_path / "p.bl"
+    source.write_text('(program (X) (include "lib.blib") (double X))\n')
+    assert cli.compile_main([str(source), "-I", str(tmp_path)]) == 0
+    included_hex = capsys.readouterr().out
+    pasted = "(program (X) (defun double (N) (* 2 N)) (double X))"
+    assert cli.compile_main([pasted]) == 0
+    assert included_hex == capsys.readouterr().out
+    assert cli.compile_main([str(source)]) == 2
+    assert "the include search path is empty" in capsys.readouterr().err
+
+
+def test_compile_include_flag_order_first_match_wins(tmp_path, capsys):
+    first = tmp_path / "first"
+    second = tmp_path / "second"
+    first.mkdir()
+    second.mkdir()
+    (first / "k.blib").write_text("((defconstant K 1))")
+    (second / "k.blib").write_text("((defconstant K 2))")
+    source = '(program () (include "k.blib") K)'
+    assert cli.compile_main([source, "-I", str(first), "-I", str(second)]) == 0
+    winner = capsys.readouterr().out
+    assert cli.compile_main(["(program () (defconstant K 1) K)"]) == 0
+    assert winner == capsys.readouterr().out
+
+
 def test_compile_output_disassembles(capsys):
     assert cli.compile_main([DOUBLE_SOURCE]) == 0
     hex_line = capsys.readouterr().out.strip()
