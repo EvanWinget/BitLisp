@@ -15,6 +15,7 @@ Transaction context:
 
 Definitions:
     (defun <name> <params> <body>)   define a named function
+    (defun-inline <name> <params> <body>)   define an inline function
     (defconstant <name> <value>)     define a constant, its value
                                    evaluated at declaration
     (include "<file>")             splice a declaration file from
@@ -54,9 +55,8 @@ never change the meaning of text that already parses.
 The same rule shapes the compiler surface: eval, spend, and debug
 read their text as raw VM syntax first, and only text the reader
 rejects on an unknown name retries as language source against the
-session's defun and defconstant definitions, the condition
-constants included. A program's solution is always data and never
-compiles.
+session's declarations, the condition constants included. A
+program's solution is always data and never compiles.
 """
 
 import argparse
@@ -388,10 +388,12 @@ class BitLispShell(cmd.Cmd):
         keyword = declaration_keyword(tree)
         if keyword == "defun":
             self.defs.add_defun(tree, taken)
+        elif keyword == "defun-inline":
+            self.defs.add_defun_inline(tree, taken)
         elif keyword == "defconstant":
             self.defs.add_defconstant(tree, taken)
         else:
-            raise CompileError("expected defun, defconstant, or include")
+            raise CompileError("expected defun, defun-inline, defconstant, or include")
 
     @_survives
     def do_def(self, arg):
@@ -413,7 +415,11 @@ class BitLispShell(cmd.Cmd):
         if name in RESERVED_WORDS or name in CONDITION_CONSTANTS:
             print(f"error: {name!r} is reserved by the language")
             return
-        if name in self.defs.functions or name in self.defs.constants:
+        if (
+            name in self.defs.functions
+            or name in self.defs.inlines
+            or name in self.defs.constants
+        ):
             print(f"error: {name!r} is already defined")
             return
         nodes = assemble_many(body, self.names)
@@ -426,7 +432,12 @@ class BitLispShell(cmd.Cmd):
     def do_undef(self, arg):
         """undef <name>: remove a definition or binding."""
         name = arg.strip()
-        spaces = (self.names, self.defs.functions, self.defs.constants)
+        spaces = (
+            self.names,
+            self.defs.functions,
+            self.defs.inlines,
+            self.defs.constants,
+        )
         for space in spaces:
             if name in space:
                 del space[name]
@@ -444,6 +455,9 @@ class BitLispShell(cmd.Cmd):
         for name in sorted(self.defs.functions):
             params, body, _ = self.defs.functions[name]
             print(f"(defun {name} {source_text(params)} {source_text(body)})")
+        for name in sorted(self.defs.inlines):
+            params, body, _ = self.defs.inlines[name]
+            print(f"(defun-inline {name} {source_text(params)} {source_text(body)})")
 
     @_survives
     def do_compile(self, arg):

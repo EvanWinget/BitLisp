@@ -644,6 +644,8 @@ def test_def_and_defun_share_one_namespace(shell, capsys):
     assert "reserved by the language" in capsys.readouterr().out
     shell.onecmd("def include (q . 1)")
     assert "reserved by the language" in capsys.readouterr().out
+    shell.onecmd("def defun-inline (q . 1)")
+    assert "reserved by the language" in capsys.readouterr().out
     # qq left the reserved words with the macro system, so the
     # spelling is an ordinary binding again.
     shell.onecmd("def qq (q . 1)")
@@ -761,6 +763,19 @@ def test_spend_accepts_compiled_program(shell, ctx_file, capsys):
     out = capsys.readouterr().out
     assert "CREATE_OUTPUT" in out
     assert "valid: 1 condition(s)" in out
+
+
+def test_defun_inline_line_declares_lists_and_undefs(shell, capsys):
+    shell.onecmd("(defun-inline double (N) (* 2 N))")
+    shell.onecmd("(double (q . 21))")
+    assert "42" in capsys.readouterr().out
+    shell.onecmd("defs")
+    assert capsys.readouterr().out == "(defun-inline double (N) (* 2 N))\n"
+    shell.onecmd("def double (q . 1)")
+    assert "'double' is already defined" in capsys.readouterr().out
+    shell.onecmd("undef double")
+    shell.onecmd("defs")
+    assert capsys.readouterr().out == ""
 
 
 def test_defconstant_line_evaluates_and_lists_reloadably(shell, capsys):

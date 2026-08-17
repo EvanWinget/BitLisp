@@ -5,9 +5,9 @@ the reader would reject as an unknown symbol, so strings, hex,
 operator names, and decimals keep exactly their raw meaning and the
 language occupies only text that previously errored. Atoms quote
 themselves, names resolve to environment paths or inline constant
-values, and the special forms are program, defun, defconstant,
-include, if, list, assert, and, and or. Everything else a source
-expression can say is an operator application.
+values, and the special forms are program, defun, defun-inline,
+defconstant, include, if, list, assert, and, and or. Everything
+else a source expression can say is an operator application.
 
 A compiled program's environment is the pair (function tree . args).
 The function tree holds every reachable function body, balanced in
@@ -55,15 +55,29 @@ _QUOTE = b"\x01"
 _APPLY = b"\x02"
 _IF_OP = b"\x03"
 _CONS = b"\x04"
+_FIRST = b"\x05"
+_REST = b"\x06"
 _RAISE = b"\x08"
 
 # The environment root, its first child, and its rest child, as the
 # VM's path lookup numbers them.
 _TOP, _LEFT, _RIGHT = 1, 2, 3
 
-_PROGRAM, _DEFUN, _DEFCONSTANT, _INCLUDE, _IF, _LIST, _ASSERT, _AND, _OR = (
+(
+    _PROGRAM,
+    _DEFUN,
+    _DEFUN_INLINE,
+    _DEFCONSTANT,
+    _INCLUDE,
+    _IF,
+    _LIST,
+    _ASSERT,
+    _AND,
+    _OR,
+) = (
     "program",
     "defun",
+    "defun-inline",
     "defconstant",
     "include",
     "if",
@@ -73,12 +87,28 @@ _PROGRAM, _DEFUN, _DEFCONSTANT, _INCLUDE, _IF, _LIST, _ASSERT, _AND, _OR = (
     "or",
 )
 RESERVED_WORDS = frozenset(
-    {_PROGRAM, _DEFUN, _DEFCONSTANT, _INCLUDE, _IF, _LIST, _ASSERT, _AND, _OR}
+    {
+        _PROGRAM,
+        _DEFUN,
+        _DEFUN_INLINE,
+        _DEFCONSTANT,
+        _INCLUDE,
+        _IF,
+        _LIST,
+        _ASSERT,
+        _AND,
+        _OR,
+    }
 )
 
 # The declaration heads a program form accepts, the one tuple the
 # REPL's line dispatch reads too, so the two surfaces cannot drift.
-DECLARATION_KEYWORDS = (_DEFUN, _DEFCONSTANT, _INCLUDE)
+DECLARATION_KEYWORDS = (_DEFUN, _DEFUN_INLINE, _DEFCONSTANT, _INCLUDE)
+
+# How deep inline calls may nest inside inline bodies before the
+# compiler rejects the program: recursion needs the function tree,
+# which is what defun is for.
+INLINE_DEPTH_LIMIT = 100
 
 
 # The condition vocabulary, one name per assigned opcode, written
@@ -286,11 +316,17 @@ class Definitions:
 
     def __init__(self):
         self.functions = {}
+        self.inlines = {}
         self.constants = {}
 
     def _claim(self, symbol, taken):
         name = _check_name(symbol, "definition")
-        if name in self.functions or name in self.constants or name in taken:
+        if (
+            name in self.functions
+            or name in self.inlines
+            or name in self.constants
+            or name in taken
+        ):
             raise CompileError(f"{name!r} is already defined", symbol.offset)
         return name
 
@@ -302,6 +338,16 @@ class Definitions:
         name = self._claim(items[1], taken)
         arity = _check_params(items[2])
         self.functions[name] = (items[2], items[3], arity)
+        return name
+
+    def add_defun_inline(self, form, taken=frozenset()):
+        """Adds one (defun-inline name params body) source form.
+        The body is stored as written and splices at each call site
+        a program reaches, never entering the function tree."""
+        items = _form_items(form, _DEFUN_INLINE, 4)
+        name = self._claim(items[1], taken)
+        arity = _check_params(items[2])
+        self.inlines[name] = (items[2], items[3], arity)
         return name
 
     def add_defconstant(self, form, taken=frozenset()):
@@ -341,6 +387,7 @@ def _form_items(form, keyword, count):
 
 _FORM_SHAPES = {
     _DEFUN: "(defun name params body)",
+    _DEFUN_INLINE: "(defun-inline name params body)",
     _DEFCONSTANT: "(defconstant name value)",
     _INCLUDE: '(include "file")',
 }
@@ -362,16 +409,48 @@ def _compose(parent, child):
 
 
 def _bind_params(tree, root):
-    """The name-to-path map a parameter tree induces at root."""
+    """The name-to-node map a parameter tree induces at root, each
+    name bound to its environment path atom."""
     bindings = {}
     stack = [(tree, root)]
     while stack:
         current, path = stack.pop()
         if isinstance(current, Symbol):
-            bindings[current.name] = path
+            bindings[current.name] = int_to_atom(path)
         elif is_pair(current):
             stack.append((current[0], _compose(path, _LEFT)))
             stack.append((current[1], _compose(path, _RIGHT)))
+    return bindings
+
+
+def _bind_inline_params(params, arguments):
+    """The name-to-node map an inline call induces: each parameter
+    name binds its argument's compiled expression, a destructured
+    name reaching its component through first and rest steps over
+    that expression, and a tail name binding the remaining
+    arguments as a built list. Every reference re-emits its node,
+    the call-by-name contract: used twice evaluates twice, unused
+    never evaluates."""
+    bindings = {}
+    stack = []
+    spine = params
+    index = 0
+    while is_pair(spine):
+        stack.append((spine[0], arguments[index]))
+        index += 1
+        spine = spine[1]
+    if isinstance(spine, Symbol):
+        rest = NIL
+        for argument in reversed(arguments[index:]):
+            rest = _proper_list(_CONS, argument, rest)
+        bindings[spine.name] = rest
+    while stack:
+        tree, node = stack.pop()
+        if isinstance(tree, Symbol):
+            bindings[tree.name] = node
+        elif is_pair(tree):
+            stack.append((tree[0], _proper_list(_FIRST, node)))
+            stack.append((tree[1], _proper_list(_REST, node)))
     return bindings
 
 
@@ -393,17 +472,21 @@ def _check_arity(name, arguments, arity, offset):
 def _reachable_names(defs, body):
     """The functions a body can reach, conservatively: every
     mentioned name counts, shadowing ignored, so the set can only
-    be too large, never too small. An unreached body never
-    compiles, so an error inside one surfaces the first time a
-    program reaches it."""
+    be too large, never too small. An inline body's mentions count
+    through the inline, because its splice will reference them. An
+    unreached body never compiles, so an error inside one surfaces
+    the first time a program reaches it."""
     reachable = set()
+    walked_inlines = set()
     pending = _symbol_names(body)
     while pending:
         name = pending.pop()
-        if name in reachable or name not in defs.functions:
-            continue
-        reachable.add(name)
-        pending |= _symbol_names(defs.functions[name][1])
+        if name in defs.functions and name not in reachable:
+            reachable.add(name)
+            pending |= _symbol_names(defs.functions[name][1])
+        elif name in defs.inlines and name not in walked_inlines:
+            walked_inlines.add(name)
+            pending |= _symbol_names(defs.inlines[name][1])
     return reachable
 
 
@@ -491,6 +574,7 @@ class _Compilation:
     def __init__(self, defs, fn_paths):
         self.defs = defs
         self.fn_paths = fn_paths
+        self.inline_depth = 0
 
     def expression(self, expr, bindings):
         if isinstance(expr, Symbol):
@@ -521,14 +605,14 @@ class _Compilation:
     def _reference(self, symbol, bindings):
         name = symbol.name
         if name in bindings:
-            return int_to_atom(bindings[name])
+            return bindings[name]
         if name in self.defs.constants:
             # A constant's value was computed at its declaration,
             # so the stored tree is a plain node.
             return _quote(self.defs.constants[name])
         if name in CONDITION_CONSTANTS:
             return _quote(CONDITION_CONSTANTS[name])
-        if name in self.defs.functions:
+        if name in self.defs.functions or name in self.defs.inlines:
             raise CompileError(f"function {name!r} used as a value", symbol.offset)
         raise CompileError(f"unknown name {name!r}", symbol.offset)
 
@@ -544,10 +628,12 @@ class _Compilation:
             return self._and(head, tail, bindings)
         if name == _OR:
             return self._or(head, tail, bindings)
-        if name in (_PROGRAM, _DEFUN, _DEFCONSTANT, _INCLUDE):
+        if name in (_PROGRAM, _DEFUN, _DEFUN_INLINE, _DEFCONSTANT, _INCLUDE):
             raise CompileError(f"{name} form is not an expression", head.offset)
         if name in bindings:
             raise CompileError(f"{name!r} is a parameter, not a function", head.offset)
+        if name in self.defs.inlines:
+            return self._inline_call(head, tail, bindings)
         if name in self.defs.functions:
             return self._call(head, tail, bindings)
         if name in self.defs.constants or name in CONDITION_CONSTANTS:
@@ -601,6 +687,37 @@ class _Compilation:
         for condition in reversed(compiled):
             result = _lazy_if(condition, _TRUE, result)
         return result
+
+    def _inline_call(self, head, tail, bindings):
+        """The body compiled at the call site, parameter references
+        replaced by the arguments' compiled expressions. Nothing
+        enters the function tree: an inline call pays no apply and
+        no path lookup, and the depth cap makes an inline calling
+        itself a compile error rather than a hang."""
+        name = head.name
+        arguments = _proper_items(tail, name, head.offset)
+        _check_arity(name, arguments, self.defs.inlines[name][2], head.offset)
+        params, body, _ = self.defs.inlines[name]
+        compiled = [self.expression(argument, bindings) for argument in arguments]
+        self.inline_depth += 1
+        try:
+            if self.inline_depth > INLINE_DEPTH_LIMIT:
+                raise CompileError(
+                    f"inline expansion exceeds {INLINE_DEPTH_LIMIT} levels",
+                    head.offset,
+                )
+            try:
+                return self.expression(body, _bind_inline_params(params, compiled))
+            except CompileError as exc:
+                # One wrap at the outermost inline frame: the body's
+                # offsets index the declaring text, and deeper frames
+                # pass the error through so a depth failure does not
+                # stack a hundred prefixes.
+                if self.inline_depth == 1:
+                    raise CompileError(f"in {name!r}: {exc}") from None
+                raise
+        finally:
+            self.inline_depth -= 1
 
     def _call(self, head, tail, bindings):
         name = head.name
@@ -831,10 +948,14 @@ def compile_program(source, include_paths=()):
         try:
             if keyword == _DEFUN:
                 defs.add_defun(declaration)
+            elif keyword == _DEFUN_INLINE:
+                defs.add_defun_inline(declaration)
             elif keyword == _DEFCONSTANT:
                 defs.add_defconstant(declaration)
             else:
-                raise CompileError("expected defun, defconstant, or include")
+                raise CompileError(
+                    "expected defun, defun-inline, defconstant, or include"
+                )
         except CompileError as exc:
             # An included declaration's offsets index its own file's
             # text, so the error names the file, as a function body's

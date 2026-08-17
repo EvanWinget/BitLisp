@@ -417,7 +417,7 @@ def test_load_symbols_tracks_the_reserved_words():
     _, table = compile_program("(program (X) (defun fun (N) (* 2 N)) (fun X))")
     data = symbols_to_json(table)
     (key,) = data["functions"]
-    for name in ("assert", "and", "or", "include"):
+    for name in ("assert", "and", "or", "include", "defun-inline"):
         data["functions"][key]["name"] = name
         with pytest.raises(ValueError) as excinfo:
             load_symbols(data)
@@ -508,6 +508,101 @@ def test_variadic_call_binds_the_rest():
     source = "(program (X) (defun spread (A . REST) REST) (spread X))"
     _, _, result = _run_program(source, "(1)")
     assert result == NIL
+
+
+# Inline functions.
+
+
+def test_pin_inline_call_splices_the_body():
+    program, _, result = _run_program(
+        "(program (X) (defun-inline double (N) (* 2 N)) (double X))", "(21)"
+    )
+    assert disassemble(program) == "(* (q . 2) 2)"
+    assert result == int_to_atom(42)
+
+
+def test_inline_call_compiles_smaller_than_its_defun_twin():
+    inline, _, _ = _run_program(
+        "(program (X) (defun-inline double (N) (* 2 N)) (double X))", "(21)"
+    )
+    tree, _, _ = _run_program(
+        "(program (X) (defun double (N) (* 2 N)) (double X))", "(21)"
+    )
+    assert len(serialize(inline)) < len(serialize(tree))
+
+
+def test_inline_argument_used_twice_emits_twice():
+    program, _, result = _run_program(
+        "(program (X) (defun-inline dbl (N) (+ N N)) (dbl (f X)))", "((5))"
+    )
+    assert disassemble(program) == "(+ (f 2) (f 2))"
+    assert result == int_to_atom(10)
+
+
+def test_inline_unused_argument_never_evaluates():
+    # Call-by-name laziness, the classic contract: the raise in the
+    # discarded argument vanishes from the compiled program.
+    program, _, result = _run_program(
+        "(program (X) (defun-inline ign (A) 7) (ign (x)))", "(1)"
+    )
+    assert disassemble(program) == "(q . 7)"
+    assert result == int_to_atom(7)
+
+
+def test_inline_destructured_and_rest_params():
+    _, _, result = _run_program(
+        "(program (X) (defun-inline g ((P Q)) (+ P Q)) (g X))", "((3 4))"
+    )
+    assert result == int_to_atom(7)
+    _, _, result = _run_program(
+        "(program (X) (defun-inline sp (A . R) R) (sp X 1 2))", "(9)"
+    )
+    assert result == assemble("(1 2)")
+    _, _, result = _run_program(
+        "(program (X) (defun-inline sp (A . R) R) (sp X))", "(9)"
+    )
+    assert result == NIL
+
+
+def test_inline_calls_inline_and_defun():
+    source = """(program (X)
+        (defun-inline twice (N) (+ N N))
+        (defun-inline fourfold (N) (twice (twice N)))
+        (fourfold X))"""
+    _, _, result = _run_program(source, "(3)")
+    assert result == int_to_atom(12)
+    # The defun is reachable only through the inline body, so the
+    # splice is what makes it enter the function tree.
+    source = """(program (X)
+        (defun square (N) (* N N))
+        (defun-inline area (S) (square S))
+        (area X))"""
+    program, table, result = _run_program(source, "(6)")
+    assert result == int_to_atom(36)
+    assert [name for name, _ in table["functions"].values()] == ["square"]
+
+
+def test_inline_bodies_stay_out_of_the_symbol_table():
+    _, table = compile_program(
+        "(program (X) (defun-inline pairup (N) (c N N)) (pairup X))"
+    )
+    assert table["functions"] == {}
+
+
+def test_inline_in_a_defconstant_value():
+    _, _, result = _run_program(
+        "(program () (defun-inline dbl (N) (+ N N)) (defconstant K (dbl 4)) K)"
+    )
+    assert result == int_to_atom(8)
+
+
+def test_self_recursive_inline_is_a_depth_error():
+    with pytest.raises(CompileError) as excinfo:
+        compile_program("(program (X) (defun-inline spin (N) (spin N)) (spin X))")
+    message = str(excinfo.value)
+    assert "in 'spin': inline expansion exceeds 100 levels" in message
+    # One wrap only: deeper frames pass the error through.
+    assert message.count("in 'spin':") == 1
 
 
 # Includes.
@@ -662,6 +757,31 @@ def test_included_body_error_names_function_and_file(tmp_path):
         ("(program (X) (defconstant or 1) X)", "'or' is a reserved word"),
         ("(program (X) (defun include (N) N) X)", "'include' is a reserved word"),
         (
+            "(program (X) (defconstant defun-inline 1) X)",
+            "'defun-inline' is a reserved word",
+        ),
+        (
+            "(program (X) (defun-inline g (A B) A) (g X))",
+            "'g' takes 2 argument(s), got 1",
+        ),
+        (
+            "(program (X) (defun-inline g (A B) A) (g X X X))",
+            "'g' takes 2 argument(s), got 3",
+        ),
+        (
+            "(program (X) (defun-inline g (N) (c (q . N) N)) (g X))",
+            "in 'g': 'N' in quoted content",
+        ),
+        (
+            "(program (X) (defun-inline g (N) N) (c g X))",
+            "function 'g' used as a value",
+        ),
+        (
+            "(program (X) (defun-inline g (N) N) (defun g (N) N) (g X))",
+            "'g' is already defined",
+        ),
+        ("(program (X) (defun-inline g N) X)", "defun-inline takes 3 parts"),
+        (
             "(program (X) (include lib.blib) X)",
             "include takes a quoted file name, got the bare name 'lib.blib'",
         ),
@@ -704,6 +824,7 @@ def test_reserved_words_are_pinned_and_all_dispatch():
         {
             "program",
             "defun",
+            "defun-inline",
             "defconstant",
             "include",
             "if",
