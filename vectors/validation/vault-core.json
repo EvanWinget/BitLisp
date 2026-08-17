@@ -12,10 +12,10 @@
      {
       "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "index": 0,
-      "script_pubkey": "512014b46a1e4df86743154d47421aea13a06ab2924efd102a357b8ffb1af7e307bc",
+      "script_pubkey": "51202db898b5fa3c81fbbe654adb34d71216a8af97ab077ada7c424cfed0bb166328",
       "amount": 60000,
       "sequence": 4294967295,
-      "conditions": "ffff37ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa0f007f82903d68de02494bfcf435fc988a07e421f1ab68e2ff6a0bfe820a94ad280ffff33ff8300ea6080ffff17ffa09802fe6fc3d7804e6b93daaa91aa54c788543b1a1377767090171abae40c6283ffa0482cfacaca750a921b18076325f12a95ecd79c7fde8421e895eeac59488936a2ffc040324fa2958a71e66a746082c2d5bcb5760ddd466ce635629b1b32670ad04f740200a57a679dc338076c33fa2f33e6d93ddfe6f09ca19d8275663f81fd14f479d580ffff02ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa0826ef5e3ca268047377631bb0a7a05ce1f2db2ef25d2e9f54d95ba78773dd440ff8300ea608080"
+      "conditions": "ffff37ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa0b702c79830f61c74b7f58ce7954c562a9cdf455e4e74b2ab81c9a1fa82ab40ca80ffff33ff8300ea6080ffff17ffa09802fe6fc3d7804e6b93daaa91aa54c788543b1a1377767090171abae40c6283ffa0482cfacaca750a921b18076325f12a95ecd79c7fde8421e895eeac59488936a2ffc040324fa2958a71e66a746082c2d5bcb5760ddd466ce635629b1b32670ad04f740200a57a679dc338076c33fa2f33e6d93ddfe6f09ca19d8275663f81fd14f479d580ffff02ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa072e2dc342438fed5c11199923550407994c6142da216946b791c8df3070394c2ff8300ea608080"
      },
      {
       "txid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
@@ -27,7 +27,7 @@
     ],
     "outputs": [
      {
-      "script_pubkey": "512091074245d24c62c6b1e9dd0ca99a45e3085266b5f560085f9421ff759151e506",
+      "script_pubkey": "51204e2e2e1bdbcdf8e3680aec8ee2140ce8913b8ad1270c9fdc2046002f16992bfc",
       "amount": 60000
      }
     ]
@@ -45,10 +45,10 @@
      {
       "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "index": 0,
-      "script_pubkey": "512014b46a1e4df86743154d47421aea13a06ab2924efd102a357b8ffb1af7e307bc",
+      "script_pubkey": "51202db898b5fa3c81fbbe654adb34d71216a8af97ab077ada7c424cfed0bb166328",
       "amount": 60000,
       "sequence": 4294967295,
-      "conditions": "ffff37ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa0f007f82903d68de02494bfcf435fc988a07e421f1ab68e2ff6a0bfe820a94ad280ffff33ff8300ea6080ffff17ffa09802fe6fc3d7804e6b93daaa91aa54c788543b1a1377767090171abae40c6283ffa09bba3f4d5b46df5065578646a9d3a3aeccac0cbe0b0d562a29cc6a83ebf5c7e5ffc0403b385e4f5b7b12f63140aba7d6abc3c287b7470ccaf47de9e004a2350d3f0bd225308c66abaa02655034ff56c856bd06c74664e6c9d9ae48167129ef78d8c7a780ffff02ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa0826ef5e3ca268047377631bb0a7a05ce1f2db2ef25d2e9f54d95ba78773dd440ff83009c4080ffff02ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa0f007f82903d68de02494bfcf435fc988a07e421f1ab68e2ff6a0bfe820a94ad2ff824e208080"
+      "conditions": "ffff37ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa0b702c79830f61c74b7f58ce7954c562a9cdf455e4e74b2ab81c9a1fa82ab40ca80ffff33ff8300ea6080ffff17ffa09802fe6fc3d7804e6b93daaa91aa54c788543b1a1377767090171abae40c6283ffa09bba3f4d5b46df5065578646a9d3a3aeccac0cbe0b0d562a29cc6a83ebf5c7e5ffc0403b385e4f5b7b12f63140aba7d6abc3c287b7470ccaf47de9e004a2350d3f0bd225308c66abaa02655034ff56c856bd06c74664e6c9d9ae48167129ef78d8c7a780ffff02ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa072e2dc342438fed5c11199923550407994c6142da216946b791c8df3070394c2ff83009c4080ffff02ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa0b702c79830f61c74b7f58ce7954c562a9cdf455e4e74b2ab81c9a1fa82ab40caff824e208080"
      },
      {
       "txid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
@@ -60,11 +60,11 @@
     ],
     "outputs": [
      {
-      "script_pubkey": "512091074245d24c62c6b1e9dd0ca99a45e3085266b5f560085f9421ff759151e506",
+      "script_pubkey": "51204e2e2e1bdbcdf8e3680aec8ee2140ce8913b8ad1270c9fdc2046002f16992bfc",
       "amount": 40000
      },
      {
-      "script_pubkey": "512014b46a1e4df86743154d47421aea13a06ab2924efd102a357b8ffb1af7e307bc",
+      "script_pubkey": "51202db898b5fa3c81fbbe654adb34d71216a8af97ab077ada7c424cfed0bb166328",
       "amount": 20000
      }
     ]
@@ -82,10 +82,10 @@
      {
       "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "index": 0,
-      "script_pubkey": "512014b46a1e4df86743154d47421aea13a06ab2924efd102a357b8ffb1af7e307bc",
+      "script_pubkey": "51202db898b5fa3c81fbbe654adb34d71216a8af97ab077ada7c424cfed0bb166328",
       "amount": 60000,
       "sequence": 4294967295,
-      "conditions": "ffff37ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa0f007f82903d68de02494bfcf435fc988a07e421f1ab68e2ff6a0bfe820a94ad280ffff33ff8300ea6080ffff17ffa09802fe6fc3d7804e6b93daaa91aa54c788543b1a1377767090171abae40c6283ffa0482cfacaca750a921b18076325f12a95ecd79c7fde8421e895eeac59488936a2ffc040334fa2958a71e66a746082c2d5bcb5760ddd466ce635629b1b32670ad04f740200a57a679dc338076c33fa2f33e6d93ddfe6f09ca19d8275663f81fd14f479d580ffff02ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa0826ef5e3ca268047377631bb0a7a05ce1f2db2ef25d2e9f54d95ba78773dd440ff8300ea608080"
+      "conditions": "ffff37ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa0b702c79830f61c74b7f58ce7954c562a9cdf455e4e74b2ab81c9a1fa82ab40ca80ffff33ff8300ea6080ffff17ffa09802fe6fc3d7804e6b93daaa91aa54c788543b1a1377767090171abae40c6283ffa0482cfacaca750a921b18076325f12a95ecd79c7fde8421e895eeac59488936a2ffc040334fa2958a71e66a746082c2d5bcb5760ddd466ce635629b1b32670ad04f740200a57a679dc338076c33fa2f33e6d93ddfe6f09ca19d8275663f81fd14f479d580ffff02ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa072e2dc342438fed5c11199923550407994c6142da216946b791c8df3070394c2ff8300ea608080"
      },
      {
       "txid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
@@ -97,7 +97,7 @@
     ],
     "outputs": [
      {
-      "script_pubkey": "512091074245d24c62c6b1e9dd0ca99a45e3085266b5f560085f9421ff759151e506",
+      "script_pubkey": "51204e2e2e1bdbcdf8e3680aec8ee2140ce8913b8ad1270c9fdc2046002f16992bfc",
       "amount": 60000
      }
     ]
@@ -115,10 +115,10 @@
      {
       "txid": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
       "index": 0,
-      "script_pubkey": "512014b46a1e4df86743154d47421aea13a06ab2924efd102a357b8ffb1af7e307bc",
+      "script_pubkey": "51202db898b5fa3c81fbbe654adb34d71216a8af97ab077ada7c424cfed0bb166328",
       "amount": 60000,
       "sequence": 4294967295,
-      "conditions": "ffff37ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa0f007f82903d68de02494bfcf435fc988a07e421f1ab68e2ff6a0bfe820a94ad280ffff33ff8300ea6080ffff17ffa09802fe6fc3d7804e6b93daaa91aa54c788543b1a1377767090171abae40c6283ffa0482cfacaca750a921b18076325f12a95ecd79c7fde8421e895eeac59488936a2ffc040324fa2958a71e66a746082c2d5bcb5760ddd466ce635629b1b32670ad04f740200a57a679dc338076c33fa2f33e6d93ddfe6f09ca19d8275663f81fd14f479d580ffff02ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa0826ef5e3ca268047377631bb0a7a05ce1f2db2ef25d2e9f54d95ba78773dd440ff8300ea608080"
+      "conditions": "ffff37ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa0b702c79830f61c74b7f58ce7954c562a9cdf455e4e74b2ab81c9a1fa82ab40ca80ffff33ff8300ea6080ffff17ffa09802fe6fc3d7804e6b93daaa91aa54c788543b1a1377767090171abae40c6283ffa0482cfacaca750a921b18076325f12a95ecd79c7fde8421e895eeac59488936a2ffc040324fa2958a71e66a746082c2d5bcb5760ddd466ce635629b1b32670ad04f740200a57a679dc338076c33fa2f33e6d93ddfe6f09ca19d8275663f81fd14f479d580ffff02ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa072e2dc342438fed5c11199923550407994c6142da216946b791c8df3070394c2ff8300ea608080"
      },
      {
       "txid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
@@ -130,7 +130,7 @@
     ],
     "outputs": [
      {
-      "script_pubkey": "512091074245d24c62c6b1e9dd0ca99a45e3085266b5f560085f9421ff759151e506",
+      "script_pubkey": "51204e2e2e1bdbcdf8e3680aec8ee2140ce8913b8ad1270c9fdc2046002f16992bfc",
       "amount": 60000
      }
     ]
@@ -148,10 +148,10 @@
      {
       "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "index": 0,
-      "script_pubkey": "512014b46a1e4df86743154d47421aea13a06ab2924efd102a357b8ffb1af7e307bc",
+      "script_pubkey": "51202db898b5fa3c81fbbe654adb34d71216a8af97ab077ada7c424cfed0bb166328",
       "amount": 60000,
       "sequence": 4294967295,
-      "conditions": "ffff37ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa0f007f82903d68de02494bfcf435fc988a07e421f1ab68e2ff6a0bfe820a94ad280ffff33ff8300ea6080ffff17ffa09802fe6fc3d7804e6b93daaa91aa54c788543b1a1377767090171abae40c6283ffa0482cfacaca750a921b18076325f12a95ecd79c7fde8421e895eeac59488936a2ffc040324fa2958a71e66a746082c2d5bcb5760ddd466ce635629b1b32670ad04f740200a57a679dc338076c33fa2f33e6d93ddfe6f09ca19d8275663f81fd14f479d580ffff02ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa0826ef5e3ca268047377631bb0a7a05ce1f2db2ef25d2e9f54d95ba78773dd440ff8300ea608080"
+      "conditions": "ffff37ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa0b702c79830f61c74b7f58ce7954c562a9cdf455e4e74b2ab81c9a1fa82ab40ca80ffff33ff8300ea6080ffff17ffa09802fe6fc3d7804e6b93daaa91aa54c788543b1a1377767090171abae40c6283ffa0482cfacaca750a921b18076325f12a95ecd79c7fde8421e895eeac59488936a2ffc040324fa2958a71e66a746082c2d5bcb5760ddd466ce635629b1b32670ad04f740200a57a679dc338076c33fa2f33e6d93ddfe6f09ca19d8275663f81fd14f479d580ffff02ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa072e2dc342438fed5c11199923550407994c6142da216946b791c8df3070394c2ff8300ea608080"
      },
      {
       "txid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
@@ -163,7 +163,7 @@
     ],
     "outputs": [
      {
-      "script_pubkey": "512057c8c4ab5edeb1d367222e8cbf60a6fcc793d9da78266fbcddb0c4df8b0434ac",
+      "script_pubkey": "512081f4bb4ffad759db7dc83413201e4a3ad9da62ae81ecdee26a399d3fbcab9e7f",
       "amount": 60000
      }
     ]
@@ -181,10 +181,10 @@
      {
       "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "index": 0,
-      "script_pubkey": "512014b46a1e4df86743154d47421aea13a06ab2924efd102a357b8ffb1af7e307bc",
+      "script_pubkey": "51202db898b5fa3c81fbbe654adb34d71216a8af97ab077ada7c424cfed0bb166328",
       "amount": 50000,
       "sequence": 4294967295,
-      "conditions": "ffff37ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa0f007f82903d68de02494bfcf435fc988a07e421f1ab68e2ff6a0bfe820a94ad280ffff33ff8300ea6080ffff17ffa09802fe6fc3d7804e6b93daaa91aa54c788543b1a1377767090171abae40c6283ffa0482cfacaca750a921b18076325f12a95ecd79c7fde8421e895eeac59488936a2ffc040324fa2958a71e66a746082c2d5bcb5760ddd466ce635629b1b32670ad04f740200a57a679dc338076c33fa2f33e6d93ddfe6f09ca19d8275663f81fd14f479d580ffff02ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa0826ef5e3ca268047377631bb0a7a05ce1f2db2ef25d2e9f54d95ba78773dd440ff8300ea608080"
+      "conditions": "ffff37ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa0b702c79830f61c74b7f58ce7954c562a9cdf455e4e74b2ab81c9a1fa82ab40ca80ffff33ff8300ea6080ffff17ffa09802fe6fc3d7804e6b93daaa91aa54c788543b1a1377767090171abae40c6283ffa0482cfacaca750a921b18076325f12a95ecd79c7fde8421e895eeac59488936a2ffc040324fa2958a71e66a746082c2d5bcb5760ddd466ce635629b1b32670ad04f740200a57a679dc338076c33fa2f33e6d93ddfe6f09ca19d8275663f81fd14f479d580ffff02ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa072e2dc342438fed5c11199923550407994c6142da216946b791c8df3070394c2ff8300ea608080"
      },
      {
       "txid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
@@ -196,13 +196,46 @@
     ],
     "outputs": [
      {
-      "script_pubkey": "512091074245d24c62c6b1e9dd0ca99a45e3085266b5f560085f9421ff759151e506",
+      "script_pubkey": "51204e2e2e1bdbcdf8e3680aec8ee2140ce8913b8ad1270c9fdc2046002f16992bfc",
       "amount": 60000
      }
     ]
    },
    "expect": {
     "error": "unsatisfied_amount_assert"
+   }
+  },
+  {
+   "name": "trigger_stale_sig_redirected_target",
+   "tx": {
+    "version": 2,
+    "locktime": 0,
+    "inputs": [
+     {
+      "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "index": 0,
+      "script_pubkey": "51202db898b5fa3c81fbbe654adb34d71216a8af97ab077ada7c424cfed0bb166328",
+      "amount": 60000,
+      "sequence": 4294967295,
+      "conditions": "ffff37ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa0b702c79830f61c74b7f58ce7954c562a9cdf455e4e74b2ab81c9a1fa82ab40ca80ffff33ff8300ea6080ffff17ffa09802fe6fc3d7804e6b93daaa91aa54c788543b1a1377767090171abae40c6283ffa077c0be615d5edca3423db0da1127dc3b9fd83af86fb63f35a868bdf7d6228fb5ffc040324fa2958a71e66a746082c2d5bcb5760ddd466ce635629b1b32670ad04f740200a57a679dc338076c33fa2f33e6d93ddfe6f09ca19d8275663f81fd14f479d580ffff02ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa0f373d0d52e9a018281b30b1d870b535a6bfe3cc44f160d3db4f1f17c019a2b5dff8300ea608080"
+     },
+     {
+      "txid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "index": 0,
+      "script_pubkey": "00141111111111111111111111111111111111111111",
+      "amount": 20000,
+      "sequence": 4294967295
+     }
+    ],
+    "outputs": [
+     {
+      "script_pubkey": "512081f4bb4ffad759db7dc83413201e4a3ad9da62ae81ecdee26a399d3fbcab9e7f",
+      "amount": 60000
+     }
+    ]
+   },
+   "expect": {
+    "error": "unsatisfied_sig_assert"
    }
   },
   {
@@ -214,10 +247,10 @@
      {
       "txid": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
       "index": 1,
-      "script_pubkey": "51205ffb1054f311265cc6b7f06bfe3ca3e402d1272b414c1e9163024e8bff69234a",
+      "script_pubkey": "512038f082a1eda41f772092dd8828d8c2e818342b9491a75d118e95bae990aa327c",
       "amount": 40000,
       "sequence": 144,
-      "conditions": "ffff37ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa0a3c3d819af61c7c842471d8ce5ec8f0817c3027be72e04726bf415aca769248c80ffff22ff82009080ffff61ffa06584085b8098e1eb59f962912f5471d034345aeb060b3814bdcf5f29d6a78f608080"
+      "conditions": "ffff37ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa0d92479720844e6b45797ff88b5adb3157034490a3cdbacff16aa13158ae5f19180ffff22ff82009080ffff61ffa06584085b8098e1eb59f962912f5471d034345aeb060b3814bdcf5f29d6a78f608080"
      }
     ],
     "outputs": [
@@ -240,10 +273,10 @@
      {
       "txid": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
       "index": 1,
-      "script_pubkey": "51205ffb1054f311265cc6b7f06bfe3ca3e402d1272b414c1e9163024e8bff69234a",
+      "script_pubkey": "512038f082a1eda41f772092dd8828d8c2e818342b9491a75d118e95bae990aa327c",
       "amount": 40000,
       "sequence": 143,
-      "conditions": "ffff37ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa0a3c3d819af61c7c842471d8ce5ec8f0817c3027be72e04726bf415aca769248c80ffff22ff82009080ffff61ffa06584085b8098e1eb59f962912f5471d034345aeb060b3814bdcf5f29d6a78f608080"
+      "conditions": "ffff37ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa0d92479720844e6b45797ff88b5adb3157034490a3cdbacff16aa13158ae5f19180ffff22ff82009080ffff61ffa06584085b8098e1eb59f962912f5471d034345aeb060b3814bdcf5f29d6a78f608080"
      }
     ],
     "outputs": [
@@ -266,10 +299,10 @@
      {
       "txid": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
       "index": 1,
-      "script_pubkey": "51205ffb1054f311265cc6b7f06bfe3ca3e402d1272b414c1e9163024e8bff69234a",
+      "script_pubkey": "512038f082a1eda41f772092dd8828d8c2e818342b9491a75d118e95bae990aa327c",
       "amount": 40000,
       "sequence": 144,
-      "conditions": "ffff37ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa0a3c3d819af61c7c842471d8ce5ec8f0817c3027be72e04726bf415aca769248c80ffff22ff82009080ffff61ffa06584085b8098e1eb59f962912f5471d034345aeb060b3814bdcf5f29d6a78f608080"
+      "conditions": "ffff37ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa0d92479720844e6b45797ff88b5adb3157034490a3cdbacff16aa13158ae5f19180ffff22ff82009080ffff61ffa06584085b8098e1eb59f962912f5471d034345aeb060b3814bdcf5f29d6a78f608080"
      }
     ],
     "outputs": [
@@ -292,10 +325,10 @@
      {
       "txid": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
       "index": 1,
-      "script_pubkey": "51205ffb1054f311265cc6b7f06bfe3ca3e402d1272b414c1e9163024e8bff69234a",
+      "script_pubkey": "512038f082a1eda41f772092dd8828d8c2e818342b9491a75d118e95bae990aa327c",
       "amount": 40000,
       "sequence": 144,
-      "conditions": "ffff37ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa0a3c3d819af61c7c842471d8ce5ec8f0817c3027be72e04726bf415aca769248c80ffff22ff82009080ffff61ffa06584085b8098e1eb59f962912f5471d034345aeb060b3814bdcf5f29d6a78f608080"
+      "conditions": "ffff37ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa0d92479720844e6b45797ff88b5adb3157034490a3cdbacff16aa13158ae5f19180ffff22ff82009080ffff61ffa06584085b8098e1eb59f962912f5471d034345aeb060b3814bdcf5f29d6a78f608080"
      }
     ],
     "outputs": [
@@ -318,10 +351,10 @@
      {
       "txid": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
       "index": 1,
-      "script_pubkey": "51205ffb1054f311265cc6b7f06bfe3ca3e402d1272b414c1e9163024e8bff69234a",
+      "script_pubkey": "512038f082a1eda41f772092dd8828d8c2e818342b9491a75d118e95bae990aa327c",
       "amount": 40000,
       "sequence": 144,
-      "conditions": "ffff37ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa0a3c3d819af61c7c842471d8ce5ec8f0817c3027be72e04726bf415aca769248c80ffff22ff82009080ffff61ffa06584085b8098e1eb59f962912f5471d034345aeb060b3814bdcf5f29d6a78f608080"
+      "conditions": "ffff37ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa0d92479720844e6b45797ff88b5adb3157034490a3cdbacff16aa13158ae5f19180ffff22ff82009080ffff61ffa06584085b8098e1eb59f962912f5471d034345aeb060b3814bdcf5f29d6a78f608080"
      },
      {
       "txid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
@@ -355,10 +388,10 @@
      {
       "txid": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
       "index": 1,
-      "script_pubkey": "51205ffb1054f311265cc6b7f06bfe3ca3e402d1272b414c1e9163024e8bff69234a",
+      "script_pubkey": "512038f082a1eda41f772092dd8828d8c2e818342b9491a75d118e95bae990aa327c",
       "amount": 40000,
       "sequence": 144,
-      "conditions": "ffff37ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa0a3c3d819af61c7c842471d8ce5ec8f0817c3027be72e04726bf415aca769248c80ffff22ff82009080ffff61ffa06584085b8098e1eb59f962912f5471d034345aeb060b3814bdcf5f29d6a78f608080"
+      "conditions": "ffff37ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa0d92479720844e6b45797ff88b5adb3157034490a3cdbacff16aa13158ae5f19180ffff22ff82009080ffff61ffa06584085b8098e1eb59f962912f5471d034345aeb060b3814bdcf5f29d6a78f608080"
      },
      {
       "txid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
@@ -388,10 +421,10 @@
      {
       "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "index": 0,
-      "script_pubkey": "512014b46a1e4df86743154d47421aea13a06ab2924efd102a357b8ffb1af7e307bc",
+      "script_pubkey": "51202db898b5fa3c81fbbe654adb34d71216a8af97ab077ada7c424cfed0bb166328",
       "amount": 60000,
       "sequence": 4294967295,
-      "conditions": "ffff37ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa0f007f82903d68de02494bfcf435fc988a07e421f1ab68e2ff6a0bfe820a94ad280ffff33ff8300ea6080ffff01ff9600149999999999999999999999999999999999999999ff8300ea608080"
+      "conditions": "ffff37ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa0b702c79830f61c74b7f58ce7954c562a9cdf455e4e74b2ab81c9a1fa82ab40ca80ffff33ff8300ea6080ffff01ff9600149999999999999999999999999999999999999999ff8300ea608080"
      },
      {
       "txid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
@@ -421,10 +454,10 @@
      {
       "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "index": 0,
-      "script_pubkey": "51200f3442c90ac5767ccfc3eb685d42255184a3aab4d8b1fb5a02309d1f364c9982",
+      "script_pubkey": "51205a42dc042d6751d38ed61e7127f9e116d188089e404adae136811195a81812a9",
       "amount": 60000,
       "sequence": 4294967295,
-      "conditions": "ffff37ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa0cd7f860c78b37ae54815bd36752605865e70fc8c9575e47593f7dfcf8ed8faf480ffff33ff8300ea6080ffff01ff9600149999999999999999999999999999999999999999ff8300ea6080ffff17ffa0860200f3ca1e283b931d88e4a14e504e3710eb7cccacc8705ff9496ed5153616ffa060f909e56384ea8c7aaf634bb3a95f94575a4948342ebb8d368673fa18ccddf8ffc04003bb98b53a9d123e9a3bb484f2d5bfe3b27a46b5f5a593b3d45c396c2aef63c1a93590a85a9fae204ed859e0a00916ced1f02f10846e81fd0ba2e9a13477ed3e8080"
+      "conditions": "ffff37ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa0bda4a75ebed2db68fde78f9f6887c1bda66e707b01789f148a3ee299acb493b480ffff33ff8300ea6080ffff01ff9600149999999999999999999999999999999999999999ff8300ea6080ffff17ffa0860200f3ca1e283b931d88e4a14e504e3710eb7cccacc8705ff9496ed5153616ffa060f909e56384ea8c7aaf634bb3a95f94575a4948342ebb8d368673fa18ccddf8ffc04003bb98b53a9d123e9a3bb484f2d5bfe3b27a46b5f5a593b3d45c396c2aef63c1a93590a85a9fae204ed859e0a00916ced1f02f10846e81fd0ba2e9a13477ed3e8080"
      },
      {
       "txid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
@@ -454,10 +487,10 @@
      {
       "txid": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
       "index": 0,
-      "script_pubkey": "51200f3442c90ac5767ccfc3eb685d42255184a3aab4d8b1fb5a02309d1f364c9982",
+      "script_pubkey": "51205a42dc042d6751d38ed61e7127f9e116d188089e404adae136811195a81812a9",
       "amount": 60000,
       "sequence": 4294967295,
-      "conditions": "ffff37ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa0cd7f860c78b37ae54815bd36752605865e70fc8c9575e47593f7dfcf8ed8faf480ffff33ff8300ea6080ffff01ff9600149999999999999999999999999999999999999999ff8300ea6080ffff17ffa0860200f3ca1e283b931d88e4a14e504e3710eb7cccacc8705ff9496ed5153616ffa060f909e56384ea8c7aaf634bb3a95f94575a4948342ebb8d368673fa18ccddf8ffc04003bb98b53a9d123e9a3bb484f2d5bfe3b27a46b5f5a593b3d45c396c2aef63c1a93590a85a9fae204ed859e0a00916ced1f02f10846e81fd0ba2e9a13477ed3e8080"
+      "conditions": "ffff37ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa0bda4a75ebed2db68fde78f9f6887c1bda66e707b01789f148a3ee299acb493b480ffff33ff8300ea6080ffff01ff9600149999999999999999999999999999999999999999ff8300ea6080ffff17ffa0860200f3ca1e283b931d88e4a14e504e3710eb7cccacc8705ff9496ed5153616ffa060f909e56384ea8c7aaf634bb3a95f94575a4948342ebb8d368673fa18ccddf8ffc04003bb98b53a9d123e9a3bb484f2d5bfe3b27a46b5f5a593b3d45c396c2aef63c1a93590a85a9fae204ed859e0a00916ced1f02f10846e81fd0ba2e9a13477ed3e8080"
      },
      {
       "txid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
@@ -487,10 +520,10 @@
      {
       "txid": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
       "index": 1,
-      "script_pubkey": "512091074245d24c62c6b1e9dd0ca99a45e3085266b5f560085f9421ff759151e506",
+      "script_pubkey": "51204e2e2e1bdbcdf8e3680aec8ee2140ce8913b8ad1270c9fdc2046002f16992bfc",
       "amount": 40000,
       "sequence": 4294967295,
-      "conditions": "ffff37ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa0826ef5e3ca268047377631bb0a7a05ce1f2db2ef25d2e9f54d95ba78773dd44080ffff33ff83009c4080ffff01ff9600149999999999999999999999999999999999999999ff83009c408080"
+      "conditions": "ffff37ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa072e2dc342438fed5c11199923550407994c6142da216946b791c8df3070394c280ffff33ff83009c4080ffff01ff9600149999999999999999999999999999999999999999ff83009c408080"
      },
      {
       "txid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
@@ -520,10 +553,10 @@
      {
       "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "index": 0,
-      "script_pubkey": "512014b46a1e4df86743154d47421aea13a06ab2924efd102a357b8ffb1af7e307bc",
+      "script_pubkey": "51202db898b5fa3c81fbbe654adb34d71216a8af97ab077ada7c424cfed0bb166328",
       "amount": 60000,
       "sequence": 4294967295,
-      "conditions": "ffff37ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa0f007f82903d68de02494bfcf435fc988a07e421f1ab68e2ff6a0bfe820a94ad280ffff33ff8300ea6080ffff01ff9600149999999999999999999999999999999999999999ff8300ea608080"
+      "conditions": "ffff37ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa0b702c79830f61c74b7f58ce7954c562a9cdf455e4e74b2ab81c9a1fa82ab40ca80ffff33ff8300ea6080ffff01ff9600149999999999999999999999999999999999999999ff8300ea608080"
      },
      {
       "txid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
@@ -553,10 +586,10 @@
      {
       "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "index": 0,
-      "script_pubkey": "512014b46a1e4df86743154d47421aea13a06ab2924efd102a357b8ffb1af7e307bc",
+      "script_pubkey": "51202db898b5fa3c81fbbe654adb34d71216a8af97ab077ada7c424cfed0bb166328",
       "amount": 60000,
       "sequence": 4294967295,
-      "conditions": "ffff37ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa0f007f82903d68de02494bfcf435fc988a07e421f1ab68e2ff6a0bfe820a94ad280ffff33ff8300ea6080ffff01ff9600149999999999999999999999999999999999999999ff8300ea608080"
+      "conditions": "ffff37ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa0b702c79830f61c74b7f58ce7954c562a9cdf455e4e74b2ab81c9a1fa82ab40ca80ffff33ff8300ea6080ffff01ff9600149999999999999999999999999999999999999999ff8300ea608080"
      },
      {
       "txid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
@@ -586,18 +619,18 @@
      {
       "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "index": 0,
-      "script_pubkey": "512014b46a1e4df86743154d47421aea13a06ab2924efd102a357b8ffb1af7e307bc",
+      "script_pubkey": "51202db898b5fa3c81fbbe654adb34d71216a8af97ab077ada7c424cfed0bb166328",
       "amount": 60000,
       "sequence": 4294967295,
-      "conditions": "ffff37ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa0f007f82903d68de02494bfcf435fc988a07e421f1ab68e2ff6a0bfe820a94ad280ffff33ff8300ea6080ffff01ff9600149999999999999999999999999999999999999999ff8300ea608080"
+      "conditions": "ffff37ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa0b702c79830f61c74b7f58ce7954c562a9cdf455e4e74b2ab81c9a1fa82ab40ca80ffff33ff8300ea6080ffff01ff9600149999999999999999999999999999999999999999ff8300ea608080"
      },
      {
       "txid": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
       "index": 0,
-      "script_pubkey": "512014b46a1e4df86743154d47421aea13a06ab2924efd102a357b8ffb1af7e307bc",
+      "script_pubkey": "51202db898b5fa3c81fbbe654adb34d71216a8af97ab077ada7c424cfed0bb166328",
       "amount": 60000,
       "sequence": 4294967295,
-      "conditions": "ffff37ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa0f007f82903d68de02494bfcf435fc988a07e421f1ab68e2ff6a0bfe820a94ad280ffff33ff8300ea6080ffff01ff9600149999999999999999999999999999999999999999ff8300ea608080"
+      "conditions": "ffff37ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa0b702c79830f61c74b7f58ce7954c562a9cdf455e4e74b2ab81c9a1fa82ab40ca80ffff33ff8300ea6080ffff01ff9600149999999999999999999999999999999999999999ff8300ea608080"
      },
      {
       "txid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
@@ -631,18 +664,18 @@
      {
       "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "index": 0,
-      "script_pubkey": "512014b46a1e4df86743154d47421aea13a06ab2924efd102a357b8ffb1af7e307bc",
+      "script_pubkey": "51202db898b5fa3c81fbbe654adb34d71216a8af97ab077ada7c424cfed0bb166328",
       "amount": 60000,
       "sequence": 4294967295,
-      "conditions": "ffff37ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa0f007f82903d68de02494bfcf435fc988a07e421f1ab68e2ff6a0bfe820a94ad280ffff33ff8300ea6080ffff01ff9600149999999999999999999999999999999999999999ff8300ea608080"
+      "conditions": "ffff37ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa0b702c79830f61c74b7f58ce7954c562a9cdf455e4e74b2ab81c9a1fa82ab40ca80ffff33ff8300ea6080ffff01ff9600149999999999999999999999999999999999999999ff8300ea608080"
      },
      {
       "txid": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
       "index": 0,
-      "script_pubkey": "512014b46a1e4df86743154d47421aea13a06ab2924efd102a357b8ffb1af7e307bc",
+      "script_pubkey": "51202db898b5fa3c81fbbe654adb34d71216a8af97ab077ada7c424cfed0bb166328",
       "amount": 60000,
       "sequence": 4294967295,
-      "conditions": "ffff37ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa0f007f82903d68de02494bfcf435fc988a07e421f1ab68e2ff6a0bfe820a94ad280ffff33ff8300ea6080ffff01ff9600149999999999999999999999999999999999999999ff8300ea608080"
+      "conditions": "ffff37ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa0b702c79830f61c74b7f58ce7954c562a9cdf455e4e74b2ab81c9a1fa82ab40ca80ffff33ff8300ea6080ffff01ff9600149999999999999999999999999999999999999999ff8300ea608080"
      },
      {
       "txid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
@@ -672,10 +705,10 @@
      {
       "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "index": 0,
-      "script_pubkey": "51200f3442c90ac5767ccfc3eb685d42255184a3aab4d8b1fb5a02309d1f364c9982",
+      "script_pubkey": "51205a42dc042d6751d38ed61e7127f9e116d188089e404adae136811195a81812a9",
       "amount": 60000,
       "sequence": 4294967295,
-      "conditions": "ffff37ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa0f007f82903d68de02494bfcf435fc988a07e421f1ab68e2ff6a0bfe820a94ad280ffff33ff8300ea6080ffff01ff9600149999999999999999999999999999999999999999ff8300ea608080"
+      "conditions": "ffff37ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa0b702c79830f61c74b7f58ce7954c562a9cdf455e4e74b2ab81c9a1fa82ab40ca80ffff33ff8300ea6080ffff01ff9600149999999999999999999999999999999999999999ff8300ea608080"
      },
      {
       "txid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",

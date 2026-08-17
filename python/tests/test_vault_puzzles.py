@@ -32,7 +32,7 @@ from bitlisp import (  # noqa: E402
     serialize,
 )
 from bitlisp.conditions import parse_conditions  # noqa: E402
-from bitlisp.sexp import int_to_atom  # noqa: E402
+from bitlisp.sexp import int_to_atom, iter_proper_list  # noqa: E402
 from bitlisp_tools import assemble  # noqa: E402
 from bitlisp_tools.compiler import compile_program, tree_hash  # noqa: E402
 from bitlisp_tools.curry import curry, uncurry  # noqa: E402
@@ -45,9 +45,7 @@ BUDGET = 11_000_000_000
 SEQ_FINAL = 0xFFFFFFFF
 
 # The BIP341 nothing-up-my-sleeve point: no key-path spend exists.
-NUMS = bytes.fromhex(
-    "50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0"
-)
+NUMS = bytes.fromhex("50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0")
 AUTH_SK = (0xA0 << 248 | 7).to_bytes(32, "big")
 AUTH_PK = compute_xonly_pubkey(AUTH_SK)[0]
 RKEY_SK = (0xB0 << 248 | 9).to_bytes(32, "big")
@@ -61,15 +59,13 @@ AUX = b"\x00" * 32
 # so any source change is a deliberate re-pin of both literals and
 # the vector files.
 VAULT_MOD_HASH = bytes.fromhex(
-    "c5c5c72807c36371c15fc58c34d2a5181db8856bd5045dc44d91ba0e6db4be63"
+    "723f648e3bbed95923915c77e6da120c82e58e8d15eec94e91bc9270cfbd1d2a"
 )
 TRIG_MOD_HASH = bytes.fromhex(
-    "250cdfb910709b360f5ebb37102a2fe42fb42287edc66eff7dffe7f5a183f6cc"
+    "2873476587df1924f19def3a43b1f80e78d08dbad32a62c48c293d2a0229e3cb"
 )
 
-VAULT_NODE, _ = compile_program(
-    (PUZZLES / "vault" / "vault.bl").read_text(), INCLUDES
-)
+VAULT_NODE, _ = compile_program((PUZZLES / "vault" / "vault.bl").read_text(), INCLUDES)
 TRIG_NODE, _ = compile_program(
     (PUZZLES / "vault" / "triggered.bl").read_text(), INCLUDES
 )
@@ -150,16 +146,42 @@ def test_mod_hashes_pinned():
     assert tree_hash(TRIG_NODE) == TRIG_MOD_HASH
 
 
+def _h_atom(data):
+    return hashlib.sha256(b"\x01" + data).digest()
+
+
+def _h_pair(left, right):
+    return hashlib.sha256(b"\x02" + left + right).digest()
+
+
+def spec_curried_root(mod_hash, values):
+    """The curried instance's tree hash from the spec's two hash
+    rules alone, independent of tree_hash and of the puzzle helpers:
+    the curried shape is (a (q . F) (c (q . v1) ... 1)) with apply
+    the atom 2, quote and the chain terminator the atom 1, and cons
+    the atom 4. All curried values here are atoms."""
+    chain = _h_atom(b"\x01")
+    for value in reversed(values):
+        quoted = _h_pair(_h_atom(b"\x01"), _h_atom(value))
+        chain = _h_pair(_h_atom(b"\x04"), _h_pair(quoted, _h_pair(chain, _h_atom(b""))))
+    program = _h_pair(_h_atom(b"\x01"), mod_hash)
+    return _h_pair(_h_atom(b"\x02"), _h_pair(program, _h_pair(chain, _h_atom(b""))))
+
+
 def test_curried_identity_matches_tooling():
-    # The program's own reconstruction, read off the taproot assert,
-    # must equal the hash the curry tooling computes for the same
-    # instance, and uncurry must read the fixed values back.
-    for inst, root, values in (
-        (VAULT, VROOT, vault_values(b"")),
-        (TRIG, TROOT, trig_values(b"", TARGET)),
+    # Three independent computations of each instance's identity
+    # must agree: the tooling's tree_hash over the curried node, the
+    # spec-rule reimplementation above, and the program's own
+    # reconstruction read off the taproot assert it emits. uncurry
+    # must also read back the inner program and the fixed values.
+    for node, inst, root, values in (
+        (VAULT_NODE, VAULT, VROOT, vault_values(b"")),
+        (TRIG_NODE, TRIG, TROOT, trig_values(b"", TARGET)),
     ):
-        assert tree_hash(inst) == root
+        mod_hash = values[0]
+        assert spec_curried_root(mod_hash, values) == root
         inner, read_back = uncurry(inst)
+        assert inner == node
         assert read_back == values
     conds = conditions_of(VAULT, f"(3 0x{VSPK.hex()})")
     assert conds[0].merkle_root == VROOT
@@ -190,10 +212,80 @@ def test_trigger_value_shortfall_raises():
     assert info.value.code == "user_raise"
 
 
-def solution_items(node):
-    while node != b"":
-        yield node[0]
-        node = node[1]
+def path_raises(program, solution):
+    if isinstance(solution, str):
+        solution = assemble(solution)
+    with pytest.raises(BitLispError) as info:
+        run(program, solution, BUDGET)
+    return info.value.code
+
+
+def test_trigger_amount_guards():
+    # A misbehaving signer still cannot mint an oversized triggered
+    # coin through a negative revault amount or a worthless one
+    # through a zero trigger amount, and a malformed target is
+    # rejected before it becomes an unwithdrawable coin.
+    for trig_amt, revault_amt in ((60_001, -1), (0, 60_000)):
+        solution = trigger_solution(
+            AUTH_SK, TXID, 0, TARGET, trig_amt, revault_amt, 60_000
+        )
+        assert path_raises(VAULT, solution) == "user_raise"
+    short_target = trigger_solution(AUTH_SK, TXID, 0, b"\x77" * 31, 60_000, 0, 60_000)
+    assert path_raises(VAULT, short_target) == "user_raise"
+
+
+def test_malformed_instance_fails_every_path():
+    # A fixed value outside its domain would break one path at spend
+    # time while the others kept working, so every path rejects the
+    # instance up front, on whichever spend is tried first.
+    bad_instances = (
+        instance(VAULT_NODE, vault_values(b"\x02" + RKEY_PK))[0],
+        instance(
+            VAULT_NODE,
+            [
+                VAULT_MOD_HASH,
+                TRIG_MOD_HASH,
+                b"\x02" + AUTH_PK,
+                NUMS,
+                RECOVERY_SPK,
+                b"",
+                int_to_atom(DELAY),
+            ],
+        )[0],
+    )
+    solutions = (
+        f"(3 0x{VSPK.hex()})",
+        "(2 60000 60000)",
+        f"(4 0x{VSPK.hex()} 60000 120000 (60000))",
+    )
+    for bad in bad_instances:
+        for solution in solutions:
+            assert path_raises(bad, solution) == "user_raise"
+    overlong_delay = instance(
+        VAULT_NODE,
+        [
+            VAULT_MOD_HASH,
+            TRIG_MOD_HASH,
+            AUTH_PK,
+            NUMS,
+            RECOVERY_SPK,
+            b"",
+            int_to_atom(65_536),
+        ],
+    )[0]
+    assert path_raises(overlong_delay, f"(3 0x{VSPK.hex()})") == "user_raise"
+    bad_triggered = instance(
+        TRIG_NODE,
+        [
+            TRIG_MOD_HASH,
+            NUMS,
+            RECOVERY_SPK,
+            b"\x02" + RKEY_PK,
+            int_to_atom(DELAY),
+            TARGET,
+        ],
+    )[0]
+    assert path_raises(bad_triggered, "(1)") == "user_raise"
 
 
 def test_trigger_signature_binds_target():
@@ -203,7 +295,7 @@ def test_trigger_signature_binds_target():
     solution = trigger_solution(AUTH_SK, TXID, 0, TARGET, 60_000, 0, 60_000)
     other_target = b"\x66" * 32
     _, _, other_tspk = instance(TRIG_NODE, trig_values(b"", other_target))
-    items = list(solution_items(solution))
+    items = list(iter_proper_list(solution))
     redirected = assemble(
         f"(1 0x{other_target.hex()} 60000 0 60000 0x{items[5].hex()})"
     )
@@ -274,9 +366,7 @@ def test_full_lifecycle():
         return Transaction(
             version=2,
             locktime=0,
-            inputs=(
-                TxInput(trigger_tx.txid, 0, trig_spk, 100_000, sequence=sequence),
-            ),
+            inputs=(TxInput(trigger_tx.txid, 0, trig_spk, 100_000, sequence=sequence),),
             outputs=(withdrawal_out,),
         )
 
@@ -302,10 +392,7 @@ def test_full_lifecycle():
         inputs=with_fee.inputs,
         outputs=matured.outputs + (TxOutput(FEE_SPK, 10_000),),
     )
-    assert (
-        spend_error(trig_inst, assemble("(1)"), grafted)
-        == "unsatisfied_seal_assert"
-    )
+    assert spend_error(trig_inst, assemble("(1)"), grafted) == "unsatisfied_seal_assert"
 
     # Recovery works from both states at any time.
     recovery_from_vault = Transaction(
@@ -350,7 +437,9 @@ def keyed_recovery_tx():
 
 
 def test_keyed_recovery():
-    run_spend(KVAULT, keyed_recovery_solution(TXID, 60_000, 60_000), keyed_recovery_tx())
+    run_spend(
+        KVAULT, keyed_recovery_solution(TXID, 60_000, 60_000), keyed_recovery_tx()
+    )
     # A wrong key's signature fails, and a solution missing the
     # signature dies in the VM reaching for it.
     wrong = sig_my_outpoint(AUTH_SK, TXID, 0, assemble("(60000 60000)"))
@@ -463,6 +552,19 @@ def test_vm_vectors_match_source():
     # Every pinned program is byte-identical to a fresh compile and
     # curry of the sources, so the corpus cannot drift from them.
     cases = load_vector("vm/vault-programs.json")
+    malformed_rkey = instance(VAULT_NODE, vault_values(b"\x02" + RKEY_PK))[0]
+    overlong_delay = instance(
+        VAULT_NODE,
+        [
+            VAULT_MOD_HASH,
+            TRIG_MOD_HASH,
+            AUTH_PK,
+            NUMS,
+            RECOVERY_SPK,
+            b"",
+            int_to_atom(65_536),
+        ],
+    )[0]
     by_program = {
         "vault_trigger_no_revault": VAULT,
         "vault_trigger_with_revault": VAULT,
@@ -473,6 +575,10 @@ def test_vm_vectors_match_source():
         "triggered_withdraw": TRIG,
         "triggered_recover": TRIG,
         "vault_trigger_value_shortfall": VAULT,
+        "vault_trigger_negative_revault": VAULT,
+        "vault_trigger_zero_amount": VAULT,
+        "vault_malformed_recovery_key_unspendable": malformed_rkey,
+        "vault_overlong_delay_unspendable": overlong_delay,
         "vault_lead_no_followers": VAULT,
         "vault_unknown_path": VAULT,
     }
@@ -481,22 +587,71 @@ def test_vm_vectors_match_source():
         assert cases[name]["program"] == serialize(node).hex(), name
 
 
+def emitted_hex(program, solution):
+    if isinstance(solution, str):
+        solution = assemble(solution)
+    return serialize(run(program, solution, BUDGET)[1]).hex()
+
+
+def lead_hex(listed, out_amt):
+    listed_text = " ".join(str(a) for a in listed)
+    return emitted_hex(VAULT, f"(4 0x{VSPK.hex()} 60000 {out_amt} ({listed_text}))")
+
+
 def test_validation_vectors_match_source():
-    # Every condition list that a vector attributes to a vault
-    # program run is byte-identical to what the compiled source
-    # emits for that case's documented solution.
-    core = load_vector("validation/vault-core.json")
-    trig_nr = trigger_solution(AUTH_SK, TXID, 0, TARGET, 60_000, 0, 60_000)
-    _, result = run(VAULT, trig_nr, BUDGET)
-    assert core["trigger_valid"]["tx"]["inputs"][0]["conditions"] == (
-        serialize(result).hex()
+    # The complete closure: every conditions field in both validation
+    # vector files is recomputed here, from compiled source for the
+    # program-derived lists and from its documented construction for
+    # the hand-built hostile and encoding variants. Set equality in
+    # both directions, so a drifted payload fails and so does a
+    # vector case this table does not account for.
+    trig_nr = emitted_hex(
+        VAULT, trigger_solution(AUTH_SK, TXID, 0, TARGET, 60_000, 0, 60_000)
     )
-    _, result = run(VAULT, assemble("(2 60000 60000)"), BUDGET)
-    assert core["recover_from_vault_keyless_valid"]["tx"]["inputs"][0][
-        "conditions"
-    ] == serialize(result).hex()
-    consolidation = load_vector("validation/vault-consolidation.json")
-    follower_hex = serialize(run(VAULT, assemble(f"(3 0x{VSPK.hex()})"), BUDGET)[1]).hex()
-    valid = consolidation["consolidate_two_followers_valid"]["tx"]["inputs"]
-    assert valid[1]["conditions"] == follower_hex
-    assert valid[2]["conditions"] == follower_hex
+    nr_sig = sig_my_outpoint(AUTH_SK, TXID, 0, assemble(f"(0x{TARGET.hex()} 60000 0)"))
+    flipped = bytes([nr_sig[0] ^ 0x01]) + nr_sig[1:]
+    wd_out = TxOutput(bytes.fromhex("0014") + b"\x22" * 20, 39_000)
+    real_target = hashlib.sha256(wd_out.wire).digest()
+    trig_w = instance(TRIG_NODE, trig_values(b"", real_target))[0]
+    one_follower_lead = lead_hex((50_000,), 110_000)
+    assert one_follower_lead.count("8300c350") == 1
+    expected = {
+        trig_nr,
+        trig_nr.replace(nr_sig.hex(), flipped.hex()),
+        emitted_hex(
+            VAULT,
+            trigger_solution(AUTH_SK, TXID, 0, TARGET, 40_000, 20_000, 60_000),
+        ),
+        emitted_hex(
+            VAULT,
+            f"(1 0x{'66' * 32} 60000 0 60000 0x{nr_sig.hex()})",
+        ),
+        emitted_hex(trig_w, "(1)"),
+        emitted_hex(VAULT, "(2 60000 60000)"),
+        emitted_hex(KVAULT, keyed_recovery_solution(TXID, 60_000, 60_000)),
+        emitted_hex(TRIG, "(2 40000 40000)"),
+        emitted_hex(VAULT, f"(3 0x{VSPK.hex()})"),
+        lead_hex((50_000, 30_000), 140_000),
+        lead_hex((50_000, 50_000), 160_000),
+        lead_hex((50_000,), 110_000),
+        lead_hex((30_000,), 90_000),
+        lead_hex((40_000, 30_000), 130_000),
+        lead_hex((60_000, 30_000), 150_000),
+        emitted_hex(VAULT, f"(4 0x{VSPK.hex()} 60000 110000 (50000 -1))"),
+        one_follower_lead.replace("8300c350", "840000c350"),
+        serialize(
+            assemble(
+                f"((0x43 26 () 0x{VSPK.hex()} 50000)"
+                f" (0x43 26 () 0x{VSPK.hex()} 30000)"
+                f" (0x01 0x{'5120' + '42' * 32} 85000))"
+            )
+        ).hex(),
+        serialize(assemble(f"((0x42 26 () 0x{VSPK.hex()}))")).hex(),
+    }
+    observed = set()
+    for name in ("validation/vault-core.json", "validation/vault-consolidation.json"):
+        for case in load_vector(name).values():
+            for entry in case["tx"]["inputs"]:
+                if "conditions" in entry:
+                    observed.add(entry["conditions"])
+    assert observed == expected

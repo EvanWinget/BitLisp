@@ -34,10 +34,28 @@ its own curried tree hash: the curried shape
 the uncurried program's tree hash and the tree hashes of the fixed
 values. The helpers in `puzzles/lib/curry-hash.blib` compute
 exactly the digest `bitlisp-curry -T` prints. Every path emits
-`ASSERT_MY_TAPROOT` over the reconstructed root, binding execution
-to the coin the program claims to govern. A wrongly curried
-instance fails that assert on every path, so the failure mode is
-an unspendable coin, never theft.
+`ASSERT_MY_TAPROOT` over the reconstructed root, binding the
+program run to the coin it claims to govern: one instance's
+program can never spend another instance's coin, and a program
+installed against a coin at any other scriptPubKey fails its own
+assert.
+
+That binding is exactly program-to-coin and nothing stronger. The
+assert recomputes the root from the same curried values the coin's
+scriptPubKey was derived from, so it cannot detect that those
+values differ from the author's intent: a coin funded from a curry
+with transposed or wrong values is live and governed by that wrong
+curry. Verifying a curry before funding it is the wallet's job,
+and `bitlisp-uncurry` plus the `-T` flag exist for it.
+
+What the programs do check, on every path of both states, is that
+each fixed value sits inside its domain: the authorization key is
+32 bytes, the recovery key is nil or 32 bytes, the delay is 0 to
+65535, and the triggered state's target hash is 32 bytes. Without
+these guards a value outside its domain would break a single path
+at spend time while the others kept working, a quietly lost
+recovery path being the worst case. With them a malformed instance
+fails on its first spend of any kind, before it has a history.
 
 This identity convention is a recorded stand-in: the Phase 4
 commitment scheme decides how programs are really committed under
@@ -85,9 +103,13 @@ Both take the solution `(PATH . ARGS)`.
 ## Vault paths
 
 **Path 1, trigger.** ARGS is
-`(TARGET TRIG_AMT REVAULT_AMT MY_AMT SIG)`. The program rejects
-`MY_AMT > TRIG_AMT + REVAULT_AMT`, the BIP-345 value rule over the
-coin's own pinned amount. Emitted conditions:
+`(TARGET TRIG_AMT REVAULT_AMT MY_AMT SIG)`. The program rejects a
+`TARGET` that is not 32 bytes, a non-positive `TRIG_AMT`, a
+negative `REVAULT_AMT`, and `MY_AMT > TRIG_AMT + REVAULT_AMT`, the
+BIP-345 value rule over the coin's own pinned amount. The amount
+guards hold even against a misbehaving signer: no signed solution
+can mint an oversized triggered coin through a negative revault or
+a worthless zero-value one. Emitted conditions:
 
 1. `ASSERT_MY_TAPROOT INTERNAL_KEY <vault root>`
 2. `ASSERT_MY_AMOUNT MY_AMT`
@@ -224,19 +246,36 @@ only when k identical sends meet exactly k identical receives, so:
   scriptPubKey compose in one transaction.
 
 The leader path rejects an empty follower list, so every
-consolidation merges at least two coins. No keyless path splits
-coins, a revault needs the trigger signature, so any conflicting
-consolidation an adversary substitutes still strictly reduces the
-number of coins at the vault's scriptPubKey. Consolidation
-progress is monotone. What remains to an adversary is
-value-preserving griefing, spending their own fees to delay a
-pending merge or to choose which coins merge, the same griefing
-posture as keyless recovery, and a vault that objects chooses the
-keyed recovery posture and accepts the key management.
+consolidation merges at least two coins, and no keyless path can
+split a coin's value, a revault needing the trigger signature. Any
+conflicting consolidation an adversary substitutes therefore still
+merges the coins it consumes. That is deliberately not a claim
+that the coin count at the scriptPubKey only falls: validation
+rule 1 leaves unclaimed output slots unconstrained, so a
+transaction can carry additional funded outputs at the vault's
+scriptPubKey. Creating such a coin costs its full value, and
+anyone can dust any scriptPubKey with an ordinary payment at any
+time, so this adds nothing to the consolidation attack surface.
+What remains to an adversary is value-preserving griefing,
+spending their own fees to delay a pending merge or to choose
+which coins merge, the same griefing posture as keyless recovery,
+and a vault that objects chooses the keyed recovery posture and
+accepts the key management.
+
+One reading note against the benchmark as the evaluation document
+records it: the recorded predicate sums every input at the shared
+scriptPubKey, while this construction enforces it per group, the
+leader plus its listed followers, and independently balanced
+groups compose in one transaction. The single-output global form
+is the one-group case. Per group is the only reading compatible
+with the validation layer's composition guarantee, under which two
+valid spend sets must stay valid when combined, so the
+construction takes it deliberately.
 
 The theft cases above are pinned in
 `vectors/validation/vault-consolidation.json`, one vector per
-attack shape.
+attack shape, the negative and non-minimal listed amounts and the
+two-leaders double-claim included.
 
 ## Fees
 
@@ -253,9 +292,9 @@ The mod hashes, pinned in `python/tests/test_vault_puzzles.py`:
 
 ```
 $ bitlisp-compile -T puzzles/vault/vault.bl -I puzzles/lib -I puzzles/vault
-c5c5c72807c36371c15fc58c34d2a5181db8856bd5045dc44d91ba0e6db4be63
+723f648e3bbed95923915c77e6da120c82e58e8d15eec94e91bc9270cfbd1d2a
 $ bitlisp-compile -T puzzles/vault/triggered.bl -I puzzles/lib -I puzzles/vault
-250cdfb910709b360f5ebb37102a2fe42fb42287edc66eff7dffe7f5a183f6cc
+2873476587df1924f19def3a43b1f80e78d08dbad32a62c48c293d2a0229e3cb
 ```
 
 An instance's merkle root is the curried tree hash, printable
@@ -269,8 +308,12 @@ $ bitlisp-compile puzzles/vault/vault.bl -I puzzles/lib -I puzzles/vault \
 ```
 
 The compiled representatives, one per spend path with the
-in-program guard failures, are pinned in
-`vectors/vm/vault-programs.json`, and the condition-level lifecycle
-in `vectors/validation/vault-core.json`. The test suite recompiles
-both programs and byte-compares them against the pinned vectors,
-so source and corpus move together or not at all.
+in-program guard failures and the malformed instances, are pinned
+in `vectors/vm/vault-programs.json`, and the condition-level
+lifecycle in `vectors/validation/vault-core.json`. The test suite
+recompiles both programs, byte-compares every pinned program
+against a fresh compile and curry, and recomputes every conditions
+field in both validation vector files, program-derived lists from
+compiled source and the hand-built hostile variants from their
+documented constructions, with set equality in both directions.
+Source and corpus move together or not at all.

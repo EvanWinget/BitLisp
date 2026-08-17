@@ -4,8 +4,11 @@
 ; values, and its coin's scriptPubKey is the taproot output of
 ; INTERNAL_KEY tweaked with the curried program's tree hash. Every
 ; path recomputes that hash and asserts it against the coin being
-; spent, so a wrongly curried instance is unspendable rather than
-; stealable. The solution is (PATH . ARGS).
+; spent, which rejects running one instance's program against
+; another instance's coin. It cannot check that the curried values
+; are the ones the author intended: a coin funded from a wrong
+; curry is governed by that wrong curry. The solution is
+; (PATH . ARGS).
 ;
 ; Paths:
 ;   1 trigger        AUTH_KEY signs the withdrawal target chosen at
@@ -51,10 +54,16 @@
   ; digest binds the consumed outpoint, so an authorization cannot be
   ; replayed onto another coin of this instance, and its message
   ; hashes the target and both amounts, so none of them can be
-  ; rewritten under a captured signature.
+  ; rewritten under a captured signature. The amount guards hold
+  ; even against a misbehaving signer: the trigger amount is
+  ; positive, the revault amount is never negative, and a malformed
+  ; target would mint a coin whose withdrawal seal can never parse.
   (defun trigger-path (TMH AK IK RSPK RKEY DELAY VROOT
                        (TARGET TRIG_AMT REVAULT_AMT MY_AMT SIG))
-    (assert (not (> MY_AMT (+ TRIG_AMT REVAULT_AMT)))
+    (assert (= (strlen TARGET) 32)
+            (> TRIG_AMT 0)
+            (not (> 0 REVAULT_AMT))
+            (not (> MY_AMT (+ TRIG_AMT REVAULT_AMT)))
       (c (list ASSERT_MY_TAPROOT IK VROOT)
       (c (list ASSERT_MY_AMOUNT MY_AMT)
       (c (list ASSERT_SIG_MY_OUTPOINT AK
@@ -85,8 +94,9 @@
         TAIL))
 
   ; A leader without followers is rejected, so every consolidation
-  ; merges at least two coins and any conflicting consolidation
-  ; still shrinks the set of coins at this scriptPubKey.
+  ; merges at least two coins: a conflicting consolidation an
+  ; adversary substitutes still merges the coins it consumes, and
+  ; no keyless path can split a coin's value.
   (defun lead-path (VROOT IK (MY_SPK MY_AMT OUT_AMT FOLLOWER_AMOUNTS))
     (assert FOLLOWER_AMOUNTS
             (not (> (+ MY_AMT (sum-amounts FOLLOWER_AMOUNTS)) OUT_AMT))
@@ -108,8 +118,17 @@
         (lead-path VROOT IK ARGS)
         (x))))))
 
-  (dispatch TRIG_MOD_HASH AUTH_KEY INTERNAL_KEY RECOVERY_SPK
-            RECOVERY_KEY DELAY
-    (vault-root VAULT_MOD_HASH TRIG_MOD_HASH AUTH_KEY INTERNAL_KEY
-                RECOVERY_SPK RECOVERY_KEY DELAY)
-    PATH ARGS))
+  ; A malformed fixed value would break one path at spend time
+  ; while the others keep working, a quietly lost recovery being
+  ; the worst case, so every path checks the value widths and the
+  ; delay domain first and a malformed instance fails on its first
+  ; spend of any kind.
+  (assert (= (strlen AUTH_KEY) 32)
+          (or (not RECOVERY_KEY) (= (strlen RECOVERY_KEY) 32))
+          (not (> 0 DELAY))
+          (not (> DELAY 65535))
+    (dispatch TRIG_MOD_HASH AUTH_KEY INTERNAL_KEY RECOVERY_SPK
+              RECOVERY_KEY DELAY
+      (vault-root VAULT_MOD_HASH TRIG_MOD_HASH AUTH_KEY INTERNAL_KEY
+                  RECOVERY_SPK RECOVERY_KEY DELAY)
+      PATH ARGS)))

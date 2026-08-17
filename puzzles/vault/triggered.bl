@@ -16,7 +16,6 @@
 ;                    RECOVERY_KEY is nil
 (program (TRIG_MOD_HASH INTERNAL_KEY RECOVERY_SPK RECOVERY_KEY DELAY
           TARGET_HASH PATH . ARGS)
-  (include "curry-hash.blib")
   (include "vault-shared.blib")
 
   (defconstant WITHDRAW_PATH 1)
@@ -41,7 +40,14 @@
         (recovery-conditions IK TROOT RSPK RKEY ARGS)
         (x))))
 
-  (dispatch INTERNAL_KEY RECOVERY_SPK RECOVERY_KEY DELAY TARGET_HASH
-    (triggered-root TRIG_MOD_HASH INTERNAL_KEY RECOVERY_SPK
-                    RECOVERY_KEY DELAY TARGET_HASH)
-    PATH ARGS))
+  ; The same first-spend well-formedness check as the vault, for a
+  ; triggered instance curried directly rather than through a
+  ; well-formed vault's trigger.
+  (assert (or (not RECOVERY_KEY) (= (strlen RECOVERY_KEY) 32))
+          (not (> 0 DELAY))
+          (not (> DELAY 65535))
+          (= (strlen TARGET_HASH) 32)
+    (dispatch INTERNAL_KEY RECOVERY_SPK RECOVERY_KEY DELAY TARGET_HASH
+      (triggered-root TRIG_MOD_HASH INTERNAL_KEY RECOVERY_SPK
+                      RECOVERY_KEY DELAY TARGET_HASH)
+      PATH ARGS)))
