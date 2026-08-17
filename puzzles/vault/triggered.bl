@@ -1,0 +1,47 @@
+; The triggered program: the delayed state between trigger and
+; withdrawal.
+;
+; A triggered instance is this program curried with its six fixed
+; values, TARGET_HASH among them, and its coin's scriptPubKey is the
+; taproot output of INTERNAL_KEY tweaked with the curried program's
+; tree hash, the same identity convention as the vault. The vault's
+; trigger path creates this coin, so TARGET_HASH is committed the
+; moment the trigger confirms. The solution is (PATH . ARGS).
+;
+; Paths:
+;   1 withdrawal     after DELAY blocks of coin age, and only into
+;                    the exact output set TARGET_HASH names
+;   2 recovery       value moves to RECOVERY_SPK at any time before
+;                    a withdrawal confirms, keyless when
+;                    RECOVERY_KEY is nil
+(program (TRIG_MOD_HASH INTERNAL_KEY RECOVERY_SPK RECOVERY_KEY DELAY
+          TARGET_HASH PATH . ARGS)
+  (include "curry-hash.blib")
+  (include "vault-shared.blib")
+
+  (defconstant WITHDRAW_PATH 1)
+  (defconstant RECOVER_PATH 2)
+
+  ; The withdrawal needs no solution data: the sequence assert makes
+  ; the coin DELAY blocks old before it moves, and the seal fixes
+  ; every output slot to the committed set while leaving the input
+  ; side open, so anyone may add a fee input to a stuck withdrawal
+  ; without invalidating it.
+  (defun-inline withdraw-conditions (IK TROOT DELAY TARGET)
+    (list
+      (list ASSERT_MY_TAPROOT IK TROOT)
+      (list ASSERT_SEQUENCE_HEIGHT DELAY)
+      (list SEAL_OUTPUTS TARGET)))
+
+  ; Exists to name TROOT once for both branches.
+  (defun dispatch (IK RSPK RKEY DELAY TARGET TROOT PATH ARGS)
+    (if (= PATH WITHDRAW_PATH)
+        (withdraw-conditions IK TROOT DELAY TARGET)
+    (if (= PATH RECOVER_PATH)
+        (recovery-conditions IK TROOT RSPK RKEY ARGS)
+        (x))))
+
+  (dispatch INTERNAL_KEY RECOVERY_SPK RECOVERY_KEY DELAY TARGET_HASH
+    (triggered-root TRIG_MOD_HASH INTERNAL_KEY RECOVERY_SPK
+                    RECOVERY_KEY DELAY TARGET_HASH)
+    PATH ARGS))
