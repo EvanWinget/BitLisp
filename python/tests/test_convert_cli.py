@@ -238,7 +238,7 @@ def test_compile_include_flag_resolves_and_is_required(tmp_path, capsys):
     assert cli.compile_main([pasted]) == 0
     assert included_hex == capsys.readouterr().out
     assert cli.compile_main([str(source)]) == 2
-    assert "not found on the include path" in capsys.readouterr().err
+    assert "the include search path is empty" in capsys.readouterr().err
 
 
 def test_compile_include_flag_order_first_match_wins(tmp_path, capsys):

@@ -92,7 +92,11 @@ same rule as `defun`. Inline bodies may call functions of both
 kinds, and inline calls nested in inline bodies expand to a depth
 of 100 before the compiler rejects the program, so an inline
 function cannot call itself: recursion needs the function tree,
-which is what `defun` is for.
+which is what `defun` is for. Expansion is also capped at one
+million emitted nodes, because a chain of doubling inlines can
+square its tree per declaration while nesting only a little, and
+the cap turns that into a compile error instead of an artifact too
+large to serialize.
 
 ## defconstant
 
@@ -113,8 +117,10 @@ An atom is its own value, so `(defconstant FEE 400)` binds 400.
 Structured data needs quoting: `(defconstant K (q 1 2 3))` binds
 the list, where `(defconstant K (+ 1 2))` binds 3. Declaration
 order matters for constants alone. A constant's value sees only
-what is declared above it, while function bodies may reference
-names in any order.
+what is declared above it, and so does everything the value
+reaches: a function it calls compiles at that moment, against the
+declarations made so far. Function bodies a constant never reaches
+may reference names in any order.
 
 A name is defined once: functions, constants, condition
 constants, and reserved words share one namespace, and
@@ -138,16 +144,22 @@ nothing else, no parameter tree and no body:
 )
 ```
 
-The file name is a string. It resolves through the include search
-path, the repeatable `-I` flag of `bitlisp-compile` and of the
-REPL, first match in flag order winning, never an implicit current
-directory. Spliced declarations join the one namespace exactly as
-if written in place, so a name collision across files is the
-ordinary redefinition error. A file already loaded in the same
-compile is skipped rather than reloaded, so two libraries may
-include a common third, and a cycle of includes is a compile error
-naming the chain. By convention library files end in `.blib`,
-though nothing enforces an extension.
+The file name is a string, and since the compiler sees an atom,
+any atom spelling a printable name reads as one. It resolves
+through the include search path, the repeatable `-I` flag of
+`bitlisp-compile` and of the REPL, first match in flag order
+winning, never an implicit current directory. A name may reach a
+subdirectory of an include directory, and a name that is absolute
+or climbs out of its directory is rejected, so the search path is
+the whole resolution story. Spliced declarations join the one
+namespace exactly as if written in place, so a name collision
+across files is the ordinary redefinition error. A file already
+loaded in the same compile is skipped rather than reloaded, the
+file's identity not its spelling, so two libraries may include a
+common third, and a cycle of includes is a compile error naming
+the chain. In the REPL the session is the load-once scope, and a
+failed include line applies nothing. By convention library files
+end in `.blib`, though nothing enforces an extension.
 
 ## Condition constants
 
@@ -382,8 +394,8 @@ nothing forces a change. The deliberate differences:
   classic substitutes parameter names inside `(q . X)` data, a
   parameter in operator position stays an error where classic
   substitutes there too, an inline can never shadow an operator or
-  any other name, and nested expansion is depth-capped where a
-  classic self-recursive inline hangs the compiler.
+  any other name, and expansion is depth-capped and size-capped
+  where a classic self-recursive inline hangs the compiler.
 - Currying is not a language form: it operates on compiled
   programs, through the surfaces defined in `curry.md`.
 

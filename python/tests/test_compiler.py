@@ -3,6 +3,7 @@ reference VM, the condition-constant table pin, symbol table
 round-trips, and the error paths."""
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -18,6 +19,7 @@ from bitlisp.conditions import CONDITION_COSTS  # noqa: E402
 from bitlisp.errors import BitLispError  # noqa: E402
 from bitlisp.sexp import NIL, int_to_atom  # noqa: E402
 from bitlisp_tools import assemble, disassemble  # noqa: E402
+from bitlisp_tools import compiler as compiler_module  # noqa: E402
 from bitlisp_tools.compiler import (  # noqa: E402
     CONDITION_CONSTANTS,
     RESERVED_WORDS,
@@ -32,7 +34,7 @@ from bitlisp_tools.compiler import (  # noqa: E402
     symbols_to_json,
     tree_hash,
 )
-from bitlisp_tools.runner import load_context, run_spend  # noqa: E402
+from bitlisp_tools.runner import DEFAULT_MAX_COST, load_context, run_spend  # noqa: E402
 
 BUDGET = 11_000_000_000
 
@@ -501,6 +503,19 @@ def test_defconstant_value_errors_name_the_constant():
     assert "in 'K': the value raised" in str(excinfo.value)
 
 
+def test_defconstant_budget_matches_the_runner_default():
+    assert compiler_module.CONSTANT_COST_BUDGET == DEFAULT_MAX_COST
+
+
+def test_defconstant_budget_exhaustion_names_the_constant(monkeypatch):
+    monkeypatch.setattr(compiler_module, "CONSTANT_COST_BUDGET", 1000)
+    with pytest.raises(CompileError) as excinfo:
+        compile_program(
+            "(program () (defconstant K (* 123456789 123456789 123456789)) K)"
+        )
+    assert "in 'K': the value raised cost_exceeded" in str(excinfo.value)
+
+
 def test_variadic_call_binds_the_rest():
     source = "(program (X) (defun spread (A . REST) REST) (spread X 2 3))"
     _, _, result = _run_program(source, "(1)")
@@ -596,6 +611,35 @@ def test_inline_in_a_defconstant_value():
     assert result == int_to_atom(8)
 
 
+def test_inline_expansion_size_is_capped():
+    # A chain of doubling inlines squares its tree per declaration
+    # while nesting only linearly, so the depth cap alone cannot
+    # bound it. Five levels fit under the node cap, six exceed it.
+    def chain(levels):
+        declarations = ["(defun-inline d1 (V) (c V V))"]
+        for n in range(2, levels + 1):
+            declarations.append(f"(defun-inline d{n} (V) (d{n - 1} (d{n - 1} V)))")
+        return "(program (X) " + " ".join(declarations) + f" (d{levels} X))"
+
+    program, _ = compile_program(chain(5))
+    assert serialize(program)
+    with pytest.raises(CompileError) as excinfo:
+        compile_program(chain(6))
+    assert "inline expansion exceeds 1000000 nodes" in str(excinfo.value)
+
+
+def test_nested_inline_error_names_the_innermost_frame():
+    source = """(program (X)
+        (defun-inline inner (V) (+ V MISSING))
+        (defun-inline outer (V) (inner V))
+        (outer X))"""
+    with pytest.raises(CompileError) as excinfo:
+        compile_program(source)
+    message = str(excinfo.value)
+    assert "in 'inner': unknown name 'MISSING'" in message
+    assert "outer" not in message
+
+
 def test_self_recursive_inline_is_a_depth_error():
     with pytest.raises(CompileError) as excinfo:
         compile_program("(program (X) (defun-inline spin (N) (spin N)) (spin X))")
@@ -688,6 +732,44 @@ def test_included_collision_names_the_file(tmp_path):
             '(program () (defconstant K 2) (include "k.blib") K)', (str(tmp_path),)
         )
     assert "in include \"k.blib\": 'K' is already defined" in str(excinfo.value)
+
+
+def test_include_reaches_subdirectories_only_downward(tmp_path):
+    (tmp_path / "std").mkdir()
+    (tmp_path / "std" / "k.blib").write_text("((defconstant K 7))")
+    program, _ = compile_program(
+        '(program () (include "std/k.blib") K)', (str(tmp_path),)
+    )
+    _, result = run(program, NIL, BUDGET)
+    assert result == int_to_atom(7)
+
+
+def test_include_dedupes_by_file_identity_not_spelling(tmp_path):
+    # A hard link is the same file under a second name, so loading
+    # through both spellings must not redeclare.
+    (tmp_path / "k.blib").write_text("((defconstant K 7))")
+    os.link(tmp_path / "k.blib", tmp_path / "alias.blib")
+    program, _ = compile_program(
+        '(program () (include "k.blib") (include "alias.blib") K)', (str(tmp_path),)
+    )
+    _, result = run(program, NIL, BUDGET)
+    assert result == int_to_atom(7)
+
+
+def test_include_rejects_a_byte_order_mark(tmp_path):
+    (tmp_path / "bom.blib").write_text("\ufeff((defconstant K 1))")
+    with pytest.raises(CompileError) as excinfo:
+        compile_program('(program () (include "bom.blib") K)', (str(tmp_path),))
+    assert 'include file "bom.blib" starts with a byte-order mark' in str(excinfo.value)
+
+
+def test_include_rejects_a_dotted_declaration_list(tmp_path):
+    (tmp_path / "dotted.blib").write_text("((defconstant K 1) . 2)")
+    with pytest.raises(CompileError) as excinfo:
+        compile_program('(program () (include "dotted.blib") K)', (str(tmp_path),))
+    assert 'include file "dotted.blib" must hold one declaration list' in str(
+        excinfo.value
+    )
 
 
 def test_included_body_error_names_function_and_file(tmp_path):
@@ -789,7 +871,20 @@ def test_included_body_error_names_function_and_file(tmp_path):
         ('(program (X) (include "a" "b") X)', "include takes 1 parts"),
         (
             '(program (X) (include "nowhere.blib") X)',
-            'include file "nowhere.blib" not found on the include path',
+            'include file "nowhere.blib" not found: the include search path is empty',
+        ),
+        (
+            '(program (X) (include "/etc/x.blib") X)',
+            'include file "/etc/x.blib" must be a relative path inside the '
+            "include path",
+        ),
+        (
+            '(program (X) (include "../x.blib") X)',
+            'include file "../x.blib" must be a relative path inside the include path',
+        ),
+        (
+            '(program (X) (include "sub/../../x.blib") X)',
+            "must be a relative path inside the include path",
         ),
         ("(program (X) (include))", "include form is not an expression"),
     ],

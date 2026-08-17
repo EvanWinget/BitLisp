@@ -663,7 +663,61 @@ def test_include_line_loads_declarations(shell, capsys, tmp_path):
 
 def test_include_line_without_path_errors(shell, capsys):
     shell.onecmd('(include "lib.blib")')
-    assert "not found on the include path" in capsys.readouterr().out
+    assert "the include search path is empty" in capsys.readouterr().out
+
+
+def test_include_lines_share_a_session_scope(shell, capsys, tmp_path):
+    (tmp_path / "base.blib").write_text("((defconstant K 7))")
+    (tmp_path / "a.blib").write_text('((include "base.blib") (defun fa (N) (+ N K)))')
+    (tmp_path / "b.blib").write_text('((include "base.blib") (defun fb (N) (* N K)))')
+    shell.include_paths = (str(tmp_path),)
+    # Two lines including libraries that share a base: the session
+    # is the load-once scope, so the diamond splices cleanly.
+    shell.onecmd('(include "a.blib")')
+    shell.onecmd('(include "b.blib")')
+    assert capsys.readouterr().out == ""
+    shell.onecmd("(fa (fb (q . 2)))")
+    assert "21" in capsys.readouterr().out
+    # A straight repeat is skipped, not a collision.
+    shell.onecmd('(include "a.blib")')
+    assert capsys.readouterr().out == ""
+
+
+def test_failed_include_line_applies_nothing(shell, capsys, tmp_path):
+    (tmp_path / "three.blib").write_text(
+        "((defun good (N) N) (defconstant CLASH 1) (defun late (N) N))"
+    )
+    shell.include_paths = (str(tmp_path),)
+    shell.onecmd("(defconstant CLASH 2)")
+    shell.onecmd('(include "three.blib")')
+    assert "'CLASH' is already defined" in capsys.readouterr().out
+    shell.onecmd("defs")
+    assert capsys.readouterr().out == "(defconstant CLASH 2)\n"
+    # The failed file is not marked loaded, so clearing the
+    # collision and retrying splices it whole.
+    shell.onecmd("undef CLASH")
+    shell.onecmd('(include "three.blib")')
+    assert capsys.readouterr().out == ""
+    shell.onecmd("defs")
+    out = capsys.readouterr().out
+    assert "good" in out
+    assert "late" in out
+    assert "(defconstant CLASH 1)" in out
+
+
+def test_piped_include_flag(tmp_path):
+    env = dict(os.environ, PYTHONPATH=str(REPO_ROOT / "python"))
+    (tmp_path / "k.blib").write_text("((defconstant K 7))")
+    completed = subprocess.run(
+        [sys.executable, "-m", "bitlisp_tools.repl", "-I", str(tmp_path)],
+        input='(include "k.blib")\neval K\nexit\n',
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    assert completed.returncode == 0
+    assert completed.stdout.startswith("7\n")
+    assert completed.stderr == ""
 
 
 def test_include_line_collision_names_the_file(shell, capsys, tmp_path):
@@ -784,7 +838,15 @@ def test_defconstant_line_evaluates_and_lists_reloadably(shell, capsys):
     shell.onecmd("defs")
     # A computed pair value lists quoted, so the line re-reads as
     # the same constant instead of re-evaluating differently.
-    assert capsys.readouterr().out == ("(defconstant K 3)\n(defconstant L (q 1 2 3))\n")
+    listing = "(defconstant K 3)\n(defconstant L (q 1 2 3))\n"
+    assert capsys.readouterr().out == listing
+    # Reload the printed lines and prove the listing is unchanged.
+    shell.onecmd("undef K")
+    shell.onecmd("undef L")
+    for line in listing.splitlines():
+        shell.onecmd(line)
+    shell.onecmd("defs")
+    assert capsys.readouterr().out == listing
     shell.onecmd("(defconstant BAD (x))")
     assert "in 'BAD': the value raised user_raise" in capsys.readouterr().out
     shell.onecmd("defs")

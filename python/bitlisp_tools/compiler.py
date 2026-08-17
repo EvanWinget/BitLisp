@@ -110,6 +110,13 @@ DECLARATION_KEYWORDS = (_DEFUN, _DEFUN_INLINE, _DEFCONSTANT, _INCLUDE)
 # which is what defun is for.
 INLINE_DEPTH_LIMIT = 100
 
+# How many structural nodes one inline expansion may emit. The
+# depth cap alone cannot bound size: a chain of doubling inlines
+# squares its tree per declaration while nesting only linearly, so
+# the size cap is what turns that into a compile error instead of
+# an artifact too large to serialize.
+INLINE_SIZE_LIMIT = 1_000_000
+
 
 # The condition vocabulary, one name per assigned opcode, written
 # out literally so a reviewer can check it by eye. A test pins the
@@ -161,6 +168,9 @@ class CompileError(Exception):
     def __init__(self, message, offset=None):
         super().__init__(message if offset is None else f"{message} at offset {offset}")
         self.offset = offset
+        # True once an inline frame has named this error, so outer
+        # frames pass it through instead of stacking prefixes.
+        self.inline_named = False
 
 
 class Symbol:
@@ -555,6 +565,14 @@ _TRUE = _quote(int_to_atom(1))
 _RAISE_CALL = _proper_list(_RAISE)
 
 
+def _inline_error(name, message, offset=None):
+    """A CompileError already carrying its inline frame's name, so
+    outer frames pass it through."""
+    error = CompileError(f"in {name!r}: {message}", offset)
+    error.inline_named = True
+    return error
+
+
 def _name_spelling(atom):
     """The name an atom's bytes spell, or None when they spell no
     single reader-accepted name."""
@@ -575,6 +593,36 @@ class _Compilation:
         self.defs = defs
         self.fn_paths = fn_paths
         self.inline_depth = 0
+        # The size memo maps node ids to structural sizes, and the
+        # measured list keeps every memoized node alive so a
+        # recycled id can never alias a new node.
+        self.node_sizes = {}
+        self.measured_nodes = []
+
+    def _node_size(self, node):
+        """Structural node count of an emitted tree, memoized
+        across the shared subtrees splicing creates, so measuring
+        costs one visit per distinct node."""
+        sizes = self.node_sizes
+        stack = [node]
+        while stack:
+            current = stack.pop()
+            key = id(current)
+            if key in sizes:
+                continue
+            if not is_pair(current):
+                sizes[key] = 1
+                self.measured_nodes.append(current)
+                continue
+            left_key, right_key = id(current[0]), id(current[1])
+            if left_key in sizes and right_key in sizes:
+                sizes[key] = 1 + sizes[left_key] + sizes[right_key]
+                self.measured_nodes.append(current)
+            else:
+                stack.append(current)
+                stack.append(current[0])
+                stack.append(current[1])
+        return sizes[id(node)]
 
     def expression(self, expr, bindings):
         if isinstance(expr, Symbol):
@@ -692,8 +740,10 @@ class _Compilation:
         """The body compiled at the call site, parameter references
         replaced by the arguments' compiled expressions. Nothing
         enters the function tree: an inline call pays no apply and
-        no path lookup, and the depth cap makes an inline calling
-        itself a compile error rather than a hang."""
+        no path lookup. The depth cap makes an inline calling
+        itself a compile error rather than a hang, and the size cap
+        does the same for expansions that multiply a tree per level
+        while nesting only a little."""
         name = head.name
         arguments = _proper_items(tail, name, head.offset)
         _check_arity(name, arguments, self.defs.inlines[name][2], head.offset)
@@ -702,20 +752,28 @@ class _Compilation:
         self.inline_depth += 1
         try:
             if self.inline_depth > INLINE_DEPTH_LIMIT:
-                raise CompileError(
+                raise _inline_error(
+                    name,
                     f"inline expansion exceeds {INLINE_DEPTH_LIMIT} levels",
                     head.offset,
                 )
             try:
-                return self.expression(body, _bind_inline_params(params, compiled))
+                result = self.expression(body, _bind_inline_params(params, compiled))
             except CompileError as exc:
-                # One wrap at the outermost inline frame: the body's
-                # offsets index the declaring text, and deeper frames
-                # pass the error through so a depth failure does not
-                # stack a hundred prefixes.
-                if self.inline_depth == 1:
-                    raise CompileError(f"in {name!r}: {exc}") from None
-                raise
+                # One wrap, at the innermost inline frame, so the
+                # error names the function whose declaring text the
+                # offset indexes, and every outer frame passes it
+                # through instead of stacking prefixes.
+                if exc.inline_named:
+                    raise
+                raise _inline_error(name, str(exc)) from None
+            if self._node_size(result) > INLINE_SIZE_LIMIT:
+                raise _inline_error(
+                    name,
+                    f"inline expansion exceeds {INLINE_SIZE_LIMIT} nodes",
+                    head.offset,
+                )
+            return result
         finally:
             self.inline_depth -= 1
 
@@ -821,7 +879,10 @@ def program_form(tree):
 def _include_name(form):
     """The file name one (include "file") form names. The name is a
     string atom: a bare name would answer to the namespace rules,
-    and nothing else spells a file."""
+    and nothing else spells a file. The name may carry subdirectory
+    components under an include directory, and a name that is
+    absolute or climbs out of its directory is rejected, so the
+    search path is the whole resolution story."""
     items = _form_items(form, _INCLUDE, 2)
     atom = items[1]
     if isinstance(atom, Symbol):
@@ -837,6 +898,10 @@ def _include_name(form):
         raise CompileError("include takes a quoted file name") from None
     if not name or not name.isprintable():
         raise CompileError("include takes a quoted file name")
+    if os.path.isabs(name) or os.path.normpath(name).split(os.sep)[0] == os.pardir:
+        raise CompileError(
+            f'include file "{name}" must be a relative path inside the include path'
+        )
     return name
 
 
@@ -845,6 +910,11 @@ def _resolve_include(name, include_paths, offset):
     order. The search path is explicit: no implicit current
     directory, so where a program compiles never changes what it
     includes."""
+    if not include_paths:
+        raise CompileError(
+            f'include file "{name}" not found: the include search path is empty',
+            offset,
+        )
     for directory in include_paths:
         path = os.path.join(directory, name)
         if os.path.isfile(path):
@@ -861,13 +931,22 @@ def _include_items(path, name):
             text = handle.read()
     except (OSError, UnicodeDecodeError) as exc:
         raise CompileError(f'include file "{name}": {exc}') from None
+    if text.startswith("\ufeff"):
+        raise CompileError(f'include file "{name}" starts with a byte-order mark')
     try:
         forms = parse_source_many(text)
     except ParseError as exc:
         raise CompileError(f'in include "{name}": {exc}') from None
     if len(forms) != 1 or not (is_pair(forms[0]) or forms[0] == NIL):
         raise CompileError(f'include file "{name}" must hold one declaration list')
-    return _proper_items(forms[0], f'include file "{name}"')
+    items = []
+    node = forms[0]
+    while is_pair(node):
+        items.append(node[0])
+        node = node[1]
+    if node != NIL:
+        raise CompileError(f'include file "{name}" must hold one declaration list')
+    return items
 
 
 # The splice stack's marker for a finished file, popping its chain
@@ -875,16 +954,20 @@ def _include_items(path, name):
 _INCLUDE_END = object()
 
 
-def _spliced(declarations, include_paths):
+def _spliced(declarations, include_paths, loaded=None):
     """Declaration and origin pairs with every include resolved
     depth first in place, origin naming the include file a
     declaration came from, None for the program's own text. A file
-    loads once per compile: a repeat include is skipped where the
-    names would otherwise collide, and an include chain reaching a
-    file still being spliced is a cycle, an error naming the
-    chain."""
+    loads once per loaded set, identified by its stat identity so
+    aliased spellings of one file cannot load it twice: a repeat
+    include is skipped where the names would otherwise collide, and
+    an include chain reaching a file still being spliced is a
+    cycle, an error naming the chain. A caller passing its own
+    loaded set widens the load-once scope, the REPL to its
+    session."""
     result = []
-    loaded = set()
+    if loaded is None:
+        loaded = set()
     chain = []
     stack = [(declaration, None) for declaration in reversed(declarations)]
     while stack:
@@ -898,30 +981,37 @@ def _spliced(declarations, include_paths):
         try:
             name = _include_name(declaration)
             offset = declaration[0].offset if origin is None else None
-            path = os.path.realpath(_resolve_include(name, include_paths, offset))
+            path = _resolve_include(name, include_paths, offset)
+            stat = os.stat(path)
         except CompileError as exc:
             if origin is None:
                 raise
             raise CompileError(f'in include "{origin}": {exc}') from None
-        if any(path == seen for seen, _ in chain):
+        except OSError as exc:
+            raise CompileError(f'include file "{name}": {exc}') from None
+        identity = (stat.st_dev, stat.st_ino)
+        if any(identity == seen for seen, _ in chain):
             names = [seen_name for _, seen_name in chain]
-            names = names[next(i for i, (p, _) in enumerate(chain) if p == path) :]
+            names = names[
+                next(i for i, (seen, _) in enumerate(chain) if seen == identity) :
+            ]
             raise CompileError("include cycle: " + " includes ".join([*names, name]))
-        if path in loaded:
+        if identity in loaded:
             continue
-        loaded.add(path)
-        chain.append((path, name))
+        loaded.add(identity)
+        chain.append((identity, name))
         stack.append((_INCLUDE_END, None))
         for item in reversed(_include_items(path, name)):
             stack.append((item, name))
     return result
 
 
-def included_declarations(form, include_paths):
+def included_declarations(form, include_paths, loaded=None):
     """The declaration and origin pairs one (include "file") form
     splices, nested includes resolved, for a caller that holds its
-    own namespace, the REPL's session declarations."""
-    return _spliced([form], include_paths)
+    own namespace, the REPL's session declarations. Passing a
+    loaded set carries the load-once scope across calls."""
+    return _spliced([form], include_paths, loaded)
 
 
 def compile_program(source, include_paths=()):

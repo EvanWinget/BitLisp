@@ -14,9 +14,11 @@ Transaction context:
     maxcost [<n>]                  show or set the cost budget
 
 Definitions:
-    (defun <name> <params> <body>)   define a named function
-    (defun-inline <name> <params> <body>)   define an inline function
-    (defconstant <name> <value>)     define a constant, its value
+    (defun <name> <params> <body>)
+                                   define a named function
+    (defun-inline <name> <params> <body>)
+                                   define an inline function
+    (defconstant <name> <value>)   define a constant, its value
                                    evaluated at declaration
     (include "<file>")             splice a declaration file from
                                    the include search path
@@ -178,6 +180,7 @@ class BitLispShell(cmd.Cmd):
         self.input_index = 0
         self.max_cost = DEFAULT_MAX_COST
         self.include_paths = ()
+        self.loaded_includes = set()
         self.session = None
 
     # Line handling.
@@ -370,16 +373,36 @@ class BitLispShell(cmd.Cmd):
     @_survives
     def _declare(self, line):
         """A declaration line adds to the compiler definitions
-        space, an include line splicing its file's declarations one
-        by one. Names are claimed once across this space and the
-        def bindings, so one spelling can never mean two things."""
+        space, an include line splicing its file's declarations.
+        Names are claimed once across this space and the def
+        bindings, so one spelling can never mean two things. The
+        session is the include load-once scope, so two lines may
+        include libraries sharing a common third, and a failed
+        include line restores the session whole, applying nothing."""
         tree = parse_source(line)
         if declaration_keyword(tree) == "include":
-            for declaration, origin in included_declarations(tree, self.include_paths):
-                try:
-                    self._add_declaration(declaration)
-                except CompileError as exc:
-                    raise CompileError(f'in include "{origin}": {exc}') from None
+            snapshot = (
+                dict(self.defs.functions),
+                dict(self.defs.inlines),
+                dict(self.defs.constants),
+                set(self.loaded_includes),
+            )
+            try:
+                for declaration, origin in included_declarations(
+                    tree, self.include_paths, self.loaded_includes
+                ):
+                    try:
+                        self._add_declaration(declaration)
+                    except CompileError as exc:
+                        raise CompileError(f'in include "{origin}": {exc}') from None
+            except CompileError:
+                self.defs.functions, self.defs.inlines, self.defs.constants = (
+                    snapshot[0],
+                    snapshot[1],
+                    snapshot[2],
+                )
+                self.loaded_includes = snapshot[3]
+                raise
             return
         self._add_declaration(tree)
 

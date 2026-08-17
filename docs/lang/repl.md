@@ -91,7 +91,11 @@ not rewrite what an earlier definition captured.
 
 A line whose head is `defun`, `defun-inline`, `defconstant`, or
 `include` is a language declaration, `language.md` syntax exactly,
-and adds to the session's compiler definitions. Declarations and `def` bindings
+and adds to the session's compiler definitions. For includes the
+session is the load-once scope: a file already spliced by an
+earlier line is skipped, so two lines may include libraries
+sharing a common third, and a failed include line applies nothing,
+leaving the session as it was. Declarations and `def` bindings
 share one namespace with the reserved words and the condition
 constants, so one spelling can never mean two things, and `undef`
 removes a name from whichever space holds it.
