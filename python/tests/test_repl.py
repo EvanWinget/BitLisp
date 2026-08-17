@@ -763,6 +763,19 @@ def test_spend_accepts_compiled_program(shell, ctx_file, capsys):
     assert "valid: 1 condition(s)" in out
 
 
+def test_defconstant_line_evaluates_and_lists_reloadably(shell, capsys):
+    shell.onecmd("(defconstant K (+ 1 2))")
+    shell.onecmd("(defconstant L (q 1 2 3))")
+    shell.onecmd("defs")
+    # A computed pair value lists quoted, so the line re-reads as
+    # the same constant instead of re-evaluating differently.
+    assert capsys.readouterr().out == ("(defconstant K 3)\n(defconstant L (q 1 2 3))\n")
+    shell.onecmd("(defconstant BAD (x))")
+    assert "in 'BAD': the value raised user_raise" in capsys.readouterr().out
+    shell.onecmd("defs")
+    assert "BAD" not in capsys.readouterr().out
+
+
 def test_defconstant_opcode_valued_atom_displays_as_value(shell, capsys):
     # 16 is the + opcode byte, and a constant's value is data, so
     # the listing must show the number the user typed.

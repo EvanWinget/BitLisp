@@ -15,8 +15,10 @@ declaration order, and a call site rebuilds the layout by consing
 the tree it received onto its evaluated arguments, so recursion and
 mutual recursion need no further machinery. A program whose body
 reaches no function is emitted bare with its arguments at the
-environment root. Constants never enter the tree: a constant
-reference inlines its value as a quoted literal at the use site.
+environment root. Constants never enter the tree: a defconstant
+value compiles and runs on the reference VM at its declaration,
+budgeted, and a constant reference inlines the computed value as a
+quoted literal at the use site.
 
 There are no source-to-source rewrites. Emission is direct, with
 one size-only exception: a nil literal is emitted as the nil atom,
@@ -40,6 +42,8 @@ import hashlib
 import os
 
 from bitlisp import conditions
+from bitlisp.errors import BitLispError
+from bitlisp.machine import run
 from bitlisp.operators import OPERATORS
 from bitlisp.sexp import NIL, int_to_atom, is_atom, is_pair
 
@@ -115,6 +119,11 @@ CONDITION_CONSTANTS = {
 
 SYMBOLS_SCHEMA = "bitlisp-sym-v0"
 
+# The inclusive budget a defconstant value evaluates under, the
+# runner's default spend budget, so compile-time evaluation can
+# never outrun what a spend could.
+CONSTANT_COST_BUDGET = 11_000_000_000
+
 
 class CompileError(Exception):
     """Source that reads as an s-expression but is not a valid program."""
@@ -155,6 +164,15 @@ def parse_source(text):
 def parse_source_many(text):
     """The source tree list for zero or more expressions."""
     return _parse(tokenize(text), _symbol_or_atom, single=False)
+
+
+def constant_text(value):
+    """The declaration spelling of a computed constant value: an
+    atom is its own spelling, a pair re-reads as the same value
+    only quoted."""
+    if is_pair(value):
+        return source_text((_QUOTE, value))
+    return source_text(value)
 
 
 def source_text(tree):
@@ -288,18 +306,22 @@ class Definitions:
 
     def add_defconstant(self, form, taken=frozenset()):
         """Adds one (defconstant name value) source form. The value
-        is data taken verbatim, never evaluated, so it cannot
-        mention names."""
+        compiles against the declarations already made and runs on
+        the reference VM now, under CONSTANT_COST_BUDGET, so a
+        constant holds computed data and sees only what is declared
+        above it. Declaration order matters for constants alone."""
         items = _form_items(form, _DEFCONSTANT, 3)
         name = self._claim(items[1], taken)
-        symbol = first_symbol(items[2])
-        if symbol is not None:
+        try:
+            program, _ = _compile(self, None, items[2])
+            _, value = run(program, NIL, CONSTANT_COST_BUDGET)
+        except CompileError as exc:
+            raise CompileError(f"in {name!r}: {exc}") from None
+        except BitLispError as exc:
             raise CompileError(
-                f"{symbol.name!r} in a defconstant value, "
-                "which is data and cannot hold names",
-                symbol.offset,
-            )
-        self.constants[name] = items[2]
+                f"in {name!r}: the value raised {exc.code}: {exc}"
+            ) from None
+        self.constants[name] = value
         return name
 
 
@@ -501,8 +523,8 @@ class _Compilation:
         if name in bindings:
             return int_to_atom(bindings[name])
         if name in self.defs.constants:
-            # A constant's value was checked symbol-free at its
-            # definition, so the stored tree is already a node.
+            # A constant's value was computed at its declaration,
+            # so the stored tree is a plain node.
             return _quote(self.defs.constants[name])
         if name in CONDITION_CONSTANTS:
             return _quote(CONDITION_CONSTANTS[name])

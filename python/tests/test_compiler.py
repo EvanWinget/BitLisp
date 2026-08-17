@@ -458,10 +458,47 @@ def test_parameters_shadow_constants_and_functions():
     assert result == (int_to_atom(7), NIL)
 
 
-def test_pair_defconstant_binds_the_tree_verbatim():
+def test_defconstant_evaluates_at_compile_time():
+    # The verbatim-data semantics of the language core are gone, a
+    # deliberate break recorded in the language doc's deviations:
+    # the value is an expression, computed once at declaration.
     _, _, result = _run_program("(program () (defconstant K (+ 1 2)) K)")
-    assert result == assemble("(+ 1 2)")
-    assert result != int_to_atom(3)
+    assert result == int_to_atom(3)
+    program, _, result = _run_program("(program () (defconstant K (q 1 2 3)) K)")
+    assert result == assemble("(1 2 3)")
+    assert disassemble(program) == "(q 1 2 3)"
+
+
+def test_defconstant_sees_earlier_declarations_only():
+    source = """(program ()
+        (defun double (N) (* 2 N))
+        (defconstant BASE (double 100))
+        (defconstant TOTAL (+ BASE 1))
+        TOTAL)"""
+    _, _, result = _run_program(source)
+    assert result == int_to_atom(201)
+    with pytest.raises(CompileError) as excinfo:
+        compile_program(
+            "(program () (defconstant K (double 1)) (defun double (N) (* 2 N)) K)"
+        )
+    assert "in 'K': unknown name 'double'" in str(excinfo.value)
+
+
+def test_defconstant_computes_a_tree_hash():
+    # The hash-plumbing use case: a constant holding the sha256tree
+    # digest of quoted data, computed by the VM operator itself.
+    source = "(program () (defconstant H (sha256tree (q 1 2))) H)"
+    _, _, result = _run_program(source)
+    assert result == tree_hash(assemble("(1 2)"))
+
+
+def test_defconstant_value_errors_name_the_constant():
+    with pytest.raises(CompileError) as excinfo:
+        compile_program("(program () (defconstant K (x)) K)")
+    assert "in 'K': the value raised user_raise" in str(excinfo.value)
+    with pytest.raises(CompileError) as excinfo:
+        compile_program("(program () (defconstant K (/ 1 0)) K)")
+    assert "in 'K': the value raised" in str(excinfo.value)
 
 
 def test_variadic_call_binds_the_rest():
@@ -590,7 +627,8 @@ def test_included_body_error_names_function_and_file(tmp_path):
             "(program (X) (defun fun (N) N) (defconstant fun 1) (fun X))",
             "already defined",
         ),
-        ("(program (X) (defconstant K Y) K)", "'Y' in a defconstant value"),
+        ("(program (X) (defconstant K Y) K)", "in 'K': unknown name 'Y'"),
+        ("(program (X) (defconstant K X) K)", "in 'K': unknown name 'X'"),
         ("(program (X) (defun fun (N) N) (fun))", "'fun' takes 1 argument(s)"),
         ("(program (X) (defun fun (A . B) N) (fun))", "at least 1 argument(s)"),
         ("(program (X) (q . X))", "'X' in quoted content"),

@@ -78,6 +78,7 @@ from .compiler import (
     Definitions,
     bind_values,
     compile_expression,
+    constant_text,
     declaration_keyword,
     first_symbol,
     included_declarations,
@@ -438,7 +439,8 @@ class BitLispShell(cmd.Cmd):
         for name in sorted(self.names):
             print(f"{name} = {self._node_text(self.names[name])}")
         for name in sorted(self.defs.constants):
-            print(f"(defconstant {name} {source_text(self.defs.constants[name])})")
+            value = constant_text(self.defs.constants[name])
+            print(f"(defconstant {name} {value})")
         for name in sorted(self.defs.functions):
             params, body, _ = self.defs.functions[name]
             print(f"(defun {name} {source_text(params)} {source_text(body)})")
