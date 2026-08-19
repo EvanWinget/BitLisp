@@ -61,6 +61,8 @@ descriptions, and commit messages*
 
 **Done 2026-08-09:** 184 tests, 984 vector cases, lint and diff harness clean at a fresh seed. Owed forward: the fresh-reader predictability exercise transfers to Phase 5 hostile-review preparation.
 
+- [ ] **Amendment, tapleaf commitment (2026-08-18, decision by Evan, skeleton change under ground rule 6):** the rule 3 specifier table gains the executing leaf's tapleaf hash. Commitment values widen to 4 bits, values 8 to 15 being values 0 to 7 plus the tapleaf with its operand first, the mode repacking as sender times 16 plus receiver, announcements sharing the table. Taproot splits Chia's puzzle-hash identity into the coin's script commitment and the executing program, and the C9 mapping carried only the first. Own PR after PR 57 merges and before the payment pool, with spec, implementation, and vector commits separate, packed-mode constants re-encoded in the same PR, and the decision plus the grafted-leaf caveat recorded in `docs/condition-record.md`. Merkle-root and internal-key addressing stay declined candidates.
+
 **Claude Code fit:** strong. Design decisions stay in Fable 5 sessions and land in spec prose first; Claude Code implements and generates vectors.
 
 ---
