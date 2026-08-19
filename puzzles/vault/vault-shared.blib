@@ -8,6 +8,13 @@
 (
   (include "curry-hash.blib")
 
+  ; Every signed message list opens with one of these tags, so the
+  ; trigger and recovery authorizations live in disjoint digest
+  ; domains even for an operator who curries the same key into both
+  ; roles, instead of resting on the two lists' shapes differing.
+  (defconstant TRIGGER_SIG_TAG 1)
+  (defconstant RECOVERY_SIG_TAG 2)
+
   ; The curried tree hash of the triggered program over its six fixed
   ; values, the merkle root of a triggered coin. The vault program
   ; computes it to create a triggered coin, and the triggered program
@@ -31,7 +38,7 @@
       (c (list CREATE_OUTPUT RSPK RECOVER_AMT)
          (if RKEY
              (list (list ASSERT_SIG_MY_OUTPOINT RKEY
-                         (sha256tree (list MY_AMT RECOVER_AMT))
+                         (sha256tree (list RECOVERY_SIG_TAG MY_AMT RECOVER_AMT))
                          (f EXTRA)))
              ()))))))
 )

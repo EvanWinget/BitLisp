@@ -42,10 +42,13 @@
 
   ; The same first-spend well-formedness check as the vault, for a
   ; triggered instance curried directly rather than through a
-  ; well-formed vault's trigger.
+  ; well-formed vault's trigger, minimal delay encoding included.
   (assert (or (not RECOVERY_KEY) (= (strlen RECOVERY_KEY) 32))
+          (> (strlen RECOVERY_SPK) 0)
+          (not (> (strlen RECOVERY_SPK) 10000))
           (not (> 0 DELAY))
           (not (> DELAY 65535))
+          (= DELAY (+ DELAY 0))
           (= (strlen TARGET_HASH) 32)
     (dispatch INTERNAL_KEY RECOVERY_SPK RECOVERY_KEY DELAY TARGET_HASH
       (triggered-root TRIG_MOD_HASH INTERNAL_KEY RECOVERY_SPK

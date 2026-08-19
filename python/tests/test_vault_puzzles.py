@@ -59,10 +59,10 @@ AUX = b"\x00" * 32
 # so any source change is a deliberate re-pin of both literals and
 # the vector files.
 VAULT_MOD_HASH = bytes.fromhex(
-    "723f648e3bbed95923915c77e6da120c82e58e8d15eec94e91bc9270cfbd1d2a"
+    "15884715af56b2851e9e1359b11d7090623168ddc2d84fc4785b75e904c2294f"
 )
 TRIG_MOD_HASH = bytes.fromhex(
-    "2873476587df1924f19def3a43b1f80e78d08dbad32a62c48c293d2a0229e3cb"
+    "214b0347c7df10d8d7c95769dd4cc3e0fdcee183b281b3d96ebda71bb739ec1b"
 )
 
 VAULT_NODE, _ = compile_program((PUZZLES / "vault" / "vault.bl").read_text(), INCLUDES)
@@ -118,7 +118,7 @@ def sig_my_outpoint(sk, txid, index, message_node):
 
 
 def trigger_solution(sk, txid, index, target, trig_amt, revault_amt, my_amt):
-    msg = assemble(f"(0x{target.hex()} {trig_amt} {revault_amt})")
+    msg = assemble(f"(1 0x{target.hex()} {trig_amt} {revault_amt})")
     sig = sig_my_outpoint(sk, txid, index, msg)
     return assemble(
         f"(1 0x{target.hex()} {trig_amt} {revault_amt} {my_amt} 0x{sig.hex()})"
@@ -274,6 +274,33 @@ def test_malformed_instance_fails_every_path():
         ],
     )[0]
     assert path_raises(overlong_delay, f"(3 0x{VSPK.hex()})") == "user_raise"
+    nil_recovery_spk = instance(
+        VAULT_NODE,
+        [
+            VAULT_MOD_HASH,
+            TRIG_MOD_HASH,
+            AUTH_PK,
+            NUMS,
+            b"",
+            b"",
+            int_to_atom(DELAY),
+        ],
+    )[0]
+    for solution in solutions:
+        assert path_raises(nil_recovery_spk, solution) == "user_raise"
+    padded_delay = instance(
+        VAULT_NODE,
+        [
+            VAULT_MOD_HASH,
+            TRIG_MOD_HASH,
+            AUTH_PK,
+            NUMS,
+            RECOVERY_SPK,
+            b"",
+            b"\x00\x00\x90",
+        ],
+    )[0]
+    assert path_raises(padded_delay, f"(3 0x{VSPK.hex()})") == "user_raise"
     bad_triggered = instance(
         TRIG_NODE,
         [
@@ -419,7 +446,7 @@ def test_full_lifecycle():
 
 def keyed_recovery_solution(txid, my_amt, recover_amt, sig=None):
     if sig is None:
-        msg = assemble(f"({my_amt} {recover_amt})")
+        msg = assemble(f"(2 {my_amt} {recover_amt})")
         sig = sig_my_outpoint(RKEY_SK, txid, 0, msg)
     return assemble(f"(2 {my_amt} {recover_amt} 0x{sig.hex()})")
 
@@ -442,7 +469,7 @@ def test_keyed_recovery():
     )
     # A wrong key's signature fails, and a solution missing the
     # signature dies in the VM reaching for it.
-    wrong = sig_my_outpoint(AUTH_SK, TXID, 0, assemble("(60000 60000)"))
+    wrong = sig_my_outpoint(AUTH_SK, TXID, 0, assemble("(2 60000 60000)"))
     assert (
         spend_error(
             KVAULT,
@@ -537,6 +564,35 @@ def test_consolidation_output_cannot_underpay():
     assert info.value.code == "user_raise"
 
 
+def test_same_target_withdrawals_merge_and_burn():
+    # Two matured triggered coins carrying the same target satisfy
+    # one committed output set together, and the second coin's value
+    # goes entirely to fees: the recorded consequence of SEAL_OUTPUTS
+    # leaving the input side open, which is why wallets must make
+    # every target unique.
+    wd_out = TxOutput(bytes.fromhex("0014") + b"\x22" * 20, 39_000)
+    real_target = hashlib.sha256(wd_out.wire).digest()
+    trig_inst, _, trig_spk = instance(TRIG_NODE, trig_values(b"", real_target))
+    other = TxInput(
+        b"\xce" * 32,
+        0,
+        trig_spk,
+        40_000,
+        sequence=DELAY,
+        conditions=conditions_of(trig_inst, "(1)"),
+    )
+    merged = Transaction(
+        version=2,
+        locktime=0,
+        inputs=(
+            TxInput(b"\xcc" * 32, 1, trig_spk, 40_000, sequence=DELAY),
+            other,
+        ),
+        outputs=(wd_out,),
+    )
+    run_spend(trig_inst, assemble("(1)"), merged)
+
+
 def test_unknown_path_raises():
     with pytest.raises(BitLispError) as info:
         run(VAULT, assemble("(9)"), BUDGET)
@@ -565,6 +621,22 @@ def test_vm_vectors_match_source():
             int_to_atom(65_536),
         ],
     )[0]
+    nil_recovery_spk = instance(
+        VAULT_NODE,
+        [VAULT_MOD_HASH, TRIG_MOD_HASH, AUTH_PK, NUMS, b"", b"", int_to_atom(DELAY)],
+    )[0]
+    padded_delay = instance(
+        VAULT_NODE,
+        [
+            VAULT_MOD_HASH,
+            TRIG_MOD_HASH,
+            AUTH_PK,
+            NUMS,
+            RECOVERY_SPK,
+            b"",
+            b"\x00\x00\x90",
+        ],
+    )[0]
     by_program = {
         "vault_trigger_no_revault": VAULT,
         "vault_trigger_with_revault": VAULT,
@@ -579,6 +651,8 @@ def test_vm_vectors_match_source():
         "vault_trigger_zero_amount": VAULT,
         "vault_malformed_recovery_key_unspendable": malformed_rkey,
         "vault_overlong_delay_unspendable": overlong_delay,
+        "vault_nil_recovery_spk_unspendable": nil_recovery_spk,
+        "vault_padded_delay_unspendable": padded_delay,
         "vault_lead_no_followers": VAULT,
         "vault_unknown_path": VAULT,
     }
@@ -608,7 +682,9 @@ def test_validation_vectors_match_source():
     trig_nr = emitted_hex(
         VAULT, trigger_solution(AUTH_SK, TXID, 0, TARGET, 60_000, 0, 60_000)
     )
-    nr_sig = sig_my_outpoint(AUTH_SK, TXID, 0, assemble(f"(0x{TARGET.hex()} 60000 0)"))
+    nr_sig = sig_my_outpoint(
+        AUTH_SK, TXID, 0, assemble(f"(1 0x{TARGET.hex()} 60000 0)")
+    )
     flipped = bytes([nr_sig[0] ^ 0x01]) + nr_sig[1:]
     wd_out = TxOutput(bytes.fromhex("0014") + b"\x22" * 20, 39_000)
     real_target = hashlib.sha256(wd_out.wire).digest()

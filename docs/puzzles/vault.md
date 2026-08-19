@@ -50,12 +50,21 @@ and `bitlisp-uncurry` plus the `-T` flag exist for it.
 
 What the programs do check, on every path of both states, is that
 each fixed value sits inside its domain: the authorization key is
-32 bytes, the recovery key is nil or 32 bytes, the delay is 0 to
-65535, and the triggered state's target hash is 32 bytes. Without
-these guards a value outside its domain would break a single path
-at spend time while the others kept working, a quietly lost
-recovery path being the worst case. With them a malformed instance
-fails on its first spend of any kind, before it has a history.
+32 bytes, the recovery key is nil or 32 bytes, the recovery
+scriptPubKey is 1 to 10000 bytes, the delay is 0 to 65535 and
+minimally encoded, and the triggered state's target hash is 32
+bytes. Without these guards a value outside its domain would break
+a single path at spend time while the others kept working, a
+quietly lost recovery path being the worst case, and the recovery
+scriptPubKey is exactly the value whose failure is that worst
+case: nil is the legitimate spelling for the adjacent recovery
+key, and an instance curried with a nil recovery scriptPubKey
+would trigger, revault, and consolidate perfectly while the panic
+button alone was dead. The minimality clause exists because a
+padded delay encoding reads as the same number in these guards but
+is rejected by the sequence assert it feeds, which would brick
+withdrawal alone. With the guards a malformed instance fails on
+its first spend of any kind, before it has a history.
 
 This identity convention is a recorded stand-in: the Phase 4
 commitment scheme decides how programs are really committed under
@@ -114,11 +123,15 @@ a worthless zero-value one. Emitted conditions:
 1. `ASSERT_MY_TAPROOT INTERNAL_KEY <vault root>`
 2. `ASSERT_MY_AMOUNT MY_AMT`
 3. `ASSERT_SIG_MY_OUTPOINT AUTH_KEY <digest message> SIG` where the
-   message is the tree hash of `(TARGET TRIG_AMT REVAULT_AMT)`. The
-   digest binds the consumed outpoint, so an authorization cannot
-   be replayed onto a sibling coin of the same instance, and it
-   binds the target and both amounts, so a captured signature
-   authorizes exactly one trigger shape.
+   message is the tree hash of `(1 TARGET TRIG_AMT REVAULT_AMT)`,
+   the leading 1 the trigger's signing-domain tag. The digest binds
+   the consumed outpoint, so an authorization cannot be replayed
+   onto a sibling coin of the same instance, and it binds the
+   target and both amounts, so a captured signature authorizes
+   exactly one trigger shape. The tag keeps trigger and recovery
+   authorizations in disjoint domains even for an operator who
+   curries one key into both roles, instead of resting on the two
+   message lists' shapes happening to differ.
 4. `CREATE_OUTPUT_TAPROOT INTERNAL_KEY <triggered root> TRIG_AMT`,
    the triggered root computed over the carried-over values plus
    `TARGET`.
@@ -131,8 +144,9 @@ a trailing signature when `RECOVERY_KEY` is set. The program
 rejects `MY_AMT > RECOVER_AMT`. Emitted conditions: the taproot
 assert, `ASSERT_MY_AMOUNT MY_AMT`, and
 `CREATE_OUTPUT RECOVERY_SPK RECOVER_AMT`, plus
-`ASSERT_SIG_MY_OUTPOINT RECOVERY_KEY <tree hash of (MY_AMT
-RECOVER_AMT)> SIG` in the keyed posture. A recovery moves at least
+`ASSERT_SIG_MY_OUTPOINT RECOVERY_KEY <tree hash of (2 MY_AMT
+RECOVER_AMT)> SIG` in the keyed posture, the leading 2 the
+recovery signing-domain tag. A recovery moves at least
 the coin's full value to the fixed recovery destination and
 nowhere else. Keyless recovery lets any watcher sweep a coin under
 attack without holding a key, at the cost of value-preserving
@@ -169,7 +183,11 @@ transaction to the committed set and nothing else, so the
 withdrawal pays exactly the outputs `TARGET_HASH` names while
 anyone may add a fee input to a stuck withdrawal. The seal operand
 is curried, committed in the scriptPubKey, so the unsigned-seal
-footgun of solution-supplied seals does not apply.
+footgun of solution-supplied seals does not apply. The open input
+side cuts the other way too: two triggered coins carrying the same
+target hash satisfy one output set together and the second coin's
+value burns to fees, the recorded divergence below, so a wallet
+never reuses a target.
 
 **Path 2, recovery.** Identical to the vault's recovery path with
 the triggered root in the taproot assert, available at any time
@@ -201,12 +219,31 @@ Recorded divergences from BIP-345:
   never sums, so per-input triggers compose in one transaction
   with one triggered output each, and the summing instrument in
   this vocabulary is the consolidation message ledger below.
-- Withdrawal batching is what `SEAL_OUTPUTS` allows: spends
-  committing to the same target can share a transaction, and
-  nothing else can add an output to it.
-- The BIP's fee posture survives: vault value never pays fees, and
-  fee inputs attach freely because the seal and the claims
-  constrain outputs, not inputs.
+- `SEAL_OUTPUTS` drops the input-side commitment BIP-345 inherits
+  from CTV's template hash, and that loss has a consequence, not
+  just a flexibility gain. The gain: fee inputs attach freely to a
+  stuck withdrawal. The consequence: the withdrawal path is
+  keyless, and the seal explicitly leaves which inputs exist
+  unconstrained, so two matured triggered coins carrying the same
+  target hash can be spent in one transaction where the single
+  committed output set satisfies both seals and the second coin's
+  entire value becomes fee. Anyone may build that transaction, and
+  a miner profits from building it. CTV's input-count commitment
+  is exactly the known half-spend protection, and this construction
+  does not have it. Wallets must therefore never produce two
+  triggered coins with the same target hash: make every target
+  unique, by perturbing an output amount, adding a per-trigger salt
+  output, or simply never re-triggering an unspent target. The
+  merge-and-burn transaction is pinned as the vector
+  `same_target_withdrawals_merge_second_burns`, expected valid,
+  because the validator accepts it and the defense is the wallet
+  rule. A seal variant that also commits the input count would
+  close this at the vocabulary level and is flagged for a spec
+  decision outside this unit.
+- The BIP's fee posture otherwise survives: no vault path can pay
+  vault value out as fees on its own, and fee inputs attach freely
+  because the seal and the claims constrain outputs, not inputs.
+  The same-target merge above is the recorded exception.
 
 ## The consolidation construction
 
@@ -292,9 +329,9 @@ The mod hashes, pinned in `python/tests/test_vault_puzzles.py`:
 
 ```
 $ bitlisp-compile -T puzzles/vault/vault.bl -I puzzles/lib -I puzzles/vault
-723f648e3bbed95923915c77e6da120c82e58e8d15eec94e91bc9270cfbd1d2a
+15884715af56b2851e9e1359b11d7090623168ddc2d84fc4785b75e904c2294f
 $ bitlisp-compile -T puzzles/vault/triggered.bl -I puzzles/lib -I puzzles/vault
-2873476587df1924f19def3a43b1f80e78d08dbad32a62c48c293d2a0229e3cb
+214b0347c7df10d8d7c95769dd4cc3e0fdcee183b281b3d96ebda71bb739ec1b
 ```
 
 An instance's merkle root is the curried tree hash, printable
