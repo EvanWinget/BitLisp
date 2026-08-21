@@ -38,8 +38,8 @@ the operands a seal carries never feed back into the quantity
 they are compared against.
 
 Rule 3, message scoping: the addressed pair contributes signed
-weights to a per-transaction ledger keyed by (sender specifier,
-receiver specifier, message), and every key must net to zero.
+weights to a per-transaction ledger keyed by (assurer specifier,
+requirer specifier, message), and every key must net to zero.
 Balance is a sum, so the check is order-free and two balanced
 groups of inputs stay balanced when spent together. Announcements
 are ordinary asserts over facts other inputs create: existence is
@@ -69,13 +69,13 @@ from .conditions import (
     AssertSequenceHeight,
     AssertSequenceTime,
     AssertSig,
+    Assure,
     CreateOutput,
     CreateOutputTaproot,
-    ReceiveMessage,
+    Require,
     ReserveFee,
     Seal,
     SealOutputs,
-    SendMessage,
     Specifier,
 )
 from .errors import BitLispError
@@ -231,9 +231,12 @@ def check_self_asserts(tx):
 
 
 def self_specifier(tx_input, commitment):
-    """The input's own prevout data at a commitment value: what a
-    SEND or RECEIVE says about its emitting input, and what an
-    announcement assert compares its announcer operands against."""
+    """The input's own prevout data and execution identity at a
+    commitment value: what an ASSURE or REQUIRE says about its
+    emitting input, and what an announcement assert compares its
+    announcer operands against. Only condition-carrying inputs emit
+    conditions, and those carry both execution-identity fields by
+    the transaction model's construction rule."""
     fields = []
     for kind in SPECIFIER_OPERANDS[commitment]:
         if kind == "txid":
@@ -242,24 +245,28 @@ def self_specifier(tx_input, commitment):
             fields.append(tx_input.script_pubkey)
         elif kind == "amount":
             fields.append(tx_input.amount)
+        elif kind == "tapleaf":
+            fields.append(tx_input.tapleaf)
+        elif kind == "merkle_root":
+            fields.append(tx_input.merkle_root)
         else:
             fields.append(tx_input.txid + tx_input.index.to_bytes(4, "little"))
     return Specifier(commitment, tuple(fields))
 
 
 def check_messages(tx):
-    """Rule 3, the message ledger. Every distinct (sender specifier,
-    receiver specifier, payload) record must net to zero across the
+    """Rule 3, the message ledger. Every distinct (assurer specifier,
+    requirer specifier, payload) record must net to zero across the
     whole transaction, sends counting +1 and receives -1."""
     ledger = Counter()
     for tx_input in tx.inputs:
         for cond in tx_input.conditions or ():
-            if isinstance(cond, SendMessage):
-                sender = self_specifier(tx_input, cond.sender_commitment)
-                ledger[(sender, cond.receiver, cond.message)] += 1
-            elif isinstance(cond, ReceiveMessage):
-                receiver = self_specifier(tx_input, cond.receiver_commitment)
-                ledger[(cond.sender, receiver, cond.message)] -= 1
+            if isinstance(cond, Assure):
+                assurer = self_specifier(tx_input, cond.assurer_commitment)
+                ledger[(assurer, cond.requirer, cond.message)] += 1
+            elif isinstance(cond, Require):
+                requirer = self_specifier(tx_input, cond.requirer_commitment)
+                ledger[(cond.assurer, requirer, cond.message)] -= 1
     for (_, _, message), weight in ledger.items():
         if weight != 0:
             raise BitLispError(

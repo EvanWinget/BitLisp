@@ -48,7 +48,11 @@ class TxInput:
     """One input: the outpoint it consumes, that output's content, the
     sequence, and the legacy scriptSig, empty for every segwit input.
     conditions is None for a non-BitLisp input, else the parsed
-    condition list its program evaluation produced."""
+    condition list its program evaluation produced. A BitLisp input
+    also carries its execution identity, the pair base consensus
+    authenticates against the spent scriptPubKey through the control
+    block: tapleaf, the executing leaf's leaf hash, and merkle_root,
+    the spending path's root."""
 
     txid: bytes
     index: int
@@ -57,6 +61,8 @@ class TxInput:
     sequence: int
     conditions: tuple | None = None
     script_sig: bytes = b""
+    tapleaf: bytes | None = None
+    merkle_root: bytes | None = None
 
     def __post_init__(self):
         if not isinstance(self.txid, bytes) or len(self.txid) != 32:
@@ -71,6 +77,16 @@ class TxInput:
             raise ValueError("conditions must be a tuple or None")
         if not isinstance(self.script_sig, bytes):
             raise ValueError("scriptSig must be bytes")
+        for name in ("tapleaf", "merkle_root"):
+            value = getattr(self, name)
+            if value is not None and (not isinstance(value, bytes) or len(value) != 32):
+                raise ValueError(f"{name} must be 32 bytes")
+        if self.conditions is not None and (
+            self.tapleaf is None or self.merkle_root is None
+        ):
+            raise ValueError(
+                "a condition-carrying input must carry tapleaf and merkle_root"
+            )
 
     @property
     def outpoint(self):

@@ -33,14 +33,14 @@ from bitlisp.conditions import (
     AssertSequenceHeight,
     AssertSequenceTime,
     AssertSig,
+    Assure,
     CreateOutput,
     CreateOutputTaproot,
-    ReceiveMessage,
+    Require,
     Reserved,
     ReserveFee,
     Seal,
     SealOutputs,
-    SendMessage,
     Specifier,
 )
 
@@ -71,8 +71,12 @@ def load_context(obj):
     The shape is the validation corpus's, closed at every level:
     version, locktime, inputs, and outputs exactly, each input with
     txid, index, script_pubkey, and amount plus optional sequence,
-    conditions, and script_sig, each output with script_pubkey and
-    amount exactly. Byte fields are plain hex strings.
+    conditions, script_sig, tapleaf, and merkle_root, each output
+    with script_pubkey and amount exactly. Byte fields are plain hex
+    strings. The transaction model requires the execution-identity
+    pair on every condition-carrying input, and the runner's target
+    input needs it too, since conditions are installed there after
+    evaluation.
 
     A carried conditions field is an already-evaluated serialized
     condition list. One that does not deserialize is a shape defect,
@@ -96,7 +100,13 @@ def load_context(obj):
         if not isinstance(entry, dict):
             raise ContextError("each input must be a JSON object")
         entry_required = {"txid", "index", "script_pubkey", "amount"}
-        entry_optional = {"sequence", "conditions", "script_sig"}
+        entry_optional = {
+            "sequence",
+            "conditions",
+            "script_sig",
+            "tapleaf",
+            "merkle_root",
+        }
         entry_keys = set(entry)
         if missing := entry_required - entry_keys:
             raise ContextError(f"input missing keys {sorted(missing)}")
@@ -135,6 +145,14 @@ def load_context(obj):
                     sequence=_int_field(entry.get("sequence", 0xFFFFFFFF), "sequence"),
                     conditions=conditions,
                     script_sig=bytes.fromhex(entry.get("script_sig", "")),
+                    tapleaf=(
+                        bytes.fromhex(entry["tapleaf"]) if "tapleaf" in entry else None
+                    ),
+                    merkle_root=(
+                        bytes.fromhex(entry["merkle_root"])
+                        if "merkle_root" in entry
+                        else None
+                    ),
                 )
                 for entry, conditions in decoded_inputs
             ),
@@ -160,9 +178,10 @@ def run_spend(program, solution, tx, input_index=0, max_cost=DEFAULT_MAX_COST):
     accrued total across evaluation and parsing.
 
     Raises BitLispError when the spend is invalid, and ContextError
-    when the selection is unusable: an index out of range, or a
+    when the selection is unusable: an index out of range, a
     target input that already carries conditions, since the runner
-    exists to compute them.
+    exists to compute them, or a target missing the
+    execution-identity pair its computed conditions will require.
     """
     if not 0 <= input_index < len(tx.inputs):
         raise ContextError(
@@ -171,6 +190,11 @@ def run_spend(program, solution, tx, input_index=0, max_cost=DEFAULT_MAX_COST):
     target = tx.inputs[input_index]
     if target.conditions is not None:
         raise ContextError(f"input {input_index} already carries conditions")
+    if target.tapleaf is None or target.merkle_root is None:
+        raise ContextError(
+            f"input {input_index} must carry tapleaf and merkle_root, the "
+            "executing input's identity"
+        )
     vm_cost, result = run(program, solution, max_cost)
     total_cost, conditions = parse_conditions(result, max_cost, cost=vm_cost)
     inputs = list(tx.inputs)
@@ -195,8 +219,8 @@ _CONDITION_NAMES = {
     AssertMyTaproot: "ASSERT_MY_TAPROOT",
     Announce: "ANNOUNCE",
     AssertAnnouncement: "ASSERT_ANNOUNCEMENT",
-    SendMessage: "SEND_MESSAGE",
-    ReceiveMessage: "RECEIVE_MESSAGE",
+    Assure: "ASSURE",
+    Require: "REQUIRE",
     ReserveFee: "RESERVE_FEE",
     Seal: "SEAL",
     SealOutputs: "SEAL_OUTPUTS",

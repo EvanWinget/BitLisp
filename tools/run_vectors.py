@@ -150,14 +150,14 @@ def _condition_json(cond):
         AssertSequenceHeight,
         AssertSequenceTime,
         AssertSig,
+        Assure,
         CreateOutput,
         CreateOutputTaproot,
-        ReceiveMessage,
+        Require,
         Reserved,
         ReserveFee,
         Seal,
         SealOutputs,
-        SendMessage,
     )
 
     if isinstance(cond, AssertLocktimeHeight):
@@ -217,18 +217,18 @@ def _condition_json(cond):
             "namespace": cond.namespace.hex(),
             "payload": cond.payload.hex(),
         }
-    if isinstance(cond, SendMessage):
+    if isinstance(cond, Assure):
         return {
             "opcode": cond.opcode,
-            "sender_commitment": cond.sender_commitment,
-            "receiver": _specifier_json(cond.receiver),
+            "assurer_commitment": cond.assurer_commitment,
+            "requirer": _specifier_json(cond.requirer),
             "message": cond.message.hex(),
         }
-    if isinstance(cond, ReceiveMessage):
+    if isinstance(cond, Require):
         return {
             "opcode": cond.opcode,
-            "sender": _specifier_json(cond.sender),
-            "receiver_commitment": cond.receiver_commitment,
+            "assurer": _specifier_json(cond.assurer),
+            "requirer_commitment": cond.requirer_commitment,
             "message": cond.message.hex(),
         }
     if isinstance(cond, ReserveFee):
@@ -283,9 +283,9 @@ def run_conditions_case(case):
     with fields in operand order, amounts as integers, all other
     fields hex. ANNOUNCE is {"opcode", "namespace", "payload"},
     ASSERT_ANNOUNCEMENT adds "announcer" (a specifier),
-    SEND_MESSAGE is {"opcode", "sender_commitment", "receiver",
-    "message"}, and RECEIVE_MESSAGE is {"opcode", "sender",
-    "receiver_commitment", "message"}.
+    ASSURE is {"opcode", "assurer_commitment", "requirer",
+    "message"}, and REQUIRE is {"opcode", "assurer",
+    "requirer_commitment", "message"}.
 
     RESERVE_FEE pins {"opcode", "reserve"} with the reserve as an
     integer.
@@ -342,7 +342,9 @@ def run_validation_case(case):
                             "script_pubkey": "<hex>", "amount": <int>,
                             "sequence": <int, optional, default 0xffffffff>,
                             "script_sig": "<hex, optional, default empty>",
-                            "conditions": "<hex node, optional>"}],
+                            "conditions": "<hex node, optional>",
+                            "tapleaf": "<32-byte hex, required with conditions>",
+                            "merkle_root": "<32-byte hex, required with conditions>"}],
                 "outputs": [{"script_pubkey": "<hex>", "amount": <int>}]
             },
             "expect": {"valid": true} or {"error": "<bitlisp error code>"}
