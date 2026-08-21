@@ -1,0 +1,141 @@
+; The vault program: the resting state of a vaulted coin.
+;
+; A vault instance is this program curried with its seven fixed
+; values, and its coin's scriptPubKey is the taproot output of
+; INTERNAL_KEY tweaked with the curried program's tree hash. Every
+; path recomputes that hash and asserts it against the coin being
+; spent, which rejects running one instance's program against
+; another instance's coin. It cannot check that the curried values
+; are the ones the author intended: a coin funded from a wrong
+; curry is governed by that wrong curry. The solution is
+; (PATH . ARGS).
+;
+; Paths:
+;   1 trigger        AUTH_KEY signs the withdrawal target chosen at
+;                    spend time, value moves to a triggered coin,
+;                    any remainder revaults to this same instance
+;   2 recovery       value moves to RECOVERY_SPK, keyless when
+;                    RECOVERY_KEY is nil
+;   3 follower       joins a consolidation led by another input
+;   4 leader         merges this coin with at least one follower
+;                    back into a single coin of this same instance
+;
+; Consolidation is keyless: the follower's message names its own
+; scriptPubKey and amount from real prevout data, the leader must
+; receive exactly one such message per follower it sums, and the
+; message ledger balances only when the leader's list matches the
+; followers present, so the merged output can never pay less than
+; every merged coin's value.
+(program (VAULT_MOD_HASH TRIG_MOD_HASH AUTH_KEY INTERNAL_KEY
+          RECOVERY_SPK RECOVERY_KEY DELAY PATH . ARGS)
+  (include "curry-hash.blib")
+  (include "vault-shared.blib")
+
+  (defconstant TRIGGER_PATH 1)
+  (defconstant RECOVER_PATH 2)
+  (defconstant FOLLOW_PATH 3)
+  (defconstant LEAD_PATH 4)
+
+  ; Sender half 3 commits the sending input's own scriptPubKey and
+  ; amount, receiver half 2 addresses a scriptPubKey argument.
+  (defconstant CONSOLIDATE_MODE (+ (* 8 3) 2))
+  (defconstant CONSOLIDATE_PAYLOAD ())
+
+  ; This instance's own curried tree hash, the merkle root its
+  ; coin's scriptPubKey commits to.
+  (defun vault-root (VMH TMH AK IK RSPK RKEY DELAY)
+    (curried-tree-hash VMH
+      (list (sha256tree VMH) (sha256tree TMH) (sha256tree AK)
+            (sha256tree IK) (sha256tree RSPK) (sha256tree RKEY)
+            (sha256tree DELAY))))
+
+  ; The trigger commits TRIG_AMT to a triggered coin carrying TARGET
+  ; and revaults any remainder to this same instance. The signature
+  ; digest binds the consumed outpoint, so an authorization cannot be
+  ; replayed onto another coin of this instance, and its message
+  ; hashes the target and both amounts, so none of them can be
+  ; rewritten under a captured signature. The amount guards hold
+  ; even against a misbehaving signer: the trigger amount is
+  ; positive, the revault amount is never negative, and a malformed
+  ; target would mint a coin whose withdrawal seal can never parse.
+  (defun trigger-path (TMH AK IK RSPK RKEY DELAY VROOT
+                       (TARGET TRIG_AMT REVAULT_AMT MY_AMT SIG))
+    (assert (= (strlen TARGET) 32)
+            (> TRIG_AMT 0)
+            (not (> 0 REVAULT_AMT))
+            (not (> MY_AMT (+ TRIG_AMT REVAULT_AMT)))
+      (c (list ASSERT_MY_TAPROOT IK VROOT)
+      (c (list ASSERT_MY_AMOUNT MY_AMT)
+      (c (list ASSERT_SIG_MY_OUTPOINT AK
+               (sha256tree (list TRIGGER_SIG_TAG TARGET TRIG_AMT REVAULT_AMT))
+               SIG)
+      (c (list CREATE_OUTPUT_TAPROOT IK
+               (triggered-root TMH IK RSPK RKEY DELAY TARGET) TRIG_AMT)
+         (if (> REVAULT_AMT 0)
+             (list (list CREATE_OUTPUT_TAPROOT IK VROOT REVAULT_AMT))
+             ())))))))
+
+  ; No operator derives the 34-byte taproot scriptPubKey, so the
+  ; shared scriptPubKey arrives in the solution and is proven equal
+  ; to the coin's own before it addresses or receives anything.
+  (defun follow-path (VROOT IK (MY_SPK))
+    (list
+      (list ASSERT_MY_TAPROOT IK VROOT)
+      (list ASSERT_MY_SCRIPTPUBKEY MY_SPK)
+      (list SEND_MESSAGE CONSOLIDATE_MODE CONSOLIDATE_PAYLOAD MY_SPK)))
+
+  (defun sum-amounts (AMOUNTS)
+    (if AMOUNTS (+ (f AMOUNTS) (sum-amounts (r AMOUNTS))) 0))
+
+  (defun receive-conditions (SPK AMOUNTS TAIL)
+    (if AMOUNTS
+        (c (list RECEIVE_MESSAGE CONSOLIDATE_MODE CONSOLIDATE_PAYLOAD
+                 SPK (f AMOUNTS))
+           (receive-conditions SPK (r AMOUNTS) TAIL))
+        TAIL))
+
+  ; A leader without followers is rejected, so every consolidation
+  ; merges at least two coins: a conflicting consolidation an
+  ; adversary substitutes still merges the coins it consumes, and
+  ; no keyless path can split a coin's value.
+  (defun lead-path (VROOT IK (MY_SPK MY_AMT OUT_AMT FOLLOWER_AMOUNTS))
+    (assert FOLLOWER_AMOUNTS
+            (not (> (+ MY_AMT (sum-amounts FOLLOWER_AMOUNTS)) OUT_AMT))
+      (c (list ASSERT_MY_TAPROOT IK VROOT)
+      (c (list ASSERT_MY_SCRIPTPUBKEY MY_SPK)
+      (c (list ASSERT_MY_AMOUNT MY_AMT)
+         (receive-conditions MY_SPK FOLLOWER_AMOUNTS
+           (list (list CREATE_OUTPUT MY_SPK OUT_AMT))))))))
+
+  ; Exists to name VROOT once for every branch.
+  (defun dispatch (TMH AK IK RSPK RKEY DELAY VROOT PATH ARGS)
+    (if (= PATH TRIGGER_PATH)
+        (trigger-path TMH AK IK RSPK RKEY DELAY VROOT ARGS)
+    (if (= PATH RECOVER_PATH)
+        (recovery-conditions IK VROOT RSPK RKEY ARGS)
+    (if (= PATH FOLLOW_PATH)
+        (follow-path VROOT IK ARGS)
+    (if (= PATH LEAD_PATH)
+        (lead-path VROOT IK ARGS)
+        (x))))))
+
+  ; A malformed fixed value would break one path at spend time
+  ; while the others keep working, a quietly lost recovery being
+  ; the worst case, so every path checks the value widths, the
+  ; recovery script bounds, and the delay domain first and a
+  ; malformed instance fails on its first spend of any kind. The
+  ; delay must also be minimally encoded: a padded encoding reads
+  ; as the same number here but the sequence assert it feeds
+  ; rejects it, which would brick withdrawal alone.
+  (assert (= (strlen AUTH_KEY) 32)
+          (or (not RECOVERY_KEY) (= (strlen RECOVERY_KEY) 32))
+          (> (strlen RECOVERY_SPK) 0)
+          (not (> (strlen RECOVERY_SPK) 10000))
+          (not (> 0 DELAY))
+          (not (> DELAY 65535))
+          (= DELAY (+ DELAY 0))
+    (dispatch TRIG_MOD_HASH AUTH_KEY INTERNAL_KEY RECOVERY_SPK
+              RECOVERY_KEY DELAY
+      (vault-root VAULT_MOD_HASH TRIG_MOD_HASH AUTH_KEY INTERNAL_KEY
+                  RECOVERY_SPK RECOVERY_KEY DELAY)
+      PATH ARGS)))

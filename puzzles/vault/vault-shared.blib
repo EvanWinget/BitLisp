@@ -1,0 +1,44 @@
+; Declarations shared by the vault program and the triggered program.
+;
+; Both programs identify a coin the same way: the coin's scriptPubKey
+; is the taproot output of a fixed internal key tweaked with the tree
+; hash of the governing curried program, the derivation
+; CREATE_OUTPUT_TAPROOT and ASSERT_MY_TAPROOT perform in the
+; validator.
+(
+  (include "curry-hash.blib")
+
+  ; Every signed message list opens with one of these tags, so the
+  ; trigger and recovery authorizations live in disjoint digest
+  ; domains even for an operator who curries the same key into both
+  ; roles, instead of resting on the two lists' shapes differing.
+  (defconstant TRIGGER_SIG_TAG 1)
+  (defconstant RECOVERY_SIG_TAG 2)
+
+  ; The curried tree hash of the triggered program over its six fixed
+  ; values, the merkle root of a triggered coin. The vault program
+  ; computes it to create a triggered coin, and the triggered program
+  ; computes it over its own curried values to recognize itself.
+  (defun triggered-root (TMH IK RSPK RKEY DELAY TARGET)
+    (curried-tree-hash TMH
+      (list (sha256tree TMH) (sha256tree IK) (sha256tree RSPK)
+            (sha256tree RKEY) (sha256tree DELAY) (sha256tree TARGET))))
+
+  ; The recovery spend, shared by both states. It pays the fixed
+  ; recovery scriptPubKey at least the coin's own pinned amount, so a
+  ; recovery moves value only to the recovery destination. RKEY nil
+  ; makes the path keyless. A 32-byte RKEY demands a signature over
+  ; the outpoint-bound digest of both amounts, so a keyed recovery
+  ; cannot be replayed onto another coin or rewritten to different
+  ; amounts.
+  (defun recovery-conditions (IK ROOT RSPK RKEY (MY_AMT RECOVER_AMT . EXTRA))
+    (assert (not (> MY_AMT RECOVER_AMT))
+      (c (list ASSERT_MY_TAPROOT IK ROOT)
+      (c (list ASSERT_MY_AMOUNT MY_AMT)
+      (c (list CREATE_OUTPUT RSPK RECOVER_AMT)
+         (if RKEY
+             (list (list ASSERT_SIG_MY_OUTPOINT RKEY
+                         (sha256tree (list RECOVERY_SIG_TAG MY_AMT RECOVER_AMT))
+                         (f EXTRA)))
+             ()))))))
+)
