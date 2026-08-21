@@ -36,11 +36,10 @@
   (defconstant FOLLOW_PATH 3)
   (defconstant LEAD_PATH 4)
 
-  ; Assurer half 3 commits the assuring input's own scriptPubKey
-  ; and amount, requirer half 2 addresses a scriptPubKey argument.
-  ; Each half is a five-bit commitment value, the mode their
-  ; packing.
-  (defconstant CONSOLIDATE_MODE (+ (* 32 3) 2))
+  ; spk_amount-spk: assurer half 3 commits the assuring input's own
+  ; scriptPubKey and amount, requirer half 2 addresses a
+  ; scriptPubKey argument, packed as assurer times 32 plus requirer.
+  (defconstant CONSOLIDATE_MODE 98)
   (defconstant CONSOLIDATE_PAYLOAD ())
 
   ; This instance's own curried tree hash, the merkle root its
