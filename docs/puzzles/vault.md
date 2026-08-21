@@ -155,11 +155,11 @@ management. The choice is per instance.
 
 **Path 3, consolidation follower.** ARGS is `(MY_SPK)`. Emitted
 conditions: the taproot assert, `ASSERT_MY_SCRIPTPUBKEY MY_SPK`,
-and `SEND_MESSAGE 26 () MY_SPK`. The scriptPubKey arrives in the
+and `ASSURE 98 () MY_SPK`. The scriptPubKey arrives in the
 solution because no operator derives it, and the assert proves it
-is the coin's own. Mode 26 puts the sender half at commitment 3,
-the sending input's own scriptPubKey and amount filled by the
-validator from real prevout data, and the receiver half at
+is the coin's own. Mode 98 puts the assurer half at commitment 3,
+the assuring input's own scriptPubKey and amount filled by the
+validator from real prevout data, and the requirer half at
 commitment 2, addressing the shared scriptPubKey.
 
 **Path 4, consolidation leader.** ARGS is
@@ -167,7 +167,7 @@ commitment 2, addressing the shared scriptPubKey.
 empty follower list and `MY_AMT + sum(FOLLOWER_AMOUNTS) > OUT_AMT`.
 Emitted conditions: the taproot assert,
 `ASSERT_MY_SCRIPTPUBKEY MY_SPK`, `ASSERT_MY_AMOUNT MY_AMT`, one
-`RECEIVE_MESSAGE 26 () MY_SPK <amount>` per listed follower
+`REQUIRE 98 () MY_SPK <amount>` per listed follower
 amount, and `CREATE_OUTPUT MY_SPK OUT_AMT`.
 
 An unknown path raises.
@@ -255,28 +255,29 @@ work.
 
 The spender, who needs no key, picks one coin as leader. Every
 other coin spends its follower path and sends one message
-addressed to the shared scriptPubKey, the sender half carrying its
+addressed to the shared scriptPubKey, the assurer half carrying its
 own scriptPubKey and amount from prevout data the validator fills.
-The leader lists the follower amounts in its solution, receives
+The leader lists the follower amounts in its solution, requires
 one matching message per listed amount, and claims one output
 paying the shared scriptPubKey at least its own amount plus the
 listed sum.
 
 The message ledger makes the sum honest. Message records balance
-only when k identical sends meet exactly k identical receives, so:
+only when k identical ASSURE records meet exactly k identical
+REQUIRE records, so:
 
-- An omitted follower leaves an unmatched send. Its coin cannot be
-  silently absorbed.
+- An omitted follower leaves an unmatched ASSURE. Its coin cannot
+  be silently absorbed.
 - A phantom or misstated listed amount creates an unmatched
-  receive. The sum cannot be inflated or deflated against the
+  REQUIRE. The sum cannot be inflated or deflated against the
   coins actually present.
 - Two followers of equal amount produce one record at weight two,
   and the leader must list the amount twice.
 - A hostile input at a foreign scriptPubKey cannot forge a
-  follower record, because the sender half is filled from its real
-  prevout data, and cannot intercept the followers as a fake
-  leader, because its receive records carry its own scriptPubKey
-  in the receiver half while the followers addressed the vault's.
+  follower record, because the assurer half is filled from its
+  real prevout data, and cannot intercept the followers as a fake
+  leader, because its REQUIRE records carry its own scriptPubKey
+  in the requirer half while the followers addressed the vault's.
 - A negative or non-minimal listed amount dies at condition
   parsing, before the ledger runs.
 - Two independently balanced consolidations at the same
@@ -329,7 +330,7 @@ The mod hashes, pinned in `python/tests/test_vault_puzzles.py`:
 
 ```
 $ bitlisp-compile -T puzzles/vault/vault.bl -I puzzles/lib -I puzzles/vault
-15884715af56b2851e9e1359b11d7090623168ddc2d84fc4785b75e904c2294f
+2fc2096c3167018bc0210e061d4add87f081360a77ec352bcfb1456243ca34a2
 $ bitlisp-compile -T puzzles/vault/triggered.bl -I puzzles/lib -I puzzles/vault
 214b0347c7df10d8d7c95769dd4cc3e0fdcee183b281b3d96ebda71bb739ec1b
 ```

@@ -37,6 +37,7 @@ Section 4 registers the rules that have no external reference at all.
 | C20 | the seal family | no equivalent: coin identity is content-derived from parent, program hash, and amount, so a spend's authorization is indifferent to which aggregate bundle carries it and bundles need no seal | SEAL and SEAL_OUTPUTS, asserts pinning the spending transaction's own txid and its BIP 341 outputs hash | A pure addition, not a divergence of shared semantics. Bitcoin output identity is positional: the txid commits to the whole transaction, so an intercepted covenant spend can be rebuilt around a grafted output with every condition still holding, the surplus-capture gap rule 7's acceptance vector pins. The seal is the consensus answer to the aggregation qualification in section 4.4 of the evaluation doc. Ratified 2026-08-09, decision 24. | `validation/seals.json` |
 | C21 | per-spend base cost | 450,000 (SPEND_COST) charged for each coin spend under the hard fork 2 pricing flag, before any condition's own cost | no per-spend constant, conditions alone charge | A Bitcoin input's fixed overhead, prevout fetch and per-input iteration, is work base consensus performs and prices in weight for every input of every transaction, so a cost-unit constant would charge it twice. Declined with a falsifier pre-registered: the Phase 4 measurement pass isolates per-spend overhead Chia-style, n spends of k conditions against nk conditions in fewer spends, and a measured non-byte-proportional overhead introduces the constant then, a tightening that is cheap before publication. Ratified 2026-08-09, decision 25. | `conditions/costs.json` totals contain no per-list constant |
 | C22 | signature-condition cost | 1,200,000 (AGG_SIG_COST) per occurrence in every regime, pricing one BLS pairing toward the bundle aggregate | 1,300,000 (CONDITION_SIG_ASSERT_COST), equal to the VM's SECP_VERIFY_COST, PROVISIONAL | Both layers of BitLisp price the same BIP340 verification, so the condition constant ties to the operator constant rather than to Chia's BLS figure: one Phase 4 measurement settles both, and a program can never buy the same verification cheaper in one layer than the other. Chia's magnitude corroborates the range, their pairing being work of the same order. Ratified 2026-08-09, decision 25. | `conditions/costs.json` signature cases |
+| C23 | execution-identity addressing | none: puzzle hash is both the coin's script commitment and the executing program, one field carries both meanings | the specifier table composes the executing leaf's tapleaf hash (bit 3) and the spending path's merkle root (bit 4) onto the prevout rows, commitment values 0 to 31, the mode packed as assurer times 32 plus requirer, both fields validator-filled from the control block. The pair itself is renamed ASSURE and REQUIRE (decision 27) | Taproot splits Chia's one identity into two, and the C9 mapping carried only the script commitment, so program-to-program trust had no faithful addressing field. Internal-key addressing declined as attacker-satisfiable (no possession proof in BIP341). Grafted-leaf and moved-root caveats recorded in decision 26 and in rule 3's author guidance. Ratified 2026-08-18, decision 26, landed 2026-08-20. | `validation/messages.json` identity cases, `conditions/messages.json` composed-mode cases |
 
 ## 2. Reference provenance
 
@@ -1471,6 +1472,56 @@ Section 4 registers the rules that have no external reference at all.
       mapping, and until then parse_conditions requires its
       budget argument explicitly, mirroring run, so no future
       caller can forget the budget silently.
+
+26. **Execution-identity commitment for rule 3 specifiers.**
+    RATIFIED (decision by Evan, 2026-08-18, landed 2026-08-20).
+    The specifier table gains two execution-identity fields, the
+    executing leaf's tapleaf hash (bit 3) and the spending path's
+    merkle root (bit 4), composed onto the eight prevout rows,
+    commitment values 0 to 31, the mode repacked as assurer times
+    32 plus requirer, announcements sharing the table. The
+    transaction view's BitLisp input carries both fields,
+    authenticated by base consensus against the spent scriptPubKey
+    through the control block, so every composed value is a
+    validator-filled binding puzzle authors do not hand-roll.
+    Rationale: taproot splits Chia's puzzle-hash identity into the
+    coin's script commitment and the executing program, and the C9
+    mapping carried only the first, so program-to-program trust had
+    no faithful addressing field. The widening was chosen over
+    repurposing an existing value: the uniform bit rule reads as
+    one spec sentence, every deployed-Chia combination survives,
+    and the re-encode is cheapest before anything ships. Two
+    caveats are stated in rule 3's author guidance and pinned by
+    vectors:
+    - **Grafted leaf.** A tapleaf hash identifies a program, not a
+      coin: the same leaf grafted into any other tree, under any
+      internal key, produces the same leaf hash, so a tapleaf-only
+      specifier is matched by any input an adversary arranges to
+      execute that program.
+    - **Moved root.** A merkle root identifies a tree, not an
+      output: the same tree under a different internal key produces
+      the same root. Programs meaning "this program, in that coin"
+      compose an execution-identity bit with the prevout fields
+      that pin the coin.
+    Internal-key addressing is declined on soundness rather than
+    deferred: BIP341 requires no possession proof for the internal
+    key, so anyone can place a foreign public key in their own
+    control block over their own tree, and an IPK specifier would
+    read as key-holder identity while proving nothing. Both
+    specifier fields are deliberately IPK-independent.
+
+27. **The addressed pair renamed to ASSURE and REQUIRE.** RATIFIED
+    (decision by Evan, 2026-08-20). SEND_MESSAGE and
+    RECEIVE_MESSAGE become ASSURE and REQUIRE at the unchanged
+    opcodes, and the mode halves follow: the sender half is the
+    assurer half, the receiver half the requirer half. Semantics
+    are untouched. Bitcoin-native terminology work under the
+    standing vocabulary policy: the pair reads as what each
+    condition demands of the transaction rather than as a
+    transport metaphor, which the balanced-both-ways ledger never
+    quite matched. The glossary maps Chia's CHIP-0025 names, and
+    the language-level rename is a deliberate source-compatibility
+    break pinned by the loader vocabulary.
 
 ## 4. Novel-layer register
 

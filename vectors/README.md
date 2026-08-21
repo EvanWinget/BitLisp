@@ -78,9 +78,9 @@ conditions) or `{"error": "<code>"}`. The message family pins
 specifiers as `{"commitment", "fields"}` with fields in operand
 order, amounts as integers, all other fields hex: ANNOUNCE is
 `{"opcode", "namespace", "payload"}`, ASSERT_ANNOUNCEMENT adds
-`"announcer"`, SEND_MESSAGE is `{"opcode", "sender_commitment",
-"receiver", "message"}`, RECEIVE_MESSAGE mirrors it with
-`"sender"` and `"receiver_commitment"`. Every rejection rule in
+`"announcer"`, ASSURE is `{"opcode", "assurer_commitment",
+"requirer", "message"}`, REQUIRE mirrors it with
+`"assurer"` and `"requirer_commitment"`. Every rejection rule in
 CONDITIONS.md section 1 and VALIDATION.md rule 6 has at least one case.
 
 ## validation case shape
@@ -99,7 +99,9 @@ CONDITIONS.md section 1 and VALIDATION.md rule 6 has at least one case.
                 "amount": 60000,
                 "sequence": 4294967295,
                 "script_sig": "<hex, optional>",
-                "conditions": "<hex node>"
+                "conditions": "<hex node>",
+                "tapleaf": "<hex, 32 bytes>",
+                "merkle_root": "<hex, 32 bytes>"
             }
         ],
         "outputs": [{"script_pubkey": "<hex>", "amount": 50000}]
@@ -113,7 +115,11 @@ optional and defaults to empty, the correct value for every segwit
 input: it exists because a SEAL reads legacy scriptSig bytes through
 the txid. An input without a `conditions` key is a non-BitLisp
 input, one with the key is a BitLisp input whose program evaluation
-produced that condition list. `expect`
+produced that condition list. A BitLisp input also carries its
+execution identity, `tapleaf` and `merkle_root`, each exactly 32
+bytes: the pair base consensus authenticates from the control
+block, which rule 3's composed specifiers read. The model rejects
+a condition-carrying input without both. `expect`
 is `{"valid": true}` or `{"error": "<code>"}`. The transaction must
 satisfy the model's base rules (value conservation, ranges, distinct
 outpoints): a case violating them is a malformed vector, not an
