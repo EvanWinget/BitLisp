@@ -472,7 +472,8 @@ spends into a different transaction never changes an outcome, and
 the composition guarantee stated in VALIDATION.md's claims and
 asserts preamble holds for this family with no discipline
 required. The operands commit to the
-same fields as the participant specifiers of VALIDATION.md rule 3
+same prevout fields as the participant specifiers of
+VALIDATION.md rule 3
 and carry the recombination-stability classes stated there:
 amount and scriptPubKey are knowable when a program is written,
 the creating txid and the outpoint exist only once the creating
@@ -600,8 +601,9 @@ whose conditions' removal from a valid transaction can invalidate
 it: a lone half of a pair, or the only announcement an assert
 reads.
 
-Specifier operands, consumed in the order VALIDATION.md rule 3's
-specifier table states for the commitment value:
+Specifier operands, consumed in the order VALIDATION.md rule 3
+states for the commitment value, the low bits' table operands
+then the appended execution-identity operands:
 
 - `txid` is an atom of exactly 32 bytes (`bad_condition_arg`).
 - `scriptPubKey` is an atom of 0 to 10,000 bytes
@@ -617,6 +619,13 @@ specifier table states for the commitment value:
   outpoint's 32 txid bytes followed by its 32-bit index in
   little-endian byte order, the wire serialization
   (`bad_condition_arg`).
+- `tapleaf` is an atom of exactly 32 bytes, a leaf hash
+  (`bad_condition_arg`).
+- `merkleRoot` is an atom of exactly 32 bytes, a script-tree
+  merkle root (`bad_condition_arg`). Never empty: a BitLisp
+  counterpart always executes a leaf of some tree, so there is no
+  no-tree case to encode, unlike ASSERT_MY_TAPROOT's
+  `merkle_root` operand.
 
 `message`, `namespace`, and `payload` are atoms of 0 to 1024 bytes
 (`bad_condition_arg`).
@@ -659,11 +668,11 @@ many, may read the same announcement. Violation is
 `unsatisfied_announcement_assert`.
 
 **Arguments.** `mode` is a minimally encoded integer with
-0 <= mode <= 7, a commitment value (`bad_condition_arg`).
+0 <= mode <= 31, a commitment value (`bad_condition_arg`).
 `namespace` and `payload` are atoms of 0 to 1024 bytes. Then the
-specifier operands the table in VALIDATION.md rule 3 states for
-`mode`, in table order. Exactly 3 + n arguments, where n is the
-mode's operand count (`bad_condition_arity`).
+specifier operands VALIDATION.md rule 3 states for `mode`, in
+rule 3's order. Exactly 3 + n arguments, where n is the mode's
+operand count (`bad_condition_arity`).
 
 **Cost.** `CONDITION_MESSAGE_COST` = 700 (COSTS.md section 10),
 charged after every argument check.
@@ -678,20 +687,19 @@ charged after every argument check.
 specifier at the assurer half of `mode`, argument specifier at
 the requirer half, `message`) in the ledger of VALIDATION.md rule
 3. Claims nothing and asserts nothing. The assurer half always
-describes the emitting input, filled from its own prevout data,
-never from operands. The ledger must balance exactly, so an
+describes the emitting input, filled from its own prevout data
+and execution identity, never from operands. The ledger must balance exactly, so an
 ASSURE without its REQUIRE invalidates the transaction
 (`unbalanced_message`): this condition demands as much as it
 offers.
 
 **Arguments.** `mode` is a minimally encoded integer with
-0 <= mode <= 63 (`bad_condition_arg`). Its high three bits are the
-assurer half and its low three bits the requirer half, both
+0 <= mode <= 1023 (`bad_condition_arg`). Its high five bits are
+the assurer half and its low five bits the requirer half, both
 commitment values. `message` is an atom of 0 to 1024 bytes. Then
-the specifier operands the table in VALIDATION.md rule 3 states
-for the requirer half, in table order. Exactly 2 + n arguments,
-where n is the requirer half's operand count
-(`bad_condition_arity`).
+the specifier operands VALIDATION.md rule 3 states for the
+requirer half, in rule 3's order. Exactly 2 + n arguments, where
+n is the requirer half's operand count (`bad_condition_arity`).
 
 **Cost.** `CONDITION_MESSAGE_COST` = 700 (COSTS.md section 10),
 charged after every argument check.
@@ -708,15 +716,15 @@ Stage 4.
 at the requirer half, `message`) in the ledger of VALIDATION.md
 rule 3. Claims nothing and asserts nothing. The requirer half
 always describes the emitting input, filled from its own prevout
-data, never from operands. The ledger must balance exactly, so a
+data and execution identity, never from operands. The ledger must balance exactly, so a
 REQUIRE without its ASSURE invalidates the transaction
 (`unbalanced_message`).
 
 **Arguments.** As for ASSURE with the halves' roles
-exchanged: `mode` 0 to 63, `message` an atom of 0 to 1024 bytes,
-then the specifier operands for the assurer half, in table order.
-Exactly 2 + n arguments, where n is the assurer half's operand
-count (`bad_condition_arity`).
+exchanged: `mode` 0 to 1023, `message` an atom of 0 to 1024
+bytes, then the specifier operands for the assurer half, in rule
+3's order. Exactly 2 + n arguments, where n is the assurer half's
+operand count (`bad_condition_arity`).
 
 **Cost.** `CONDITION_MESSAGE_COST` = 700 (COSTS.md section 10),
 charged after every argument check.
