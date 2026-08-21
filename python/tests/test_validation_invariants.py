@@ -13,6 +13,7 @@ irrelevant to validation.
 """
 
 from collections import Counter
+from dataclasses import replace
 
 import pytest
 from bitlisp import (
@@ -303,16 +304,7 @@ def test_plain_only_transaction_always_valid(input_count, outputs):
 def _with_fresh_outpoints(tx_inputs, offset):
     """The same inputs on outpoints from a disjoint txid range."""
     return tuple(
-        TxInput(
-            txid=bytes([offset + n]) * 32,
-            index=tx_input.index,
-            script_pubkey=tx_input.script_pubkey,
-            amount=tx_input.amount,
-            sequence=tx_input.sequence,
-            conditions=tx_input.conditions,
-            tapleaf=tx_input.tapleaf,
-            merkle_root=tx_input.merkle_root,
-        )
+        replace(tx_input, txid=bytes([offset + n]) * 32)
         for n, tx_input in enumerate(tx_inputs, start=1)
     )
 

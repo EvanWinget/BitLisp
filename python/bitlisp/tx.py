@@ -77,10 +77,14 @@ class TxInput:
             raise ValueError("conditions must be a tuple or None")
         if not isinstance(self.script_sig, bytes):
             raise ValueError("scriptSig must be bytes")
-        for name in ("tapleaf", "merkle_root"):
-            value = getattr(self, name)
-            if value is not None and (not isinstance(value, bytes) or len(value) != 32):
-                raise ValueError(f"{name} must be 32 bytes")
+        if self.tapleaf is not None and (
+            not isinstance(self.tapleaf, bytes) or len(self.tapleaf) != 32
+        ):
+            raise ValueError("tapleaf must be 32 bytes")
+        if self.merkle_root is not None and (
+            not isinstance(self.merkle_root, bytes) or len(self.merkle_root) != 32
+        ):
+            raise ValueError("merkle_root must be 32 bytes")
         if self.conditions is not None and (
             self.tapleaf is None or self.merkle_root is None
         ):

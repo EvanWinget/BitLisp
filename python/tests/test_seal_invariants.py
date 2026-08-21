@@ -13,6 +13,7 @@ non-witness byte, and neither is a function of anything else.
 
 import hashlib
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 from hypothesis import assume, given, settings
@@ -138,25 +139,9 @@ def reseal(tx, conds, carrier=0):
     input can carry the seals. Conditions are witness data, so
     neither derived quantity changes."""
     carrier %= len(tx.inputs)
-    old = tx.inputs[carrier]
-    replaced = TxInput(
-        txid=old.txid,
-        index=old.index,
-        script_pubkey=old.script_pubkey,
-        amount=old.amount,
-        sequence=old.sequence,
-        conditions=tuple(conds),
-        script_sig=old.script_sig,
-        tapleaf=old.tapleaf,
-        merkle_root=old.merkle_root,
-    )
+    replaced = replace(tx.inputs[carrier], conditions=tuple(conds))
     inputs = tx.inputs[:carrier] + (replaced,) + tx.inputs[carrier + 1 :]
-    return Transaction(
-        version=tx.version,
-        locktime=tx.locktime,
-        inputs=inputs,
-        outputs=tx.outputs,
-    )
+    return replace(tx, inputs=inputs)
 
 
 def outcome(tx):

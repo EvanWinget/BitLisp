@@ -324,7 +324,7 @@
    }
   },
   {
-   "name": "equal_followers_single_receive",
+   "name": "equal_followers_single_require",
    "tx": {
     "version": 2,
     "locktime": 0,
@@ -427,7 +427,7 @@
    }
   },
   {
-   "name": "hostile_extra_sender",
+   "name": "hostile_extra_assurer",
    "tx": {
     "version": 2,
     "locktime": 0,

@@ -40,7 +40,7 @@
    }
   },
   {
-   "name": "send_without_receive",
+   "name": "assure_without_require",
    "tx": {
     "version": 2,
     "locktime": 0,
@@ -73,7 +73,7 @@
    }
   },
   {
-   "name": "receive_without_send",
+   "name": "require_without_assure",
    "tx": {
     "version": 2,
     "locktime": 0,
@@ -106,7 +106,7 @@
    }
   },
   {
-   "name": "two_sends_one_receive",
+   "name": "two_assures_one_require",
    "tx": {
     "version": 2,
     "locktime": 0,
@@ -142,7 +142,7 @@
    }
   },
   {
-   "name": "one_send_two_receives",
+   "name": "one_assure_two_requires",
    "tx": {
     "version": 2,
     "locktime": 0,
@@ -178,7 +178,7 @@
    }
   },
   {
-   "name": "two_sends_two_receives",
+   "name": "two_assures_two_requires",
    "tx": {
     "version": 2,
     "locktime": 0,
@@ -214,7 +214,7 @@
    }
   },
   {
-   "name": "three_sends_one_receive",
+   "name": "three_assures_one_require",
    "tx": {
     "version": 2,
     "locktime": 0,
@@ -250,7 +250,7 @@
    }
   },
   {
-   "name": "three_sends_three_receives",
+   "name": "three_assures_three_requires",
    "tx": {
     "version": 2,
     "locktime": 0,
@@ -286,7 +286,7 @@
    }
   },
   {
-   "name": "self_send_single_input",
+   "name": "self_assure_single_input",
    "tx": {
     "version": 2,
     "locktime": 0,
@@ -349,7 +349,7 @@
    }
   },
   {
-   "name": "send_addressed_to_absent_outpoint",
+   "name": "assure_addressed_to_absent_outpoint",
    "tx": {
     "version": 2,
     "locktime": 0,
@@ -385,7 +385,7 @@
    }
   },
   {
-   "name": "receive_listed_before_send",
+   "name": "require_listed_before_assure",
    "tx": {
     "version": 2,
     "locktime": 0,
@@ -421,7 +421,7 @@
    }
   },
   {
-   "name": "sender_script_amount_mode",
+   "name": "assurer_script_amount_mode",
    "tx": {
     "version": 2,
     "locktime": 0,
@@ -457,7 +457,7 @@
    }
   },
   {
-   "name": "sender_amount_only_mode",
+   "name": "assurer_amount_only_mode",
    "tx": {
     "version": 2,
     "locktime": 0,
@@ -493,7 +493,7 @@
    }
   },
   {
-   "name": "sender_txid_mode",
+   "name": "assurer_txid_mode",
    "tx": {
     "version": 2,
     "locktime": 0,
@@ -967,7 +967,7 @@
    }
   },
   {
-   "name": "sender_txid_amount_mode",
+   "name": "assurer_txid_amount_mode",
    "tx": {
     "version": 2,
     "locktime": 0,
@@ -1003,7 +1003,7 @@
    }
   },
   {
-   "name": "sender_txid_script_mode",
+   "name": "assurer_txid_script_mode",
    "tx": {
     "version": 2,
     "locktime": 0,

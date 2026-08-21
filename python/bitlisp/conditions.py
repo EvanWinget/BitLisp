@@ -146,6 +146,14 @@ SPECIFIER_OPERANDS = {
     for tapleaf in (0, 1)
     for root in (0, 1)
 }
+# An addressed pair's mode packs two commitment values side by side,
+# one per participant, each spanning the specifier table, so the
+# half width and the packed mode bound derive from the table itself.
+SPECIFIER_COMMITMENT_MAX = max(SPECIFIER_OPERANDS)
+_SPECIFIER_HALF_BITS = SPECIFIER_COMMITMENT_MAX.bit_length()
+_MESSAGE_MODE_MAX = (
+    SPECIFIER_COMMITMENT_MAX << _SPECIFIER_HALF_BITS
+) | SPECIFIER_COMMITMENT_MAX
 
 # A locktime below the threshold counts blocks, at or above it counts
 # Unix seconds. Operand domains exclude the wrong-typed range, so a
@@ -660,11 +668,6 @@ def _parse_specifier(commitment, args, name):
             continue
         if not is_atom(atom):
             raise BitLispError("bad_condition_arg", f"{name} {kind} must be an atom")
-        if kind == "txid" and len(atom) != 32:
-            raise BitLispError(
-                "bad_condition_arg",
-                f"{name} txid must be 32 bytes, got {len(atom)}",
-            )
         if kind == "script_pubkey" and len(atom) > MAX_SCRIPT_PUBKEY_SIZE:
             raise BitLispError(
                 "bad_condition_arg",
@@ -676,7 +679,7 @@ def _parse_specifier(commitment, args, name):
                 "bad_condition_arg",
                 f"{name} outpoint must be {OUTPOINT_SIZE} bytes, got {len(atom)}",
             )
-        if kind in ("tapleaf", "merkle_root") and len(atom) != 32:
+        if kind in ("txid", "tapleaf", "merkle_root") and len(atom) != 32:
             raise BitLispError(
                 "bad_condition_arg",
                 f"{name} {kind} must be 32 bytes, got {len(atom)}",
@@ -704,9 +707,9 @@ def _parse_message_pair(args, name, self_half_high):
             "bad_condition_arity",
             f"{name} takes at least 2 arguments, got {len(args)}",
         )
-    mode = _parse_mode(args[0], name, 1023)
-    self_half = (mode >> 5) & 0b11111 if self_half_high else mode & 0b11111
-    arg_half = mode & 0b11111 if self_half_high else (mode >> 5) & 0b11111
+    mode = _parse_mode(args[0], name, _MESSAGE_MODE_MAX)
+    high, low = mode >> _SPECIFIER_HALF_BITS, mode & SPECIFIER_COMMITMENT_MAX
+    self_half, arg_half = (high, low) if self_half_high else (low, high)
     expected = 2 + len(SPECIFIER_OPERANDS[arg_half])
     if len(args) != expected:
         raise BitLispError(
@@ -718,14 +721,14 @@ def _parse_message_pair(args, name, self_half_high):
     return mode, self_half, specifier, message
 
 
-def _parse_send_message(args):
+def _parse_assure(args):
     _, self_half, requirer, message = _parse_message_pair(
         args, "ASSURE", self_half_high=True
     )
     return Assure(self_half, requirer, message)
 
 
-def _parse_receive_message(args):
+def _parse_require(args):
     _, self_half, assurer, message = _parse_message_pair(
         args, "REQUIRE", self_half_high=False
     )
@@ -748,7 +751,7 @@ def _parse_assert_announcement(args):
             "bad_condition_arity",
             f"ASSERT_ANNOUNCEMENT takes at least 3 arguments, got {len(args)}",
         )
-    mode = _parse_mode(args[0], "ASSERT_ANNOUNCEMENT", 31)
+    mode = _parse_mode(args[0], "ASSERT_ANNOUNCEMENT", SPECIFIER_COMMITMENT_MAX)
     expected = 3 + len(SPECIFIER_OPERANDS[mode])
     if len(args) != expected:
         raise BitLispError(
@@ -869,9 +872,9 @@ def _parse_assigned(opcode, args):
     if opcode == ASSERT_ANNOUNCEMENT:
         return _parse_assert_announcement(args)
     if opcode == ASSURE:
-        return _parse_send_message(args)
+        return _parse_assure(args)
     if opcode == REQUIRE:
-        return _parse_receive_message(args)
+        return _parse_require(args)
     if opcode == RESERVE_FEE:
         return _parse_reserve_fee(args)
     if opcode == SEAL:

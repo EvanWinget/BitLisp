@@ -249,15 +249,17 @@ def self_specifier(tx_input, commitment):
             fields.append(tx_input.tapleaf)
         elif kind == "merkle_root":
             fields.append(tx_input.merkle_root)
-        else:
+        elif kind == "outpoint":
             fields.append(tx_input.txid + tx_input.index.to_bytes(4, "little"))
+        else:
+            raise AssertionError(f"unknown specifier field {kind!r}")
     return Specifier(commitment, tuple(fields))
 
 
 def check_messages(tx):
     """Rule 3, the message ledger. Every distinct (assurer specifier,
     requirer specifier, payload) record must net to zero across the
-    whole transaction, sends counting +1 and receives -1."""
+    whole transaction, assures counting +1 and requires -1."""
     ledger = Counter()
     for tx_input in tx.inputs:
         for cond in tx_input.conditions or ():

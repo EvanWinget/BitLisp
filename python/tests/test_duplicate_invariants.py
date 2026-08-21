@@ -83,7 +83,7 @@ _TAPROOT_SPK = b"\x51\x20" + taproot_output_key(_TAPROOT_IK, b"")
 
 def _pool(own_txid, own_script, other_txid, other_script):
     """Condition candidates for one input. Announcer specifiers,
-    receiver specifiers, and payloads collide across the pools of
+    requirer specifiers, and payloads collide across the pools of
     both inputs, so generated transactions land on both sides of
     every landed rule, and the never-announced payload keeps the
     announcement error path exercised. The self asserts pair each

@@ -129,6 +129,21 @@ def fee_input(amount=20_000):
     return TxInput(FEE_TXID, 0, FEE_SPK, amount, sequence=SEQ_FINAL)
 
 
+def bl_input(txid, index, spk, amount, root, sequence=SEQ_FINAL, conditions=None):
+    """A BitLisp input of a single-leaf taproot tree, where the
+    executing leaf's hash is also the spending path's merkle root."""
+    return TxInput(
+        txid,
+        index,
+        spk,
+        amount,
+        sequence=sequence,
+        conditions=conditions,
+        tapleaf=root,
+        merkle_root=root,
+    )
+
+
 def spend_error(program, solution, tx, input_index=0):
     with pytest.raises(BitLispError) as info:
         run_spend(program, solution, tx, input_index)
@@ -193,18 +208,7 @@ def test_trigger_spend_with_revault():
     tx = Transaction(
         version=2,
         locktime=0,
-        inputs=(
-            TxInput(
-                TXID,
-                0,
-                VSPK,
-                60_000,
-                sequence=SEQ_FINAL,
-                tapleaf=VROOT,
-                merkle_root=VROOT,
-            ),
-            fee_input(),
-        ),
+        inputs=(bl_input(TXID, 0, VSPK, 60_000, VROOT), fee_input()),
         outputs=(TxOutput(TSPK, 40_000), TxOutput(VSPK, 20_000)),
     )
     _, conds = run_spend(VAULT, solution, tx)
@@ -337,18 +341,7 @@ def test_trigger_signature_binds_target():
     tx = Transaction(
         version=2,
         locktime=0,
-        inputs=(
-            TxInput(
-                TXID,
-                0,
-                VSPK,
-                60_000,
-                sequence=SEQ_FINAL,
-                tapleaf=VROOT,
-                merkle_root=VROOT,
-            ),
-            fee_input(),
-        ),
+        inputs=(bl_input(TXID, 0, VSPK, 60_000, VROOT), fee_input()),
         outputs=(TxOutput(other_tspk, 60_000),),
     )
     assert spend_error(VAULT, redirected, tx) == "unsatisfied_sig_assert"
@@ -361,18 +354,7 @@ def test_trigger_signature_binds_outpoint():
     tx = Transaction(
         version=2,
         locktime=0,
-        inputs=(
-            TxInput(
-                b"\xcd" * 32,
-                0,
-                VSPK,
-                60_000,
-                sequence=SEQ_FINAL,
-                tapleaf=VROOT,
-                merkle_root=VROOT,
-            ),
-            fee_input(),
-        ),
+        inputs=(bl_input(b"\xcd" * 32, 0, VSPK, 60_000, VROOT), fee_input()),
         outputs=(TxOutput(TSPK, 60_000),),
     )
     assert spend_error(VAULT, solution, tx) == "unsatisfied_sig_assert"
@@ -405,17 +387,7 @@ def test_full_lifecycle():
     trigger_tx = Transaction(
         version=2,
         locktime=0,
-        inputs=(
-            TxInput(
-                *vault_outpoint,
-                VSPK,
-                100_000,
-                sequence=SEQ_FINAL,
-                tapleaf=VROOT,
-                merkle_root=VROOT,
-            ),
-            fee_input(),
-        ),
+        inputs=(bl_input(*vault_outpoint, VSPK, 100_000, VROOT), fee_input()),
         outputs=(TxOutput(trig_spk, 100_000),),
     )
     run_spend(VAULT, solution, trigger_tx)
@@ -425,14 +397,8 @@ def test_full_lifecycle():
             version=2,
             locktime=0,
             inputs=(
-                TxInput(
-                    trigger_tx.txid,
-                    0,
-                    trig_spk,
-                    100_000,
-                    sequence=sequence,
-                    tapleaf=trig_root,
-                    merkle_root=trig_root,
+                bl_input(
+                    trigger_tx.txid, 0, trig_spk, 100_000, trig_root, sequence=sequence
                 ),
             ),
             outputs=(withdrawal_out,),
@@ -466,17 +432,7 @@ def test_full_lifecycle():
     recovery_from_vault = Transaction(
         version=2,
         locktime=0,
-        inputs=(
-            TxInput(
-                *vault_outpoint,
-                VSPK,
-                100_000,
-                sequence=SEQ_FINAL,
-                tapleaf=VROOT,
-                merkle_root=VROOT,
-            ),
-            fee_input(),
-        ),
+        inputs=(bl_input(*vault_outpoint, VSPK, 100_000, VROOT), fee_input()),
         outputs=(TxOutput(RECOVERY_SPK, 100_000),),
     )
     run_spend(VAULT, assemble("(2 100000 100000)"), recovery_from_vault)
@@ -484,15 +440,7 @@ def test_full_lifecycle():
         version=2,
         locktime=0,
         inputs=(
-            TxInput(
-                trigger_tx.txid,
-                0,
-                trig_spk,
-                100_000,
-                sequence=SEQ_FINAL,
-                tapleaf=trig_root,
-                merkle_root=trig_root,
-            ),
+            bl_input(trigger_tx.txid, 0, trig_spk, 100_000, trig_root),
             fee_input(),
         ),
         outputs=(TxOutput(RECOVERY_SPK, 100_000),),
@@ -511,18 +459,7 @@ def keyed_recovery_tx():
     return Transaction(
         version=2,
         locktime=0,
-        inputs=(
-            TxInput(
-                TXID,
-                0,
-                KVSPK,
-                60_000,
-                sequence=SEQ_FINAL,
-                tapleaf=KVROOT,
-                merkle_root=KVROOT,
-            ),
-            fee_input(),
-        ),
+        inputs=(bl_input(TXID, 0, KVSPK, 60_000, KVROOT), fee_input()),
         outputs=(TxOutput(RECOVERY_SPK, 60_000),),
     )
 
@@ -554,18 +491,7 @@ def test_recovery_cannot_underpay():
     underfunded = Transaction(
         version=2,
         locktime=0,
-        inputs=(
-            TxInput(
-                TXID,
-                0,
-                VSPK,
-                60_000,
-                sequence=SEQ_FINAL,
-                tapleaf=VROOT,
-                merkle_root=VROOT,
-            ),
-            fee_input(),
-        ),
+        inputs=(bl_input(TXID, 0, VSPK, 60_000, VROOT), fee_input()),
         outputs=(TxOutput(RECOVERY_SPK, 59_999),),
     )
     assert (
@@ -581,28 +507,16 @@ def follower_conditions():
 def consolidation_tx(listed, out_amt, followers=(50_000, 30_000)):
     listed_text = " ".join(str(a) for a in listed)
     solution = assemble(f"(4 0x{VSPK.hex()} 60000 {out_amt} ({listed_text}))")
-    inputs = [
-        TxInput(
-            b"\xd0" * 32,
-            0,
-            VSPK,
-            60_000,
-            sequence=SEQ_FINAL,
-            tapleaf=VROOT,
-            merkle_root=VROOT,
-        )
-    ]
+    inputs = [bl_input(b"\xd0" * 32, 0, VSPK, 60_000, VROOT)]
     for i, amount in enumerate(followers):
         inputs.append(
-            TxInput(
+            bl_input(
                 bytes([0xD1 + i]) * 32,
                 0,
                 VSPK,
                 amount,
-                sequence=SEQ_FINAL,
+                VROOT,
                 conditions=follower_conditions(),
-                tapleaf=VROOT,
-                merkle_root=VROOT,
             )
         )
     inputs.append(fee_input(50_000))
@@ -657,29 +571,20 @@ def test_same_target_withdrawals_merge_and_burn():
     wd_out = TxOutput(bytes.fromhex("0014") + b"\x22" * 20, 39_000)
     real_target = hashlib.sha256(wd_out.wire).digest()
     trig_inst, trig_root, trig_spk = instance(TRIG_NODE, trig_values(b"", real_target))
-    other = TxInput(
+    other = bl_input(
         b"\xce" * 32,
         0,
         trig_spk,
         40_000,
+        trig_root,
         sequence=DELAY,
         conditions=conditions_of(trig_inst, "(1)"),
-        tapleaf=trig_root,
-        merkle_root=trig_root,
     )
     merged = Transaction(
         version=2,
         locktime=0,
         inputs=(
-            TxInput(
-                b"\xcc" * 32,
-                1,
-                trig_spk,
-                40_000,
-                sequence=DELAY,
-                tapleaf=trig_root,
-                merkle_root=trig_root,
-            ),
+            bl_input(b"\xcc" * 32, 1, trig_spk, 40_000, trig_root, sequence=DELAY),
             other,
         ),
         outputs=(wd_out,),

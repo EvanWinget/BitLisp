@@ -95,18 +95,18 @@ def load_context(obj):
         raise ContextError(f"tx unknown keys {sorted(extra)}")
     if not isinstance(obj["inputs"], list) or not isinstance(obj["outputs"], list):
         raise ContextError("tx inputs and outputs must be arrays")
+    entry_required = {"txid", "index", "script_pubkey", "amount"}
+    entry_optional = {
+        "sequence",
+        "conditions",
+        "script_sig",
+        "tapleaf",
+        "merkle_root",
+    }
     decoded_inputs = []
     for entry in obj["inputs"]:
         if not isinstance(entry, dict):
             raise ContextError("each input must be a JSON object")
-        entry_required = {"txid", "index", "script_pubkey", "amount"}
-        entry_optional = {
-            "sequence",
-            "conditions",
-            "script_sig",
-            "tapleaf",
-            "merkle_root",
-        }
         entry_keys = set(entry)
         if missing := entry_required - entry_keys:
             raise ContextError(f"input missing keys {sorted(missing)}")
