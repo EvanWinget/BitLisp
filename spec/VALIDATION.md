@@ -49,10 +49,11 @@ A transaction is:
   revealed leaf into `tapleaf`, combining it with the control
   block's path into `merkleRoot`, and checking that root against
   the spent scriptPubKey through the taproot tweak, so the pair is
-  witness data the spender chooses but cannot forge. A non-BitLisp
-  input carries no execution identity, and no rule reads one from
-  it: only BitLisp inputs produce conditions, and only conditions
-  reach these fields.
+  witness data the spender chooses but cannot forge. Only
+  conditions reach these fields: an input without a condition
+  list, whether a non-BitLisp input or a BitLisp spend whose
+  evaluation has not yet produced one, may carry the pair or not,
+  and no rule reads it from either.
 - `outputs`, an ordered list of slots. Each slot's content is the
   pair (`scriptPubKey`, `amount`). Slots are addressed by index.
 
