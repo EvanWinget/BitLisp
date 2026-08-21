@@ -14,7 +14,9 @@
       "index": 1,
       "script_pubkey": "5120aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "amount": 50000,
-      "conditions": "ffff30ffa41111111111111111111111111111111111111111111111111111111111111111010000008080"
+      "conditions": "ffff30ffa41111111111111111111111111111111111111111111111111111111111111111010000008080",
+      "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
      }
     ],
     "outputs": [
@@ -39,7 +41,9 @@
       "index": 0,
       "script_pubkey": "5120aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "amount": 50000,
-      "conditions": "ffff30ffa41111111111111111111111111111111111111111111111111111111111111111000000008080"
+      "conditions": "ffff30ffa41111111111111111111111111111111111111111111111111111111111111111000000008080",
+      "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
      }
     ],
     "outputs": [
@@ -64,7 +68,9 @@
       "index": 256,
       "script_pubkey": "5120aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "amount": 50000,
-      "conditions": "ffff30ffa41111111111111111111111111111111111111111111111111111111111111111000100008080"
+      "conditions": "ffff30ffa41111111111111111111111111111111111111111111111111111111111111111000100008080",
+      "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
      }
     ],
     "outputs": [
@@ -89,7 +95,9 @@
       "index": 256,
       "script_pubkey": "5120aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "amount": 50000,
-      "conditions": "ffff30ffa41111111111111111111111111111111111111111111111111111111111111111000000008080"
+      "conditions": "ffff30ffa41111111111111111111111111111111111111111111111111111111111111111000000008080",
+      "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
      }
     ],
     "outputs": [
@@ -114,7 +122,9 @@
       "index": 1,
       "script_pubkey": "5120aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "amount": 50000,
-      "conditions": "ffff30ffa41111111111111111111111111111111111111111111111111111111111111111000000008080"
+      "conditions": "ffff30ffa41111111111111111111111111111111111111111111111111111111111111111000000008080",
+      "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
      }
     ],
     "outputs": [
@@ -139,7 +149,9 @@
       "index": 1,
       "script_pubkey": "5120aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "amount": 50000,
-      "conditions": "ffff30ffa42222222222222222222222222222222222222222222222222222222222222222010000008080"
+      "conditions": "ffff30ffa42222222222222222222222222222222222222222222222222222222222222222010000008080",
+      "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
      }
     ],
     "outputs": [
@@ -164,7 +176,9 @@
       "index": 1,
       "script_pubkey": "5120aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "amount": 50000,
-      "conditions": "ffff30ffa41111111111111111111111111111111111111111111111111111111111111111000000018080"
+      "conditions": "ffff30ffa41111111111111111111111111111111111111111111111111111111111111111000000018080",
+      "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
      }
     ],
     "outputs": [
@@ -189,7 +203,9 @@
       "index": 1,
       "script_pubkey": "5120aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "amount": 50000,
-      "conditions": "ffff31ffa011111111111111111111111111111111111111111111111111111111111111118080"
+      "conditions": "ffff31ffa011111111111111111111111111111111111111111111111111111111111111118080",
+      "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
      }
     ],
     "outputs": [
@@ -214,7 +230,9 @@
       "index": 1,
       "script_pubkey": "5120aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "amount": 50000,
-      "conditions": "ffff31ffa022222222222222222222222222222222222222222222222222222222222222228080"
+      "conditions": "ffff31ffa022222222222222222222222222222222222222222222222222222222222222228080",
+      "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
      }
     ],
     "outputs": [
@@ -239,7 +257,9 @@
       "index": 7,
       "script_pubkey": "5120aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "amount": 50000,
-      "conditions": "ffff31ffa011111111111111111111111111111111111111111111111111111111111111118080"
+      "conditions": "ffff31ffa011111111111111111111111111111111111111111111111111111111111111118080",
+      "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
      }
     ],
     "outputs": [
@@ -264,7 +284,9 @@
       "index": 7,
       "script_pubkey": "5120aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "amount": 50000,
-      "conditions": "ffff30ffa41111111111111111111111111111111111111111111111111111111111111111000000008080"
+      "conditions": "ffff30ffa41111111111111111111111111111111111111111111111111111111111111111000000008080",
+      "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
      }
     ],
     "outputs": [
@@ -289,7 +311,9 @@
       "index": 1,
       "script_pubkey": "5120aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "amount": 50000,
-      "conditions": "ffff32ffa25120aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa8080"
+      "conditions": "ffff32ffa25120aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa8080",
+      "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
      }
     ],
     "outputs": [
@@ -314,7 +338,9 @@
       "index": 1,
       "script_pubkey": "5120aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "amount": 50000,
-      "conditions": "ffff32ff960014bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb8080"
+      "conditions": "ffff32ff960014bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb8080",
+      "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
      }
     ],
     "outputs": [
@@ -339,7 +365,9 @@
       "index": 1,
       "script_pubkey": "",
       "amount": 50000,
-      "conditions": "ffff32ff808080"
+      "conditions": "ffff32ff808080",
+      "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
      }
     ],
     "outputs": [
@@ -364,7 +392,9 @@
       "index": 1,
       "script_pubkey": "5120aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "amount": 50000,
-      "conditions": "ffff33ff8300c3508080"
+      "conditions": "ffff33ff8300c3508080",
+      "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
      }
     ],
     "outputs": [
@@ -389,7 +419,9 @@
       "index": 1,
       "script_pubkey": "5120aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "amount": 50000,
-      "conditions": "ffff33ff8300c34f8080"
+      "conditions": "ffff33ff8300c34f8080",
+      "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
      }
     ],
     "outputs": [
@@ -414,7 +446,9 @@
       "index": 1,
       "script_pubkey": "5120aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "amount": 2100000000000000,
-      "conditions": "ffff33ff870775f05a0740008080"
+      "conditions": "ffff33ff870775f05a0740008080",
+      "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
      }
     ],
     "outputs": [
@@ -439,7 +473,9 @@
       "index": 1,
       "script_pubkey": "5120aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "amount": 4295017296,
-      "conditions": "ffff33ff8300c3508080"
+      "conditions": "ffff33ff8300c3508080",
+      "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
      }
     ],
     "outputs": [
@@ -464,7 +500,9 @@
       "index": 1,
       "script_pubkey": "5120aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "amount": 50000,
-      "conditions": "ffff32ff808080"
+      "conditions": "ffff32ff808080",
+      "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
      }
     ],
     "outputs": [
@@ -489,7 +527,9 @@
       "index": 1,
       "script_pubkey": "5120aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "amount": 50000,
-      "conditions": "ffff32ffa25120bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb8080"
+      "conditions": "ffff32ffa25120bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb8080",
+      "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
      }
     ],
     "outputs": [
@@ -514,7 +554,9 @@
       "index": 1,
       "script_pubkey": "0020147c9c57132f6e7ecddba9800bb0c4449251c92a1e60371ee77557b6620f3ea3",
       "amount": 50000,
-      "conditions": "ffff32ffa25120147c9c57132f6e7ecddba9800bb0c4449251c92a1e60371ee77557b6620f3ea38080"
+      "conditions": "ffff32ffa25120147c9c57132f6e7ecddba9800bb0c4449251c92a1e60371ee77557b6620f3ea38080",
+      "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
      }
     ],
     "outputs": [
@@ -539,7 +581,9 @@
       "index": 1,
       "script_pubkey": "5120147c9c57132f6e7ecddba9800bb0c4449251c92a1e60371ee77557b6620f3ea3",
       "amount": 50000,
-      "conditions": "ffff37ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b218080"
+      "conditions": "ffff37ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b218080",
+      "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
      }
     ],
     "outputs": [
@@ -564,7 +608,9 @@
       "index": 1,
       "script_pubkey": "512053a1f6e454df1aa2776a2814a721372d6258050de330b3c6d10ee8f4e0dda343",
       "amount": 50000,
-      "conditions": "ffff37ffa0d6889cb081036e0faefa3a35157ad71086b123b2b144b649798b494c300a961dff808080"
+      "conditions": "ffff37ffa0d6889cb081036e0faefa3a35157ad71086b123b2b144b649798b494c300a961dff808080",
+      "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
      }
     ],
     "outputs": [
@@ -589,7 +635,9 @@
       "index": 1,
       "script_pubkey": "5120147c9c57132f6e7ecddba9800bb0c4449251c92a1e60371ee77557b6620f3ea3",
       "amount": 50000,
-      "conditions": "ffff37ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa099999999999999999999999999999999999999999999999999999999999999998080"
+      "conditions": "ffff37ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa099999999999999999999999999999999999999999999999999999999999999998080",
+      "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
      }
     ],
     "outputs": [
@@ -614,7 +662,9 @@
       "index": 1,
       "script_pubkey": "0014bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
       "amount": 50000,
-      "conditions": "ffff37ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b218080"
+      "conditions": "ffff37ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b218080",
+      "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
      }
     ],
     "outputs": [
@@ -639,7 +689,9 @@
       "index": 1,
       "script_pubkey": "0020147c9c57132f6e7ecddba9800bb0c4449251c92a1e60371ee77557b6620f3ea3",
       "amount": 50000,
-      "conditions": "ffff37ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b218080"
+      "conditions": "ffff37ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b218080",
+      "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
      }
     ],
     "outputs": [
@@ -664,7 +716,9 @@
       "index": 1,
       "script_pubkey": "147c9c57132f6e7ecddba9800bb0c4449251c92a1e60371ee77557b6620f3ea3",
       "amount": 50000,
-      "conditions": "ffff37ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b218080"
+      "conditions": "ffff37ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b218080",
+      "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
      }
     ],
     "outputs": [
@@ -689,7 +743,9 @@
       "index": 1,
       "script_pubkey": "5120e7f7a8924eaeafddb971a1d05801ce9b0ec566963a21e04f7d52bef66ee593ec",
       "amount": 50000,
-      "conditions": "ffff37ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b218080"
+      "conditions": "ffff37ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b218080",
+      "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
      }
     ],
     "outputs": [
@@ -714,7 +770,9 @@
       "index": 1,
       "script_pubkey": "5120147c9c57132f6e7ecddba9800bb0c4449251c92a1e60371ee77557b6620f3ea3",
       "amount": 50000,
-      "conditions": "ffff37ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b2180ffff02ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b21ff83009c408080"
+      "conditions": "ffff37ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b2180ffff02ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b21ff83009c408080",
+      "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
      }
     ],
     "outputs": [
@@ -739,7 +797,9 @@
       "index": 1,
       "script_pubkey": "5120147c9c57132f6e7ecddba9800bb0c4449251c92a1e60371ee77557b6620f3ea3",
       "amount": 50000,
-      "conditions": "ffff37ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b2180ffff02ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b21ff83009c408080"
+      "conditions": "ffff37ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b2180ffff02ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b21ff83009c408080",
+      "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
      }
     ],
     "outputs": [
@@ -764,7 +824,9 @@
       "index": 1,
       "script_pubkey": "5120aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "amount": 50000,
-      "conditions": "ffff31ffa0111111111111111111111111111111111111111111111111111111111111111180ffff31ffa011111111111111111111111111111111111111111111111111111111111111118080"
+      "conditions": "ffff31ffa0111111111111111111111111111111111111111111111111111111111111111180ffff31ffa011111111111111111111111111111111111111111111111111111111111111118080",
+      "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
      }
     ],
     "outputs": [
@@ -789,7 +851,9 @@
       "index": 1,
       "script_pubkey": "5120aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "amount": 50000,
-      "conditions": "ffff33ff8300c35080ffff33ff018080"
+      "conditions": "ffff33ff8300c35080ffff33ff018080",
+      "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
      }
     ],
     "outputs": [
@@ -814,14 +878,18 @@
       "index": 0,
       "script_pubkey": "5120aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "amount": 50000,
-      "conditions": "ffff33ff8300c3508080"
+      "conditions": "ffff33ff8300c3508080",
+      "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
      },
      {
       "txid": "1111111111111111111111111111111111111111111111111111111111111111",
       "index": 1,
       "script_pubkey": "5120aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "amount": 70000,
-      "conditions": "ffff33ff830111708080"
+      "conditions": "ffff33ff830111708080",
+      "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
      }
     ],
     "outputs": [
@@ -846,14 +914,18 @@
       "index": 0,
       "script_pubkey": "5120aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "amount": 50000,
-      "conditions": "ffff33ff8300c3508080"
+      "conditions": "ffff33ff8300c3508080",
+      "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
      },
      {
       "txid": "1111111111111111111111111111111111111111111111111111111111111111",
       "index": 1,
       "script_pubkey": "5120aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "amount": 70000,
-      "conditions": "ffff33ff8300c3508080"
+      "conditions": "ffff33ff8300c3508080",
+      "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
      }
     ],
     "outputs": [
@@ -878,7 +950,9 @@
       "index": 1,
       "script_pubkey": "5120aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "amount": 50000,
-      "conditions": "ffff30ffa41111111111111111111111111111111111111111111111111111111111111111010000008080"
+      "conditions": "ffff30ffa41111111111111111111111111111111111111111111111111111111111111111010000008080",
+      "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
      },
      {
       "txid": "3333333333333333333333333333333333333333333333333333333333333333",
