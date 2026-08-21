@@ -59,7 +59,7 @@ AUX = b"\x00" * 32
 # so any source change is a deliberate re-pin of both literals and
 # the vector files.
 VAULT_MOD_HASH = bytes.fromhex(
-    "15884715af56b2851e9e1359b11d7090623168ddc2d84fc4785b75e904c2294f"
+    "2fc2096c3167018bc0210e061d4add87f081360a77ec352bcfb1456243ca34a2"
 )
 TRIG_MOD_HASH = bytes.fromhex(
     "214b0347c7df10d8d7c95769dd4cc3e0fdcee183b281b3d96ebda71bb739ec1b"
@@ -194,7 +194,15 @@ def test_trigger_spend_with_revault():
         version=2,
         locktime=0,
         inputs=(
-            TxInput(TXID, 0, VSPK, 60_000, sequence=SEQ_FINAL),
+            TxInput(
+                TXID,
+                0,
+                VSPK,
+                60_000,
+                sequence=SEQ_FINAL,
+                tapleaf=VROOT,
+                merkle_root=VROOT,
+            ),
             fee_input(),
         ),
         outputs=(TxOutput(TSPK, 40_000), TxOutput(VSPK, 20_000)),
@@ -330,7 +338,15 @@ def test_trigger_signature_binds_target():
         version=2,
         locktime=0,
         inputs=(
-            TxInput(TXID, 0, VSPK, 60_000, sequence=SEQ_FINAL),
+            TxInput(
+                TXID,
+                0,
+                VSPK,
+                60_000,
+                sequence=SEQ_FINAL,
+                tapleaf=VROOT,
+                merkle_root=VROOT,
+            ),
             fee_input(),
         ),
         outputs=(TxOutput(other_tspk, 60_000),),
@@ -346,7 +362,15 @@ def test_trigger_signature_binds_outpoint():
         version=2,
         locktime=0,
         inputs=(
-            TxInput(b"\xcd" * 32, 0, VSPK, 60_000, sequence=SEQ_FINAL),
+            TxInput(
+                b"\xcd" * 32,
+                0,
+                VSPK,
+                60_000,
+                sequence=SEQ_FINAL,
+                tapleaf=VROOT,
+                merkle_root=VROOT,
+            ),
             fee_input(),
         ),
         outputs=(TxOutput(TSPK, 60_000),),
@@ -373,7 +397,7 @@ def test_full_lifecycle():
         outputs=(withdrawal_out,),
     )
     real_target = probe.outputs_hash
-    trig_inst, _, trig_spk = instance(TRIG_NODE, trig_values(b"", real_target))
+    trig_inst, trig_root, trig_spk = instance(TRIG_NODE, trig_values(b"", real_target))
 
     solution = trigger_solution(
         AUTH_SK, vault_outpoint[0], 0, real_target, 100_000, 0, 100_000
@@ -382,7 +406,14 @@ def test_full_lifecycle():
         version=2,
         locktime=0,
         inputs=(
-            TxInput(*vault_outpoint, VSPK, 100_000, sequence=SEQ_FINAL),
+            TxInput(
+                *vault_outpoint,
+                VSPK,
+                100_000,
+                sequence=SEQ_FINAL,
+                tapleaf=VROOT,
+                merkle_root=VROOT,
+            ),
             fee_input(),
         ),
         outputs=(TxOutput(trig_spk, 100_000),),
@@ -393,7 +424,17 @@ def test_full_lifecycle():
         return Transaction(
             version=2,
             locktime=0,
-            inputs=(TxInput(trigger_tx.txid, 0, trig_spk, 100_000, sequence=sequence),),
+            inputs=(
+                TxInput(
+                    trigger_tx.txid,
+                    0,
+                    trig_spk,
+                    100_000,
+                    sequence=sequence,
+                    tapleaf=trig_root,
+                    merkle_root=trig_root,
+                ),
+            ),
             outputs=(withdrawal_out,),
         )
 
@@ -426,7 +467,14 @@ def test_full_lifecycle():
         version=2,
         locktime=0,
         inputs=(
-            TxInput(*vault_outpoint, VSPK, 100_000, sequence=SEQ_FINAL),
+            TxInput(
+                *vault_outpoint,
+                VSPK,
+                100_000,
+                sequence=SEQ_FINAL,
+                tapleaf=VROOT,
+                merkle_root=VROOT,
+            ),
             fee_input(),
         ),
         outputs=(TxOutput(RECOVERY_SPK, 100_000),),
@@ -436,7 +484,15 @@ def test_full_lifecycle():
         version=2,
         locktime=0,
         inputs=(
-            TxInput(trigger_tx.txid, 0, trig_spk, 100_000, sequence=SEQ_FINAL),
+            TxInput(
+                trigger_tx.txid,
+                0,
+                trig_spk,
+                100_000,
+                sequence=SEQ_FINAL,
+                tapleaf=trig_root,
+                merkle_root=trig_root,
+            ),
             fee_input(),
         ),
         outputs=(TxOutput(RECOVERY_SPK, 100_000),),
@@ -456,7 +512,15 @@ def keyed_recovery_tx():
         version=2,
         locktime=0,
         inputs=(
-            TxInput(TXID, 0, KVSPK, 60_000, sequence=SEQ_FINAL),
+            TxInput(
+                TXID,
+                0,
+                KVSPK,
+                60_000,
+                sequence=SEQ_FINAL,
+                tapleaf=KVROOT,
+                merkle_root=KVROOT,
+            ),
             fee_input(),
         ),
         outputs=(TxOutput(RECOVERY_SPK, 60_000),),
@@ -491,7 +555,15 @@ def test_recovery_cannot_underpay():
         version=2,
         locktime=0,
         inputs=(
-            TxInput(TXID, 0, VSPK, 60_000, sequence=SEQ_FINAL),
+            TxInput(
+                TXID,
+                0,
+                VSPK,
+                60_000,
+                sequence=SEQ_FINAL,
+                tapleaf=VROOT,
+                merkle_root=VROOT,
+            ),
             fee_input(),
         ),
         outputs=(TxOutput(RECOVERY_SPK, 59_999),),
@@ -509,7 +581,17 @@ def follower_conditions():
 def consolidation_tx(listed, out_amt, followers=(50_000, 30_000)):
     listed_text = " ".join(str(a) for a in listed)
     solution = assemble(f"(4 0x{VSPK.hex()} 60000 {out_amt} ({listed_text}))")
-    inputs = [TxInput(b"\xd0" * 32, 0, VSPK, 60_000, sequence=SEQ_FINAL)]
+    inputs = [
+        TxInput(
+            b"\xd0" * 32,
+            0,
+            VSPK,
+            60_000,
+            sequence=SEQ_FINAL,
+            tapleaf=VROOT,
+            merkle_root=VROOT,
+        )
+    ]
     for i, amount in enumerate(followers):
         inputs.append(
             TxInput(
@@ -519,6 +601,8 @@ def consolidation_tx(listed, out_amt, followers=(50_000, 30_000)):
                 amount,
                 sequence=SEQ_FINAL,
                 conditions=follower_conditions(),
+                tapleaf=VROOT,
+                merkle_root=VROOT,
             )
         )
     inputs.append(fee_input(50_000))
@@ -572,7 +656,7 @@ def test_same_target_withdrawals_merge_and_burn():
     # every target unique.
     wd_out = TxOutput(bytes.fromhex("0014") + b"\x22" * 20, 39_000)
     real_target = hashlib.sha256(wd_out.wire).digest()
-    trig_inst, _, trig_spk = instance(TRIG_NODE, trig_values(b"", real_target))
+    trig_inst, trig_root, trig_spk = instance(TRIG_NODE, trig_values(b"", real_target))
     other = TxInput(
         b"\xce" * 32,
         0,
@@ -580,12 +664,22 @@ def test_same_target_withdrawals_merge_and_burn():
         40_000,
         sequence=DELAY,
         conditions=conditions_of(trig_inst, "(1)"),
+        tapleaf=trig_root,
+        merkle_root=trig_root,
     )
     merged = Transaction(
         version=2,
         locktime=0,
         inputs=(
-            TxInput(b"\xcc" * 32, 1, trig_spk, 40_000, sequence=DELAY),
+            TxInput(
+                b"\xcc" * 32,
+                1,
+                trig_spk,
+                40_000,
+                sequence=DELAY,
+                tapleaf=trig_root,
+                merkle_root=trig_root,
+            ),
             other,
         ),
         outputs=(wd_out,),
@@ -717,12 +811,12 @@ def test_validation_vectors_match_source():
         one_follower_lead.replace("8300c350", "840000c350"),
         serialize(
             assemble(
-                f"((0x43 26 () 0x{VSPK.hex()} 50000)"
-                f" (0x43 26 () 0x{VSPK.hex()} 30000)"
+                f"((0x43 98 () 0x{VSPK.hex()} 50000)"
+                f" (0x43 98 () 0x{VSPK.hex()} 30000)"
                 f" (0x01 0x{'5120' + '42' * 32} 85000))"
             )
         ).hex(),
-        serialize(assemble(f"((0x42 26 () 0x{VSPK.hex()}))")).hex(),
+        serialize(assemble(f"((0x42 98 () 0x{VSPK.hex()}))")).hex(),
     }
     observed = set()
     for name in ("validation/vault-core.json", "validation/vault-consolidation.json"):

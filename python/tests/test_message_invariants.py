@@ -15,9 +15,9 @@ from dataclasses import replace
 from bitlisp import (
     Announce,
     AssertAnnouncement,
+    Assure,
     BitLispError,
-    ReceiveMessage,
-    SendMessage,
+    Require,
     Transaction,
     TxInput,
     TxOutput,
@@ -27,7 +27,11 @@ from bitlisp.validation import self_specifier
 from hypothesis import given
 from hypothesis import strategies as st
 
-_MODES = tuple(range(8))
+# The eight prevout values plus a spread of execution-identity
+# compositions: tapleaf alone, merkle root alone, both, and both
+# over prevout fields. The pool inputs carry distinct identity
+# pairs, so composed self specifiers discriminate like the rest.
+_MODES = tuple(range(8)) + (8, 16, 24, 10, 21, 31)
 _PAYLOADS = (b"x", b"y")
 _NAMESPACES = (b"n1", b"n2")
 _PHANTOM = -1
@@ -45,6 +49,8 @@ def _input_identity(salt, n):
         amount=40_000 if n == 0 else n,
         sequence=0xFFFFFFFE,
         conditions=None,
+        tapleaf=bytes([0xA0 ^ (salt + n) & 0xFF]) * 32,
+        merkle_root=bytes([0xB0 ^ (salt + n) & 0xFF]) * 32,
     )
 
 
@@ -60,10 +66,10 @@ def _realize(salt, item):
     kind = item[0]
     if kind == "send":
         _, target, s_half, r_half, payload = item
-        return SendMessage(s_half, _specifier(salt, target, r_half), payload)
+        return Assure(s_half, _specifier(salt, target, r_half), payload)
     if kind == "recv":
         _, source, s_half, r_half, payload = item
-        return ReceiveMessage(_specifier(salt, source, s_half), r_half, payload)
+        return Require(_specifier(salt, source, s_half), r_half, payload)
     if kind == "ann":
         _, namespace, payload = item
         return Announce(namespace, payload)
@@ -125,12 +131,12 @@ def _spec_says_valid(tx):
     ledger = Counter()
     for tx_input in tx.inputs:
         for cond in tx_input.conditions or ():
-            if isinstance(cond, SendMessage):
-                sender = self_specifier(tx_input, cond.sender_commitment)
-                ledger[(sender, cond.receiver, cond.message)] += 1
-            elif isinstance(cond, ReceiveMessage):
-                receiver = self_specifier(tx_input, cond.receiver_commitment)
-                ledger[(cond.sender, receiver, cond.message)] -= 1
+            if isinstance(cond, Assure):
+                sender = self_specifier(tx_input, cond.assurer_commitment)
+                ledger[(sender, cond.requirer, cond.message)] += 1
+            elif isinstance(cond, Require):
+                receiver = self_specifier(tx_input, cond.requirer_commitment)
+                ledger[(cond.assurer, receiver, cond.message)] -= 1
     if any(weight != 0 for weight in ledger.values()):
         return False
     for tx_input in tx.inputs:
@@ -250,9 +256,9 @@ def test_specifier_field_flip_rejects(payload):
     tx = build_tx(spec)
     assert is_valid(tx)
     send_cond = tx.inputs[0].conditions[0]
-    script = send_cond.receiver.fields[0]
+    script = send_cond.requirer.fields[0]
     tampered_desc = replace(
-        send_cond.receiver, fields=(bytes([script[0] ^ 0x01]) + script[1:],)
+        send_cond.requirer, fields=(bytes([script[0] ^ 0x01]) + script[1:],)
     )
     tampered = Transaction(
         2,
@@ -260,7 +266,7 @@ def test_specifier_field_flip_rejects(payload):
         (
             replace(
                 tx.inputs[0],
-                conditions=(replace(send_cond, receiver=tampered_desc),),
+                conditions=(replace(send_cond, requirer=tampered_desc),),
             ),
             tx.inputs[1],
         ),

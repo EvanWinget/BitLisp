@@ -73,6 +73,8 @@ def build_tx(version, locktime, spec):
             amount=40_000 if n == 0 else 0,
             sequence=sequence,
             conditions=tuple(asserts),
+            tapleaf=b"\x0a" * 32,
+            merkle_root=b"\x0b" * 32,
         )
         for n, (sequence, asserts) in enumerate(spec)
     )

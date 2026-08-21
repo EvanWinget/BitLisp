@@ -87,6 +87,8 @@ def build_tx(txid, index, script, amount, conds, env):
             amount=amount,
             sequence=sequence,
             conditions=tuple(conds),
+            tapleaf=b"\x0a" * 32,
+            merkle_root=b"\x0b" * 32,
         )
     ]
     if extra_position != "none":

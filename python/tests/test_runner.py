@@ -34,14 +34,14 @@ from bitlisp.conditions import (  # noqa: E402
     AssertSequenceHeight,
     AssertSequenceTime,
     AssertSig,
+    Assure,
     CreateOutput,
     CreateOutputTaproot,
-    ReceiveMessage,
+    Require,
     Reserved,
     ReserveFee,
     Seal,
     SealOutputs,
-    SendMessage,
     Specifier,
 )
 from bitlisp.machine import QUOTE  # noqa: E402
@@ -67,6 +67,8 @@ def _context(**overrides):
                 "index": 0,
                 "script_pubkey": SPK_TAPROOT,
                 "amount": 1000,
+                "tapleaf": "0a" * 32,
+                "merkle_root": "0b" * 32,
             }
         ],
         "outputs": [{"script_pubkey": SPK_P2WPKH, "amount": 600}],
@@ -143,15 +145,14 @@ RENDER_CASES = [
         + " amount=600} namespace=0x6e payload=0x70",
     ),
     (
-        SendMessage(5, Specifier(0b111, (b"\x08" * 36,)), b"hi"),
-        "SEND_MESSAGE sender_commitment=5 receiver={commitment=7 outpoint=0x"
+        Assure(5, Specifier(0b111, (b"\x08" * 36,)), b"hi"),
+        "ASSURE assurer_commitment=5 requirer={commitment=7 outpoint=0x"
         + "08" * 36
         + "} message=0x6869",
     ),
     (
-        ReceiveMessage(Specifier(0b001, (0,)), 2, b""),
-        "RECEIVE_MESSAGE sender={commitment=1 amount=0}"
-        " receiver_commitment=2 message=0x",
+        Require(Specifier(0b001, (0,)), 2, b""),
+        "REQUIRE assurer={commitment=1 amount=0} requirer_commitment=2 message=0x",
     ),
     (ReserveFee(400), "RESERVE_FEE reserve=400"),
     (Seal(b"\x0a" * 32), "SEAL txid=0x" + "0a" * 32),
@@ -221,6 +222,9 @@ def test_load_context_carried_conditions_parse():
         # A carried conditions field that does not deserialize.
         _context(inputs=[_input(conditions="zz")]),
         _context(inputs=[_input(conditions="ff")]),
+        # Execution-identity shape defects from the model.
+        _context(inputs=[_input(tapleaf="0a" * 31)]),
+        _context(inputs=[_input(merkle_root="0b" * 33)]),
     ],
 )
 def test_load_context_rejects(obj):
@@ -279,6 +283,17 @@ def test_run_spend_index_out_of_range(index):
 def test_run_spend_rejects_carried_target():
     tx = load_context(_context(inputs=[_input(conditions="80")]))
     with pytest.raises(ContextError):
+        run_spend(assemble("(q)"), b"", tx)
+
+
+def test_run_spend_rejects_target_without_identity():
+    # The computed conditions would install onto an input the model
+    # refuses, so the runner reports the missing pair up front.
+    entry = _input()
+    del entry["tapleaf"]
+    del entry["merkle_root"]
+    tx = load_context(_context(inputs=[entry]))
+    with pytest.raises(ContextError, match="tapleaf and merkle_root"):
         run_spend(assemble("(q)"), b"", tx)
 
 

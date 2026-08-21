@@ -111,6 +111,8 @@ def build_tx(version, locktime, inputs, outputs, conds, txid_prefix=b"\x01"):
             sequence=sequence,
             conditions=tuple(conds) if n == 0 else None,
             script_sig=script_sig,
+            tapleaf=b"\x0a" * 32,
+            merkle_root=b"\x0b" * 32,
         )
         for n, (txid, script_sig, sequence) in enumerate(inputs)
     )
@@ -145,6 +147,8 @@ def reseal(tx, conds, carrier=0):
         sequence=old.sequence,
         conditions=tuple(conds),
         script_sig=old.script_sig,
+        tapleaf=old.tapleaf,
+        merkle_root=old.merkle_root,
     )
     inputs = tx.inputs[:carrier] + (replaced,) + tx.inputs[carrier + 1 :]
     return Transaction(
