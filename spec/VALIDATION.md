@@ -100,7 +100,7 @@ its cost against its input's budget under rule 5.
   balance exactly. Its counterpart is another condition, not a
   transaction resource, so it is neither a claim nor an assert.
   Satisfaction is consumed one for one as with a claim, but both
-  directions demand: an unmatched send and an unmatched receive
+  directions demand: an unmatched ASSURE and an unmatched REQUIRE
   are equally invalid.
 - A **fee reserve** demands that the transaction's fee reach a
   quantity. Reserves are counted, not idempotent: rule 7 sums
@@ -277,14 +277,14 @@ the committed fields from that input's own prevout data in the
 transaction view. The **argument specifier** fills them from
 condition operands, in the operand order the table states.
 
-**The message ledger.** Each SEND_MESSAGE condition of an input
+**The message ledger.** Each ASSURE condition of an input
 contributes weight +1 to the record (self specifier of that input
-at the mode's sender half, argument specifier at the receiver
-half, `message`). Each RECEIVE_MESSAGE condition of an input
+at the mode's assurer half, argument specifier at the requirer
+half, `message`). Each REQUIRE condition of an input
 contributes weight -1 to the record (argument specifier at the
-sender half, self specifier of that input at the receiver half,
-`message`). The sender half of the six-bit mode is its high three
-bits and the receiver half its low three bits.
+assurer half, self specifier of that input at the requirer half,
+`message`). The assurer half of the six-bit mode is its high three
+bits and the requirer half its low three bits.
 
 The message ledger balances if and only if the
 weights of every distinct record sum to zero, and a transaction
@@ -294,14 +294,15 @@ checked as asserts, not through the ledger.
 
 Consequences, each pinned by vectors:
 
-- k identical sends require exactly k identical receives, and the
-  reverse. One send cannot satisfy two receives.
-- A send and a receive may come from the same input, including one
-  input carrying both halves of its own pair.
+- k identical ASSURE conditions require exactly k identical
+  REQUIRE conditions, and the reverse. One ASSURE cannot satisfy
+  two REQUIRE conditions.
+- An ASSURE and a REQUIRE may come from the same input, including
+  one input carrying both halves of its own pair.
 - The ledger is a sum, so input order and condition order never
   affect the outcome.
-- A send whose receiver specifier matches no input's self
-  specifier can never balance, because only a receive from a
+- An ASSURE whose requirer specifier matches no input's self
+  specifier can never balance, because only a REQUIRE from a
   matching input produces the equal record.
 - Two independently balanced groups of inputs stay balanced when
   spent together, even when their records collide.
@@ -360,7 +361,7 @@ their operands are equal, operand by operand, equal as trees with
 corresponding atoms byte-exact. Identity is a property of the
 condition alone. What a condition contributes may still depend on
 the input that carries it: rule 3's self specifiers make
-identical SEND_MESSAGE conditions of different inputs contribute
+identical ASSURE conditions of different inputs contribute
 distinct records, and an assert's fact may read the carrying
 input's own fields.
 
@@ -650,9 +651,9 @@ it enforceable, and lands with that rule:
 - ASSERT_MY_TAPROOT and an ASSERT_MY_SCRIPTPUBKEY carrying its
   derived scriptPubKey produce identical outcomes on every input
   (self asserts).
-- Adding a balanced send and receive pair to a valid transaction
-  keeps it valid, and adding either half alone invalidates it
-  (rule 3).
+- Adding a balanced ASSURE and REQUIRE pair to a valid
+  transaction keeps it valid, and adding either half alone
+  invalidates it (rule 3).
 - Adding an ANNOUNCE to a valid transaction never invalidates it,
   and removing the only announcement an assert reads invalidates
   it (rule 3).

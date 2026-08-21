@@ -85,8 +85,8 @@ block without a vocabulary entry are invalid, not reserved:
 | `0x37` | `ASSERT_MY_TAPROOT` |
 | `0x40` | `ANNOUNCE` |
 | `0x41` | `ASSERT_ANNOUNCEMENT` |
-| `0x42` | `SEND_MESSAGE` |
-| `0x43` | `RECEIVE_MESSAGE` |
+| `0x42` | `ASSURE` |
+| `0x43` | `REQUIRE` |
 | `0x50` | `RESERVE_FEE` |
 | `0x60` | `SEAL` |
 | `0x61` | `SEAL_OUTPUTS` |
@@ -670,27 +670,27 @@ charged after every argument check.
 
 **Validation rule.** VALIDATION.md rule 3 (announcements). Stage 4.
 
-### SEND_MESSAGE (`0x42`)
+### ASSURE (`0x42`)
 
-`(0x42 mode message receiver...)`
+`(0x42 mode message requirer...)`
 
 **Semantics.** Contributes weight +1 to the message record (self
-specifier at the sender half of `mode`, argument specifier at
-the receiver half, `message`) in the ledger of VALIDATION.md rule
-3. Claims nothing and asserts nothing. The sender half always
+specifier at the assurer half of `mode`, argument specifier at
+the requirer half, `message`) in the ledger of VALIDATION.md rule
+3. Claims nothing and asserts nothing. The assurer half always
 describes the emitting input, filled from its own prevout data,
-never from operands. The ledger must balance exactly, so a send
-without its receive invalidates the transaction
+never from operands. The ledger must balance exactly, so an
+ASSURE without its REQUIRE invalidates the transaction
 (`unbalanced_message`): this condition demands as much as it
 offers.
 
 **Arguments.** `mode` is a minimally encoded integer with
 0 <= mode <= 63 (`bad_condition_arg`). Its high three bits are the
-sender half and its low three bits the receiver half, both
+assurer half and its low three bits the requirer half, both
 commitment values. `message` is an atom of 0 to 1024 bytes. Then
 the specifier operands the table in VALIDATION.md rule 3 states
-for the receiver half, in table order. Exactly 2 + n arguments,
-where n is the receiver half's operand count
+for the requirer half, in table order. Exactly 2 + n arguments,
+where n is the requirer half's operand count
 (`bad_condition_arity`).
 
 **Cost.** `CONDITION_MESSAGE_COST` = 700 (COSTS.md section 10),
@@ -699,23 +699,23 @@ charged after every argument check.
 **Validation rule.** VALIDATION.md rule 3 (the message ledger).
 Stage 4.
 
-### RECEIVE_MESSAGE (`0x43`)
+### REQUIRE (`0x43`)
 
-`(0x43 mode message sender...)`
+`(0x43 mode message assurer...)`
 
 **Semantics.** Contributes weight -1 to the message record
-(argument specifier at the sender half of `mode`, self specifier
-at the receiver half, `message`) in the ledger of VALIDATION.md
-rule 3. Claims nothing and asserts nothing. The receiver half
+(argument specifier at the assurer half of `mode`, self specifier
+at the requirer half, `message`) in the ledger of VALIDATION.md
+rule 3. Claims nothing and asserts nothing. The requirer half
 always describes the emitting input, filled from its own prevout
 data, never from operands. The ledger must balance exactly, so a
-receive without its send invalidates the transaction
+REQUIRE without its ASSURE invalidates the transaction
 (`unbalanced_message`).
 
-**Arguments.** As for SEND_MESSAGE with the halves' roles
+**Arguments.** As for ASSURE with the halves' roles
 exchanged: `mode` 0 to 63, `message` an atom of 0 to 1024 bytes,
-then the specifier operands for the sender half, in table order.
-Exactly 2 + n arguments, where n is the sender half's operand
+then the specifier operands for the assurer half, in table order.
+Exactly 2 + n arguments, where n is the assurer half's operand
 count (`bad_condition_arity`).
 
 **Cost.** `CONDITION_MESSAGE_COST` = 700 (COSTS.md section 10),
