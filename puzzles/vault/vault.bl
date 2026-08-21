@@ -36,9 +36,11 @@
   (defconstant FOLLOW_PATH 3)
   (defconstant LEAD_PATH 4)
 
-  ; Sender half 3 commits the sending input's own scriptPubKey and
-  ; amount, receiver half 2 addresses a scriptPubKey argument.
-  (defconstant CONSOLIDATE_MODE (+ (* 8 3) 2))
+  ; Assurer half 3 commits the assuring input's own scriptPubKey
+  ; and amount, requirer half 2 addresses a scriptPubKey argument.
+  ; Each half is a five-bit commitment value, the mode their
+  ; packing.
+  (defconstant CONSOLIDATE_MODE (+ (* 32 3) 2))
   (defconstant CONSOLIDATE_PAYLOAD ())
 
   ; This instance's own curried tree hash, the merkle root its
@@ -82,14 +84,14 @@
     (list
       (list ASSERT_MY_TAPROOT IK VROOT)
       (list ASSERT_MY_SCRIPTPUBKEY MY_SPK)
-      (list SEND_MESSAGE CONSOLIDATE_MODE CONSOLIDATE_PAYLOAD MY_SPK)))
+      (list ASSURE CONSOLIDATE_MODE CONSOLIDATE_PAYLOAD MY_SPK)))
 
   (defun sum-amounts (AMOUNTS)
     (if AMOUNTS (+ (f AMOUNTS) (sum-amounts (r AMOUNTS))) 0))
 
   (defun receive-conditions (SPK AMOUNTS TAIL)
     (if AMOUNTS
-        (c (list RECEIVE_MESSAGE CONSOLIDATE_MODE CONSOLIDATE_PAYLOAD
+        (c (list REQUIRE CONSOLIDATE_MODE CONSOLIDATE_PAYLOAD
                  SPK (f AMOUNTS))
            (receive-conditions SPK (r AMOUNTS) TAIL))
         TAIL))
