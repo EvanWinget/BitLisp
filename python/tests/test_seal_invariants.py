@@ -13,6 +13,7 @@ non-witness byte, and neither is a function of anything else.
 
 import hashlib
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 from hypothesis import assume, given, settings
@@ -111,6 +112,8 @@ def build_tx(version, locktime, inputs, outputs, conds, txid_prefix=b"\x01"):
             sequence=sequence,
             conditions=tuple(conds) if n == 0 else None,
             script_sig=script_sig,
+            tapleaf=b"\x0a" * 32,
+            merkle_root=b"\x0b" * 32,
         )
         for n, (txid, script_sig, sequence) in enumerate(inputs)
     )
@@ -136,23 +139,9 @@ def reseal(tx, conds, carrier=0):
     input can carry the seals. Conditions are witness data, so
     neither derived quantity changes."""
     carrier %= len(tx.inputs)
-    old = tx.inputs[carrier]
-    replaced = TxInput(
-        txid=old.txid,
-        index=old.index,
-        script_pubkey=old.script_pubkey,
-        amount=old.amount,
-        sequence=old.sequence,
-        conditions=tuple(conds),
-        script_sig=old.script_sig,
-    )
+    replaced = replace(tx.inputs[carrier], conditions=tuple(conds))
     inputs = tx.inputs[:carrier] + (replaced,) + tx.inputs[carrier + 1 :]
-    return Transaction(
-        version=tx.version,
-        locktime=tx.locktime,
-        inputs=inputs,
-        outputs=tx.outputs,
-    )
+    return replace(tx, inputs=inputs)
 
 
 def outcome(tx):

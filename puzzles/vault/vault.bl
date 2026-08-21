@@ -22,7 +22,7 @@
 ;
 ; Consolidation is keyless: the follower's message names its own
 ; scriptPubKey and amount from real prevout data, the leader must
-; receive exactly one such message per follower it sums, and the
+; require exactly one such message per follower it sums, and the
 ; message ledger balances only when the leader's list matches the
 ; followers present, so the merged output can never pay less than
 ; every merged coin's value.
@@ -36,9 +36,10 @@
   (defconstant FOLLOW_PATH 3)
   (defconstant LEAD_PATH 4)
 
-  ; Sender half 3 commits the sending input's own scriptPubKey and
-  ; amount, receiver half 2 addresses a scriptPubKey argument.
-  (defconstant CONSOLIDATE_MODE (+ (* 8 3) 2))
+  ; spk_amount-spk: assurer half 3 commits the assuring input's own
+  ; scriptPubKey and amount, requirer half 2 addresses a
+  ; scriptPubKey argument, packed as assurer times 32 plus requirer.
+  (defconstant CONSOLIDATE_MODE 98)
   (defconstant CONSOLIDATE_PAYLOAD ())
 
   ; This instance's own curried tree hash, the merkle root its
@@ -77,21 +78,21 @@
 
   ; No operator derives the 34-byte taproot scriptPubKey, so the
   ; shared scriptPubKey arrives in the solution and is proven equal
-  ; to the coin's own before it addresses or receives anything.
+  ; to the coin's own before it assures or requires anything.
   (defun follow-path (VROOT IK (MY_SPK))
     (list
       (list ASSERT_MY_TAPROOT IK VROOT)
       (list ASSERT_MY_SCRIPTPUBKEY MY_SPK)
-      (list SEND_MESSAGE CONSOLIDATE_MODE CONSOLIDATE_PAYLOAD MY_SPK)))
+      (list ASSURE CONSOLIDATE_MODE CONSOLIDATE_PAYLOAD MY_SPK)))
 
   (defun sum-amounts (AMOUNTS)
     (if AMOUNTS (+ (f AMOUNTS) (sum-amounts (r AMOUNTS))) 0))
 
-  (defun receive-conditions (SPK AMOUNTS TAIL)
+  (defun require-conditions (SPK AMOUNTS TAIL)
     (if AMOUNTS
-        (c (list RECEIVE_MESSAGE CONSOLIDATE_MODE CONSOLIDATE_PAYLOAD
+        (c (list REQUIRE CONSOLIDATE_MODE CONSOLIDATE_PAYLOAD
                  SPK (f AMOUNTS))
-           (receive-conditions SPK (r AMOUNTS) TAIL))
+           (require-conditions SPK (r AMOUNTS) TAIL))
         TAIL))
 
   ; A leader without followers is rejected, so every consolidation
@@ -104,7 +105,7 @@
       (c (list ASSERT_MY_TAPROOT IK VROOT)
       (c (list ASSERT_MY_SCRIPTPUBKEY MY_SPK)
       (c (list ASSERT_MY_AMOUNT MY_AMT)
-         (receive-conditions MY_SPK FOLLOWER_AMOUNTS
+         (require-conditions MY_SPK FOLLOWER_AMOUNTS
            (list (list CREATE_OUTPUT MY_SPK OUT_AMT))))))))
 
   ; Exists to name VROOT once for every branch.

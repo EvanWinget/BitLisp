@@ -55,8 +55,8 @@ ASSERT_MY_AMOUNT = 0x33
 ASSERT_MY_TAPROOT = 0x37
 ANNOUNCE = 0x40
 ASSERT_ANNOUNCEMENT = 0x41
-SEND_MESSAGE = 0x42
-RECEIVE_MESSAGE = 0x43
+ASSURE = 0x42
+REQUIRE = 0x43
 RESERVE_FEE = 0x50
 SEAL = 0x60
 SEAL_OUTPUTS = 0x61
@@ -117,12 +117,13 @@ SIG_BINDINGS = {
     ),
 }
 
-# A participant specifier names an input's prevout data at one of
-# eight precisions. The commitment value's bits select the fields:
-# 0b100 the creating txid, 0b010 the spent scriptPubKey, 0b001 the
-# amount, except that 0b111 commits to the whole outpoint as a
-# single 36-byte value rather than the three fields separately.
-SPECIFIER_OPERANDS = {
+# A participant specifier names an input's prevout data and
+# execution identity at one of 32 precisions. The commitment
+# value's low three bits select prevout fields: 0b100 the creating
+# txid, 0b010 the spent scriptPubKey, 0b001 the amount, except
+# that 0b111 commits to the whole outpoint as a single 36-byte
+# value rather than the three fields separately.
+_PREVOUT_OPERANDS = {
     0b000: (),
     0b001: ("amount",),
     0b010: ("script_pubkey",),
@@ -132,6 +133,27 @@ SPECIFIER_OPERANDS = {
     0b110: ("txid", "script_pubkey"),
     0b111: ("outpoint",),
 }
+# Bit 3 appends the executing leaf's tapleaf hash and bit 4 the
+# spending path's merkle root, each after the prevout operands,
+# tapleaf first. All 32 combinations are valid commitment values.
+SPECIFIER_OPERANDS = {
+    prevout | (tapleaf << 3) | (root << 4): (
+        operands
+        + (("tapleaf",) if tapleaf else ())
+        + (("merkle_root",) if root else ())
+    )
+    for prevout, operands in _PREVOUT_OPERANDS.items()
+    for tapleaf in (0, 1)
+    for root in (0, 1)
+}
+# An addressed pair's mode packs two commitment values side by side,
+# one per participant, each spanning the specifier table, so the
+# half width and the packed mode bound derive from the table itself.
+SPECIFIER_COMMITMENT_MAX = max(SPECIFIER_OPERANDS)
+_SPECIFIER_HALF_BITS = SPECIFIER_COMMITMENT_MAX.bit_length()
+_MESSAGE_MODE_MAX = (
+    SPECIFIER_COMMITMENT_MAX << _SPECIFIER_HALF_BITS
+) | SPECIFIER_COMMITMENT_MAX
 
 # A locktime below the threshold counts blocks, at or above it counts
 # Unix seconds. Operand domains exclude the wrong-typed range, so a
@@ -162,8 +184,8 @@ CONDITION_COSTS = {
     ASSERT_MY_TAPROOT: CONDITION_GENERIC_COST + TAPROOT_TWEAK_COST,
     ANNOUNCE: CONDITION_MESSAGE_COST,
     ASSERT_ANNOUNCEMENT: CONDITION_MESSAGE_COST,
-    SEND_MESSAGE: CONDITION_MESSAGE_COST,
-    RECEIVE_MESSAGE: CONDITION_MESSAGE_COST,
+    ASSURE: CONDITION_MESSAGE_COST,
+    REQUIRE: CONDITION_MESSAGE_COST,
     RESERVE_FEE: CONDITION_GENERIC_COST,
     SEAL: CONDITION_GENERIC_COST,
     SEAL_OUTPUTS: CONDITION_GENERIC_COST,
@@ -346,29 +368,29 @@ class AssertAnnouncement:
 
 
 @dataclass(frozen=True)
-class SendMessage:
-    """Weight +1 in the message ledger. The sender half describes the
+class Assure:
+    """Weight +1 in the message ledger. The assurer half describes the
     emitting input itself, so only its commitment value is stored
-    here. The receiver is the argument specifier."""
+    here. The requirer is the argument specifier."""
 
-    sender_commitment: int
-    receiver: Specifier
+    assurer_commitment: int
+    requirer: Specifier
     message: bytes
 
-    opcode = SEND_MESSAGE
+    opcode = ASSURE
 
 
 @dataclass(frozen=True)
-class ReceiveMessage:
-    """Weight -1 in the message ledger. The receiver half describes
-    the emitting input itself, the sender is the argument
+class Require:
+    """Weight -1 in the message ledger. The requirer half describes
+    the emitting input itself, the assurer is the argument
     specifier."""
 
-    sender: Specifier
-    receiver_commitment: int
+    assurer: Specifier
+    requirer_commitment: int
     message: bytes
 
-    opcode = RECEIVE_MESSAGE
+    opcode = REQUIRE
 
 
 @dataclass(frozen=True)
@@ -646,11 +668,6 @@ def _parse_specifier(commitment, args, name):
             continue
         if not is_atom(atom):
             raise BitLispError("bad_condition_arg", f"{name} {kind} must be an atom")
-        if kind == "txid" and len(atom) != 32:
-            raise BitLispError(
-                "bad_condition_arg",
-                f"{name} txid must be 32 bytes, got {len(atom)}",
-            )
         if kind == "script_pubkey" and len(atom) > MAX_SCRIPT_PUBKEY_SIZE:
             raise BitLispError(
                 "bad_condition_arg",
@@ -661,6 +678,11 @@ def _parse_specifier(commitment, args, name):
             raise BitLispError(
                 "bad_condition_arg",
                 f"{name} outpoint must be {OUTPOINT_SIZE} bytes, got {len(atom)}",
+            )
+        if kind in ("txid", "tapleaf", "merkle_root") and len(atom) != 32:
+            raise BitLispError(
+                "bad_condition_arg",
+                f"{name} {kind} must be 32 bytes, got {len(atom)}",
             )
         fields.append(atom)
     return Specifier(commitment, tuple(fields))
@@ -679,15 +701,15 @@ def _parse_message_pair(args, name, self_half_high):
     """Shared parse for the addressed pair: mode, message, then the
     specifier operands for the argument half. self_half_high says
     whether the emitting input's own half is the mode's high bits
-    (SEND_MESSAGE) or its low bits (RECEIVE_MESSAGE)."""
+    (ASSURE) or its low bits (REQUIRE)."""
     if len(args) < 2:
         raise BitLispError(
             "bad_condition_arity",
             f"{name} takes at least 2 arguments, got {len(args)}",
         )
-    mode = _parse_mode(args[0], name, 63)
-    self_half = (mode >> 3) & 0b111 if self_half_high else mode & 0b111
-    arg_half = mode & 0b111 if self_half_high else (mode >> 3) & 0b111
+    mode = _parse_mode(args[0], name, _MESSAGE_MODE_MAX)
+    high, low = mode >> _SPECIFIER_HALF_BITS, mode & SPECIFIER_COMMITMENT_MAX
+    self_half, arg_half = (high, low) if self_half_high else (low, high)
     expected = 2 + len(SPECIFIER_OPERANDS[arg_half])
     if len(args) != expected:
         raise BitLispError(
@@ -699,18 +721,18 @@ def _parse_message_pair(args, name, self_half_high):
     return mode, self_half, specifier, message
 
 
-def _parse_send_message(args):
-    _, self_half, receiver, message = _parse_message_pair(
-        args, "SEND_MESSAGE", self_half_high=True
+def _parse_assure(args):
+    _, self_half, requirer, message = _parse_message_pair(
+        args, "ASSURE", self_half_high=True
     )
-    return SendMessage(self_half, receiver, message)
+    return Assure(self_half, requirer, message)
 
 
-def _parse_receive_message(args):
-    _, self_half, sender, message = _parse_message_pair(
-        args, "RECEIVE_MESSAGE", self_half_high=False
+def _parse_require(args):
+    _, self_half, assurer, message = _parse_message_pair(
+        args, "REQUIRE", self_half_high=False
     )
-    return ReceiveMessage(sender, self_half, message)
+    return Require(assurer, self_half, message)
 
 
 def _parse_announce(args):
@@ -729,7 +751,7 @@ def _parse_assert_announcement(args):
             "bad_condition_arity",
             f"ASSERT_ANNOUNCEMENT takes at least 3 arguments, got {len(args)}",
         )
-    mode = _parse_mode(args[0], "ASSERT_ANNOUNCEMENT", 7)
+    mode = _parse_mode(args[0], "ASSERT_ANNOUNCEMENT", SPECIFIER_COMMITMENT_MAX)
     expected = 3 + len(SPECIFIER_OPERANDS[mode])
     if len(args) != expected:
         raise BitLispError(
@@ -849,10 +871,10 @@ def _parse_assigned(opcode, args):
         return _parse_announce(args)
     if opcode == ASSERT_ANNOUNCEMENT:
         return _parse_assert_announcement(args)
-    if opcode == SEND_MESSAGE:
-        return _parse_send_message(args)
-    if opcode == RECEIVE_MESSAGE:
-        return _parse_receive_message(args)
+    if opcode == ASSURE:
+        return _parse_assure(args)
+    if opcode == REQUIRE:
+        return _parse_require(args)
     if opcode == RESERVE_FEE:
         return _parse_reserve_fee(args)
     if opcode == SEAL:

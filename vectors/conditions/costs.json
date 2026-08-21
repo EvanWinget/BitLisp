@@ -185,8 +185,8 @@
     "parsed": [
      {
       "opcode": 66,
-      "sender_commitment": 0,
-      "receiver": {
+      "assurer_commitment": 0,
+      "requirer": {
        "commitment": 0,
        "fields": []
       },
@@ -203,11 +203,11 @@
     "parsed": [
      {
       "opcode": 67,
-      "sender": {
+      "assurer": {
        "commitment": 0,
        "fields": []
       },
-      "receiver_commitment": 0,
+      "requirer_commitment": 0,
       "message": "6d7367"
      }
     ],
@@ -499,8 +499,8 @@
      },
      {
       "opcode": 66,
-      "sender_commitment": 0,
-      "receiver": {
+      "assurer_commitment": 0,
+      "requirer": {
        "commitment": 0,
        "fields": []
       },
@@ -508,11 +508,11 @@
      },
      {
       "opcode": 67,
-      "sender": {
+      "assurer": {
        "commitment": 0,
        "fields": []
       },
-      "receiver_commitment": 0,
+      "requirer_commitment": 0,
       "message": "6d7367"
      },
      {

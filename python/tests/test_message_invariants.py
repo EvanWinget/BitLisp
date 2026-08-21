@@ -15,9 +15,9 @@ from dataclasses import replace
 from bitlisp import (
     Announce,
     AssertAnnouncement,
+    Assure,
     BitLispError,
-    ReceiveMessage,
-    SendMessage,
+    Require,
     Transaction,
     TxInput,
     TxOutput,
@@ -27,7 +27,11 @@ from bitlisp.validation import self_specifier
 from hypothesis import given
 from hypothesis import strategies as st
 
-_MODES = tuple(range(8))
+# The eight prevout values plus a spread of execution-identity
+# compositions: tapleaf alone, merkle root alone, both, and both
+# over prevout fields. The pool inputs carry distinct identity
+# pairs, so composed self specifiers discriminate like the rest.
+_MODES = tuple(range(8)) + (8, 16, 24, 10, 21, 31)
 _PAYLOADS = (b"x", b"y")
 _NAMESPACES = (b"n1", b"n2")
 _PHANTOM = -1
@@ -45,6 +49,8 @@ def _input_identity(salt, n):
         amount=40_000 if n == 0 else n,
         sequence=0xFFFFFFFE,
         conditions=None,
+        tapleaf=bytes([0xA0 ^ (salt + n) & 0xFF]) * 32,
+        merkle_root=bytes([0xB0 ^ (salt + n) & 0xFF]) * 32,
     )
 
 
@@ -58,12 +64,12 @@ def _specifier(salt, idx, commitment):
 def _realize(salt, item):
     """One abstract condition into a dataclass instance."""
     kind = item[0]
-    if kind == "send":
+    if kind == "assure":
         _, target, s_half, r_half, payload = item
-        return SendMessage(s_half, _specifier(salt, target, r_half), payload)
-    if kind == "recv":
+        return Assure(s_half, _specifier(salt, target, r_half), payload)
+    if kind == "require":
         _, source, s_half, r_half, payload = item
-        return ReceiveMessage(_specifier(salt, source, s_half), r_half, payload)
+        return Require(_specifier(salt, source, s_half), r_half, payload)
     if kind == "ann":
         _, namespace, payload = item
         return Announce(namespace, payload)
@@ -79,8 +85,8 @@ def _condition_pool():
         for s_half in _MODES:
             for r_half in _MODES:
                 for payload in _PAYLOADS:
-                    items.append(("send", target, s_half, r_half, payload))
-                    items.append(("recv", target, s_half, r_half, payload))
+                    items.append(("assure", target, s_half, r_half, payload))
+                    items.append(("require", target, s_half, r_half, payload))
     for namespace in _NAMESPACES:
         for payload in _PAYLOADS:
             items.append(("ann", namespace, payload))
@@ -125,12 +131,12 @@ def _spec_says_valid(tx):
     ledger = Counter()
     for tx_input in tx.inputs:
         for cond in tx_input.conditions or ():
-            if isinstance(cond, SendMessage):
-                sender = self_specifier(tx_input, cond.sender_commitment)
-                ledger[(sender, cond.receiver, cond.message)] += 1
-            elif isinstance(cond, ReceiveMessage):
-                receiver = self_specifier(tx_input, cond.receiver_commitment)
-                ledger[(cond.sender, receiver, cond.message)] -= 1
+            if isinstance(cond, Assure):
+                assurer = self_specifier(tx_input, cond.assurer_commitment)
+                ledger[(assurer, cond.requirer, cond.message)] += 1
+            elif isinstance(cond, Require):
+                requirer = self_specifier(tx_input, cond.requirer_commitment)
+                ledger[(cond.assurer, requirer, cond.message)] -= 1
     if any(weight != 0 for weight in ledger.values()):
         return False
     for tx_input in tx.inputs:
@@ -156,18 +162,18 @@ def test_validation_matches_the_rule_restatement(spec):
 
 @given(input_specs, st.data())
 def test_matched_pair_addition_and_lone_halves(spec, data):
-    """From the spec's invariant list: adding a balanced send and
-    receive pair to a valid transaction keeps it valid, and adding
+    """From the spec's invariant list: adding a balanced assure and
+    require pair to a valid transaction keeps it valid, and adding
     either half alone invalidates it."""
     if not is_valid(build_tx(spec)):
         return
-    sender_idx = data.draw(st.integers(0, len(spec) - 1))
-    receiver_idx = data.draw(st.integers(0, len(spec) - 1))
+    assurer_idx = data.draw(st.integers(0, len(spec) - 1))
+    requirer_idx = data.draw(st.integers(0, len(spec) - 1))
     s_half = data.draw(st.sampled_from(_MODES))
     r_half = data.draw(st.sampled_from(_MODES))
     payload = data.draw(st.sampled_from(_PAYLOADS))
-    send = ("send", receiver_idx, s_half, r_half, payload)
-    recv = ("recv", sender_idx, s_half, r_half, payload)
+    assure = ("assure", requirer_idx, s_half, r_half, payload)
+    require = ("require", assurer_idx, s_half, r_half, payload)
 
     def extended(additions):
         grown = [list(items) for items in spec]
@@ -175,9 +181,9 @@ def test_matched_pair_addition_and_lone_halves(spec, data):
             grown[idx] = grown[idx] + [item]
         return build_tx(grown)
 
-    assert is_valid(extended([(sender_idx, send), (receiver_idx, recv)]))
-    assert not is_valid(extended([(sender_idx, send)]))
-    assert not is_valid(extended([(receiver_idx, recv)]))
+    assert is_valid(extended([(assurer_idx, assure), (requirer_idx, require)]))
+    assert not is_valid(extended([(assurer_idx, assure)]))
+    assert not is_valid(extended([(requirer_idx, require)]))
 
 
 @given(input_specs)
@@ -244,15 +250,15 @@ def test_namespace_byte_flip_rejects(commitment, payload):
 def test_specifier_field_flip_rejects(payload):
     """Metamorphic, from the spec's invariant list: flipping a byte
     of a committed specifier field of the only balancing pair
-    rejects. The send's receiver script specifier is mutated after
+    rejects. The assure's requirer script specifier is mutated after
     construction, so only the field byte changes."""
-    spec = [[("send", 1, 2, 2, payload)], [("recv", 0, 2, 2, payload)]]
+    spec = [[("assure", 1, 2, 2, payload)], [("require", 0, 2, 2, payload)]]
     tx = build_tx(spec)
     assert is_valid(tx)
-    send_cond = tx.inputs[0].conditions[0]
-    script = send_cond.receiver.fields[0]
+    assure_cond = tx.inputs[0].conditions[0]
+    script = assure_cond.requirer.fields[0]
     tampered_desc = replace(
-        send_cond.receiver, fields=(bytes([script[0] ^ 0x01]) + script[1:],)
+        assure_cond.requirer, fields=(bytes([script[0] ^ 0x01]) + script[1:],)
     )
     tampered = Transaction(
         2,
@@ -260,7 +266,7 @@ def test_specifier_field_flip_rejects(payload):
         (
             replace(
                 tx.inputs[0],
-                conditions=(replace(send_cond, receiver=tampered_desc),),
+                conditions=(replace(assure_cond, requirer=tampered_desc),),
             ),
             tx.inputs[1],
         ),
@@ -278,12 +284,12 @@ def test_payload_byte_flip_rejects(s_half, r_half, payload):
     """Metamorphic, from the spec's invariant list: flipping a byte of
     the only balancing pair's payload rejects."""
     spec = [
-        [("send", 1, s_half, r_half, payload)],
-        [("recv", 0, s_half, r_half, payload)],
+        [("assure", 1, s_half, r_half, payload)],
+        [("require", 0, s_half, r_half, payload)],
     ]
     assert is_valid(build_tx(spec))
     flipped = bytes([payload[0] ^ 0x01]) + payload[1:]
-    spec[1] = [("recv", 0, s_half, r_half, flipped)]
+    spec[1] = [("require", 0, s_half, r_half, flipped)]
     assert not is_valid(build_tx(spec))
 
 

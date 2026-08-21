@@ -20,12 +20,12 @@ from bitlisp.conditions import (  # noqa: E402
     ASSERT_MY_AMOUNT,
     ASSERT_MY_TAPROOT,
     ASSERT_SIG_RAW,
+    ASSURE,
     CONDITION_COSTS,
     CREATE_OUTPUT,
     CREATE_OUTPUT_TAPROOT,
     RESERVE_FEE,
     SEAL,
-    SEND_MESSAGE,
 )
 from bitlisp.sexp import NIL, int_to_atom  # noqa: E402
 
@@ -59,7 +59,7 @@ def test_cost_table_values_match_spec():
     assert CONDITION_COSTS[SEAL] == 200
     assert CONDITION_COSTS[RESERVE_FEE] == 200
     assert CONDITION_COSTS[ANNOUNCE] == 700
-    assert CONDITION_COSTS[SEND_MESSAGE] == 700
+    assert CONDITION_COSTS[ASSURE] == 700
     assert CONDITION_COSTS[ASSERT_SIG_RAW] == 1_300_000
     assert CONDITION_COSTS[CREATE_OUTPUT] == 1_350_000
     assert CONDITION_COSTS[CREATE_OUTPUT_TAPROOT] == 2_650_000

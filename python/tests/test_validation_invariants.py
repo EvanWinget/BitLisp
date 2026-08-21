@@ -13,6 +13,7 @@ irrelevant to validation.
 """
 
 from collections import Counter
+from dataclasses import replace
 
 import pytest
 from bitlisp import (
@@ -92,6 +93,8 @@ def build_tx(input_claims, outputs):
                 amount=out_total if n == 0 else 0,
                 sequence=0xFFFFFFFF,
                 conditions=conditions,
+                tapleaf=b"\x0a" * 32,
+                merkle_root=b"\x0b" * 32,
             )
         )
     return Transaction(
@@ -301,14 +304,7 @@ def test_plain_only_transaction_always_valid(input_count, outputs):
 def _with_fresh_outpoints(tx_inputs, offset):
     """The same inputs on outpoints from a disjoint txid range."""
     return tuple(
-        TxInput(
-            txid=bytes([offset + n]) * 32,
-            index=tx_input.index,
-            script_pubkey=tx_input.script_pubkey,
-            amount=tx_input.amount,
-            sequence=tx_input.sequence,
-            conditions=tx_input.conditions,
-        )
+        replace(tx_input, txid=bytes([offset + n]) * 32)
         for n, tx_input in enumerate(tx_inputs, start=1)
     )
 
@@ -354,6 +350,18 @@ def test_model_rejects_empty_sides():
         Transaction(2, 0, (), (TxOutput(b"\x51", 1),))
     with pytest.raises(ValueError, match="non-empty"):
         Transaction(2, 0, (tx_input,), ())
+
+
+def test_model_requires_identity_with_conditions():
+    # A condition-carrying input is a BitLisp input, and a BitLisp
+    # input always executes a leaf of some tree, so the model refuses
+    # the impossible shape.
+    with pytest.raises(ValueError, match="tapleaf and merkle_root"):
+        TxInput(b"\x01" * 32, 0, b"\x51", 1, 0, conditions=())
+    with pytest.raises(ValueError, match="tapleaf must be 32 bytes"):
+        TxInput(b"\x01" * 32, 0, b"\x51", 1, 0, tapleaf=b"\x0a" * 31)
+    with pytest.raises(ValueError, match="merkle_root must be 32 bytes"):
+        TxInput(b"\x01" * 32, 0, b"\x51", 1, 0, merkle_root=b"\x0b" * 33)
 
 
 def test_model_rejects_out_of_range_amounts():

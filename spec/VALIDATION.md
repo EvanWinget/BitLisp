@@ -42,7 +42,18 @@ A transaction is:
   `scriptPubKey` and `amount`, a 32-bit `sequence`, and a
   `scriptSig`, the legacy signature field, empty for every segwit
   input. A BitLisp input additionally carries the condition list its
-  evaluation produced.
+  evaluation produced and its execution identity: `tapleaf`, the
+  32-byte leaf hash of the executing leaf, and `merkleRoot`, the
+  32-byte merkle root of the spending path. Base consensus
+  authenticates both during every script-path spend, hashing the
+  revealed leaf into `tapleaf`, combining it with the control
+  block's path into `merkleRoot`, and checking that root against
+  the spent scriptPubKey through the taproot tweak, so the pair is
+  witness data the spender chooses but cannot forge. Only
+  conditions reach these fields: an input without a condition
+  list, whether a non-BitLisp input or a BitLisp spend whose
+  evaluation has not yet produced one, may carry the pair or not,
+  and no rule reads it from either.
 - `outputs`, an ordered list of slots. Each slot's content is the
   pair (`scriptPubKey`, `amount`). Slots are addressed by index.
 
@@ -100,7 +111,7 @@ its cost against its input's budget under rule 5.
   balance exactly. Its counterpart is another condition, not a
   transaction resource, so it is neither a claim nor an assert.
   Satisfaction is consumed one for one as with a claim, but both
-  directions demand: an unmatched send and an unmatched receive
+  directions demand: an unmatched ASSURE and an unmatched REQUIRE
   are equally invalid.
 - A **fee reserve** demands that the transaction's fee reach a
   quantity. Reserves are counted, not idempotent: rule 7 sums
@@ -248,10 +259,12 @@ this rule is scoped to the containing transaction. No message or
 announcement exists outside it.
 
 **Participant specifiers.** A specifier identifies an input's
-prevout data at a chosen precision. It is a commitment value from
-0 to 7 together with the fields that value commits to:
+prevout data and execution identity at a chosen precision. It is
+a commitment value from 0 to 31 together with the fields that
+value commits to. The value's low three bits select prevout
+fields:
 
-| commitment value | committed fields | operands, in order |
+| low three bits | committed fields | operands, in order |
 | --- | --- | --- |
 | 0 | none | none |
 | 1 | `amount` | `amount` |
@@ -262,29 +275,42 @@ prevout data at a chosen precision. It is a commitment value from
 | 6 | creating txid and `scriptPubKey` | `txid`, `scriptPubKey` |
 | 7 | the outpoint | `outpoint` |
 
+Bit 3 (value 8) additionally commits to the input's `tapleaf` and
+bit 4 (value 16) to its `merkleRoot`, the two execution-identity
+fields of the transaction view. Each set bit appends its one
+operand after the low bits' operands, `tapleaf` before
+`merkleRoot`. Every combination is a valid commitment value: the
+32 values are the 8 prevout rows composed with the 4
+execution-identity subsets.
+
 The creating txid of an input is the txid half of the outpoint it
 consumes: the transaction that created a coin is the transaction
-its outpoint names. Commitment value 7 commits to the whole
-outpoint as a single 36-byte value and is a distinct specifier,
-not the union of the other bits.
+its outpoint names. Low bits 7 commit to the whole outpoint as a
+single 36-byte value and are a distinct specifier, not the union
+of the other prevout bits.
 
 Two specifiers are equal if and only if their commitment values
 are equal and their committed fields are equal, byte-exact for
 scripts, txids, and outpoints, numeric for amounts.
 
 The **self specifier** of an input at commitment value m fills
-the committed fields from that input's own prevout data in the
-transaction view. The **argument specifier** fills them from
-condition operands, in the operand order the table states.
+the committed fields from that input's own prevout data and
+execution identity in the transaction view. Every input a self
+specifier is built for is a BitLisp input, since only conditions
+build them, so its execution-identity fields always exist. The
+**argument specifier** fills the committed fields from condition
+operands, in the operand order stated above.
 
-**The message ledger.** Each SEND_MESSAGE condition of an input
+**The message ledger.** Each ASSURE condition of an input
 contributes weight +1 to the record (self specifier of that input
-at the mode's sender half, argument specifier at the receiver
-half, `message`). Each RECEIVE_MESSAGE condition of an input
+at the mode's assurer half, argument specifier at the requirer
+half, `message`). Each REQUIRE condition of an input
 contributes weight -1 to the record (argument specifier at the
-sender half, self specifier of that input at the receiver half,
-`message`). The sender half of the six-bit mode is its high three
-bits and the receiver half its low three bits.
+assurer half, self specifier of that input at the requirer half,
+`message`). The assurer half of the ten-bit mode is its high five
+bits and the requirer half its low five bits, each a commitment
+value: the mode is the assurer's commitment value times 32 plus
+the requirer's.
 
 The message ledger balances if and only if the
 weights of every distinct record sum to zero, and a transaction
@@ -294,14 +320,15 @@ checked as asserts, not through the ledger.
 
 Consequences, each pinned by vectors:
 
-- k identical sends require exactly k identical receives, and the
-  reverse. One send cannot satisfy two receives.
-- A send and a receive may come from the same input, including one
-  input carrying both halves of its own pair.
+- k identical ASSURE conditions require exactly k identical
+  REQUIRE conditions, and the reverse. One ASSURE cannot satisfy
+  two REQUIRE conditions.
+- An ASSURE and a REQUIRE may come from the same input, including
+  one input carrying both halves of its own pair.
 - The ledger is a sum, so input order and condition order never
   affect the outcome.
-- A send whose receiver specifier matches no input's self
-  specifier can never balance, because only a receive from a
+- An ASSURE whose requirer specifier matches no input's self
+  specifier can never balance, because only a REQUIRE from a
   matching input produces the equal record.
 - Two independently balanced groups of inputs stay balanced when
   spent together, even when their records collide.
@@ -315,12 +342,19 @@ recombination-stability class:
 | `scriptPubKey` | yes | yes |
 | creating txid | no | no |
 | `outpoint` | no | no |
+| `tapleaf` | yes | yes |
+| `merkleRoot` | yes | yes |
 
 For an input whose creating transaction is confirmed, every field
 is fixed and any mode is safe. The classes separate content, which
 a program written before its counterpart exists can commit to,
 from location, which exists only once the creating transaction is
-final.
+final. The execution-identity fields are content: a leaf hash and
+a tree root are computable from scripts alone, before any
+transaction exists. They are also per-spend rather than per-coin:
+a coin committing to several leaves executes one of them in each
+spend, so a `tapleaf` commitment addresses the program the
+counterpart runs in this transaction, not the coin that runs it.
 
 **Guidance for program authors (not consensus).** A loose
 commitment is a loose lock. A specifier at commitment value 0, or
@@ -336,6 +370,22 @@ fields, txid or outpoint, once the counterpart is confirmed. A
 program embedded in a coin whose counterpart may still be
 reassembled can only safely address by content fields, and it
 accepts the substitution exposure that choice implies.
+
+The execution-identity fields carry their own two cautions. A
+`tapleaf` commitment identifies a program, not a coin: the same
+leaf grafted into any other tree, under any internal key,
+produces the same leaf hash, so a specifier committing to
+`tapleaf` alone is matched by any input an adversary arranges to
+execute that program. A `merkleRoot` commitment identifies a
+tree, not an output: the same tree placed under a different
+internal key produces the same root, so a specifier committing to
+`merkleRoot` alone is matched by an input whose key path an
+adversary controls. A program that means "this program, in that
+coin" composes an execution-identity bit with the prevout fields
+that pin the coin. The root's value over the leaf field is
+breadth: committing to `merkleRoot` accepts any leaf of a known
+tree, where `tapleaf` alone forces the addressing program to
+enumerate a whitelist of leaves.
 
 **Announcements.** Each ANNOUNCE condition of an input creates the
 announcement (that input, `namespace`, `payload`). An
@@ -360,7 +410,7 @@ their operands are equal, operand by operand, equal as trees with
 corresponding atoms byte-exact. Identity is a property of the
 condition alone. What a condition contributes may still depend on
 the input that carries it: rule 3's self specifiers make
-identical SEND_MESSAGE conditions of different inputs contribute
+identical ASSURE conditions of different inputs contribute
 distinct records, and an assert's fact may read the carrying
 input's own fields.
 
@@ -650,9 +700,9 @@ it enforceable, and lands with that rule:
 - ASSERT_MY_TAPROOT and an ASSERT_MY_SCRIPTPUBKEY carrying its
   derived scriptPubKey produce identical outcomes on every input
   (self asserts).
-- Adding a balanced send and receive pair to a valid transaction
-  keeps it valid, and adding either half alone invalidates it
-  (rule 3).
+- Adding a balanced ASSURE and REQUIRE pair to a valid
+  transaction keeps it valid, and adding either half alone
+  invalidates it (rule 3).
 - Adding an ANNOUNCE to a valid transaction never invalidates it,
   and removing the only announcement an assert reads invalidates
   it (rule 3).

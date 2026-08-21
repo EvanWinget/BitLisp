@@ -27,11 +27,11 @@ from bitlisp import (
     AssertLocktimeTime,
     AssertSequenceHeight,
     AssertSequenceTime,
+    Assure,
     BitLispError,
     CreateOutput,
-    ReceiveMessage,
+    Require,
     Reserved,
-    SendMessage,
     Specifier,
     Transaction,
     TxInput,
@@ -83,7 +83,7 @@ _TAPROOT_SPK = b"\x51\x20" + taproot_output_key(_TAPROOT_IK, b"")
 
 def _pool(own_txid, own_script, other_txid, other_script):
     """Condition candidates for one input. Announcer specifiers,
-    receiver specifiers, and payloads collide across the pools of
+    requirer specifiers, and payloads collide across the pools of
     both inputs, so generated transactions land on both sides of
     every landed rule, and the never-announced payload keeps the
     announcement error path exercised. The self asserts pair each
@@ -116,10 +116,10 @@ def _pool(own_txid, own_script, other_txid, other_script):
         AssertAnnouncement(Specifier(0, ()), b"ns", b"never-announced"),
         Reserved(0x80, 500, ()),
         Reserved(0xFF, 12345, ()),
-        SendMessage(7, Specifier(7, (_outpoint(other_txid),)), b"hi"),
-        ReceiveMessage(Specifier(7, (_outpoint(other_txid),)), 7, b"hi"),
-        SendMessage(0, Specifier(0, ()), b"hi"),
-        ReceiveMessage(Specifier(0, ()), 0, b"hi"),
+        Assure(7, Specifier(7, (_outpoint(other_txid),)), b"hi"),
+        Require(Specifier(7, (_outpoint(other_txid),)), 7, b"hi"),
+        Assure(0, Specifier(0, ()), b"hi"),
+        Require(Specifier(0, ()), 0, b"hi"),
     )
 
 
@@ -146,6 +146,8 @@ def build_tx(version, locktime, cond_lists, seq_pair, output_contents):
             amount=out_total if txid == TXID_A else 0,
             sequence=sequence,
             conditions=tuple(conditions),
+            tapleaf=b"\x0a" * 32,
+            merkle_root=b"\x0b" * 32,
         )
         for txid, script, sequence, conditions in (
             (TXID_A, SCRIPT_A, seq_pair[0], cond_lists[0]),
