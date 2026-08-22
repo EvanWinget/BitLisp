@@ -53,6 +53,7 @@ ASSERT_MY_TXID = 0x31
 ASSERT_MY_SCRIPTPUBKEY = 0x32
 ASSERT_MY_AMOUNT = 0x33
 ASSERT_MY_TAPROOT = 0x37
+ASSERT_MY_TAPTREE = 0x38
 ANNOUNCE = 0x40
 ASSERT_ANNOUNCEMENT = 0x41
 ASSURE = 0x42
@@ -182,6 +183,7 @@ CONDITION_COSTS = {
     ASSERT_MY_SCRIPTPUBKEY: CONDITION_GENERIC_COST,
     ASSERT_MY_AMOUNT: CONDITION_GENERIC_COST,
     ASSERT_MY_TAPROOT: CONDITION_GENERIC_COST + TAPROOT_TWEAK_COST,
+    ASSERT_MY_TAPTREE: CONDITION_GENERIC_COST,
     ANNOUNCE: CONDITION_MESSAGE_COST,
     ASSERT_ANNOUNCEMENT: CONDITION_MESSAGE_COST,
     ASSURE: CONDITION_MESSAGE_COST,
@@ -313,6 +315,25 @@ class AssertMyTaproot:
     script_pubkey: bytes
 
     opcode = ASSERT_MY_TAPROOT
+
+
+@dataclass(frozen=True)
+class AssertMyTaptree:
+    """Asserts the input's execution identity: the internal key and
+    merkle root its control block carries, each compared byte-exact.
+
+    Proves what AssertMyTaproot proves without the derivation: base
+    consensus has already tweaked this key by this root and checked
+    the result against the spent scriptPubKey. The internal key is
+    width-checked only. The field it is compared against always
+    lifts to a curve point, so an operand that does not lift never
+    matches and fails as unsatisfied.
+    """
+
+    internal_key: bytes
+    merkle_root: bytes
+
+    opcode = ASSERT_MY_TAPTREE
 
 
 @dataclass(frozen=True)
@@ -615,6 +636,29 @@ def _parse_assert_my_taproot(args, meter):
     return AssertMyTaproot(internal_key, merkle_root, script_pubkey)
 
 
+def _parse_assert_my_taptree(args):
+    """Two atom operands of exactly 32 bytes each, the internal key
+    then the merkle root. The root is never empty here, unlike the
+    taproot assert's: a BitLisp spend always executes a leaf of some
+    tree."""
+    if len(args) != 2:
+        raise BitLispError(
+            "bad_condition_arity",
+            f"ASSERT_MY_TAPTREE takes 2 arguments, got {len(args)}",
+        )
+    for atom, what in zip(args, ("internal key", "merkle root"), strict=True):
+        if not is_atom(atom):
+            raise BitLispError(
+                "bad_condition_arg", f"ASSERT_MY_TAPTREE {what} must be an atom"
+            )
+        if len(atom) != 32:
+            raise BitLispError(
+                "bad_condition_arg",
+                f"ASSERT_MY_TAPTREE {what} must be 32 bytes, got {len(atom)}",
+            )
+    return AssertMyTaptree(*args)
+
+
 def _parse_assert_sig(opcode, args):
     name = SIG_BINDINGS[opcode][0]
     if len(args) != 3:
@@ -867,6 +911,8 @@ def _parse_assigned(opcode, args):
         return _parse_assert_my_scriptpubkey(args)
     if opcode == ASSERT_MY_AMOUNT:
         return _parse_assert_my_amount(args)
+    if opcode == ASSERT_MY_TAPTREE:
+        return _parse_assert_my_taptree(args)
     if opcode == ANNOUNCE:
         return _parse_announce(args)
     if opcode == ASSERT_ANNOUNCEMENT:

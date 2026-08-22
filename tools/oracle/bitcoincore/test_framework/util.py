@@ -21,8 +21,7 @@ def assert_equal(thing1, thing2, *args):
 def assert_not_equal(thing1, thing2, *, error_message=""):
     if thing1 == thing2:
         raise AssertionError(
-            f"Both values are {thing1}"
-            f"{f', {error_message}' if error_message else ''}"
+            f"Both values are {thing1}{f', {error_message}' if error_message else ''}"
         )
 
 

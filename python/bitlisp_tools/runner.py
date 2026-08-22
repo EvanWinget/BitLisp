@@ -29,6 +29,7 @@ from bitlisp.conditions import (
     AssertMyOutpoint,
     AssertMyScriptPubKey,
     AssertMyTaproot,
+    AssertMyTaptree,
     AssertMyTxid,
     AssertSequenceHeight,
     AssertSequenceTime,
@@ -71,12 +72,12 @@ def load_context(obj):
     The shape is the validation corpus's, closed at every level:
     version, locktime, inputs, and outputs exactly, each input with
     txid, index, script_pubkey, and amount plus optional sequence,
-    conditions, script_sig, tapleaf, and merkle_root, each output
-    with script_pubkey and amount exactly. Byte fields are plain hex
-    strings. The transaction model requires the execution-identity
-    pair on every condition-carrying input, and the runner's target
-    input needs it too, since conditions are installed there after
-    evaluation.
+    conditions, script_sig, tapleaf, merkle_root, and internal_key,
+    each output with script_pubkey and amount exactly. Byte fields
+    are plain hex strings. The transaction model requires the
+    execution-identity triple on every condition-carrying input, and
+    the runner's target input needs it too, since conditions are
+    installed there after evaluation.
 
     A carried conditions field is an already-evaluated serialized
     condition list. One that does not deserialize is a shape defect,
@@ -102,6 +103,7 @@ def load_context(obj):
         "script_sig",
         "tapleaf",
         "merkle_root",
+        "internal_key",
     }
     decoded_inputs = []
     for entry in obj["inputs"]:
@@ -153,6 +155,11 @@ def load_context(obj):
                         if "merkle_root" in entry
                         else None
                     ),
+                    internal_key=(
+                        bytes.fromhex(entry["internal_key"])
+                        if "internal_key" in entry
+                        else None
+                    ),
                 )
                 for entry, conditions in decoded_inputs
             ),
@@ -190,10 +197,14 @@ def run_spend(program, solution, tx, input_index=0, max_cost=DEFAULT_MAX_COST):
     target = tx.inputs[input_index]
     if target.conditions is not None:
         raise ContextError(f"input {input_index} already carries conditions")
-    if target.tapleaf is None or target.merkle_root is None:
+    if (
+        target.tapleaf is None
+        or target.merkle_root is None
+        or target.internal_key is None
+    ):
         raise ContextError(
-            f"input {input_index} must carry tapleaf and merkle_root, the "
-            "executing input's identity"
+            f"input {input_index} must carry tapleaf, merkle_root, and "
+            "internal_key, the executing input's identity"
         )
     vm_cost, result = run(program, solution, max_cost)
     total_cost, conditions = parse_conditions(result, max_cost, cost=vm_cost)
@@ -217,6 +228,7 @@ _CONDITION_NAMES = {
     AssertMyScriptPubKey: "ASSERT_MY_SCRIPTPUBKEY",
     AssertMyAmount: "ASSERT_MY_AMOUNT",
     AssertMyTaproot: "ASSERT_MY_TAPROOT",
+    AssertMyTaptree: "ASSERT_MY_TAPTREE",
     Announce: "ANNOUNCE",
     AssertAnnouncement: "ASSERT_ANNOUNCEMENT",
     Assure: "ASSURE",
