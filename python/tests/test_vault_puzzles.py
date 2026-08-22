@@ -141,6 +141,7 @@ def bl_input(txid, index, spk, amount, root, sequence=SEQ_FINAL, conditions=None
         conditions=conditions,
         tapleaf=root,
         merkle_root=root,
+        internal_key=NUMS,
     )
 
 

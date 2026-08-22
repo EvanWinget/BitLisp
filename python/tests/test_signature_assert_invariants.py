@@ -134,6 +134,7 @@ def build_tx(coin, conds, env):
             conditions=tuple(conds),
             tapleaf=b"\x0a" * 32,
             merkle_root=b"\x0b" * 32,
+            internal_key=b"\x0c" * 32,
         )
     ]
     if extra_position != "none":

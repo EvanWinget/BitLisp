@@ -148,6 +148,7 @@ def build_tx(version, locktime, cond_lists, seq_pair, output_contents):
             conditions=tuple(conditions),
             tapleaf=b"\x0a" * 32,
             merkle_root=b"\x0b" * 32,
+            internal_key=b"\x0c" * 32,
         )
         for txid, script, sequence, conditions in (
             (TXID_A, SCRIPT_A, seq_pair[0], cond_lists[0]),

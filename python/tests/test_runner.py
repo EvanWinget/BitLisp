@@ -69,6 +69,7 @@ def _context(**overrides):
                 "amount": 1000,
                 "tapleaf": "0a" * 32,
                 "merkle_root": "0b" * 32,
+                "internal_key": "0c" * 32,
             }
         ],
         "outputs": [{"script_pubkey": SPK_P2WPKH, "amount": 600}],
@@ -225,6 +226,7 @@ def test_load_context_carried_conditions_parse():
         # Execution-identity shape defects from the model.
         _context(inputs=[_input(tapleaf="0a" * 31)]),
         _context(inputs=[_input(merkle_root="0b" * 33)]),
+        _context(inputs=[_input(internal_key="0c" * 31)]),
     ],
 )
 def test_load_context_rejects(obj):
@@ -288,13 +290,16 @@ def test_run_spend_rejects_carried_target():
 
 def test_run_spend_rejects_target_without_identity():
     # The computed conditions would install onto an input the model
-    # refuses, so the runner reports the missing pair up front.
-    entry = _input()
-    del entry["tapleaf"]
-    del entry["merkle_root"]
-    tx = load_context(_context(inputs=[entry]))
-    with pytest.raises(ContextError, match="tapleaf and merkle_root"):
-        run_spend(assemble("(q)"), b"", tx)
+    # refuses, so the runner reports the missing triple up front, and
+    # any one missing field is enough.
+    for missing in ("tapleaf", "merkle_root", "internal_key"):
+        entry = _input()
+        del entry[missing]
+        tx = load_context(_context(inputs=[entry]))
+        with pytest.raises(
+            ContextError, match="tapleaf, merkle_root, and internal_key"
+        ):
+            run_spend(assemble("(q)"), b"", tx)
 
 
 # The command.

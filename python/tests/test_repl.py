@@ -40,6 +40,7 @@ def ctx_file(tmp_path):
                 "amount": 1000,
                 "tapleaf": "0a" * 32,
                 "merkle_root": "0b" * 32,
+                "internal_key": "0c" * 32,
             }
         ],
         "outputs": [{"script_pubkey": SPK_P2WPKH, "amount": 600}],
@@ -201,6 +202,7 @@ def test_input_selection_reaches_spend(shell, tmp_path, capsys):
                 "amount": 1000,
                 "tapleaf": "0a" * 32,
                 "merkle_root": "0b" * 32,
+                "internal_key": "0c" * 32,
             },
             {
                 "txid": "22" * 32,
@@ -209,6 +211,7 @@ def test_input_selection_reaches_spend(shell, tmp_path, capsys):
                 "amount": 700,
                 "tapleaf": "0a" * 32,
                 "merkle_root": "0b" * 32,
+                "internal_key": "0c" * 32,
             },
         ],
         "outputs": [{"script_pubkey": SPK_P2WPKH, "amount": 600}],
@@ -489,6 +492,7 @@ def test_main_input_out_of_range_exits_two(tmp_path, capsys):
                 "amount": 1000,
                 "tapleaf": "0a" * 32,
                 "merkle_root": "0b" * 32,
+                "internal_key": "0c" * 32,
             }
         ],
         "outputs": [{"script_pubkey": SPK_P2WPKH, "amount": 600}],

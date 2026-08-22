@@ -189,6 +189,7 @@ def singleton_input(spk, root, txid, index, amount, conditions=None):
         conditions=conditions,
         tapleaf=root,
         merkle_root=root,
+        internal_key=NUMS,
     )
 
 
