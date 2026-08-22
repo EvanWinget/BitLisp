@@ -94,10 +94,18 @@ serialization library, the two-preimage lineage proof, the
 output-index rule, and the condition morph, is exactly what the
 fungible asset token needs, the one construction on the list where
 a funded imitation steals, and the suite's own entry. That is the
-value this work delivered, and the recommendation is to point the
-remaining benchmark effort there. Should that token become a
-standard, its name is BAT1, the Bitcoin asset token standard
-(decision by Evan, 2026-08-22).
+value this work delivered, and the remaining benchmark effort on
+lineage belongs there.
+
+One thing the token benchmark is not: a goal. BitLisp does not set
+out to put fungible asset tokens on Bitcoin. The benchmark exists
+because a covenant vocabulary that can express a vault can
+probably express a token layer too, and the project's obligation is
+to know that, to know what it costs, and to state the risks, rather
+than to discover them after deployment. The token is built to
+understand the capability and its exposure, not to ship it. Should
+a standard ever be written, its name is BAT1, the Bitcoin asset
+token standard (decision by Evan, 2026-08-22).
 
 ## Why the Chia construction does not port directly
 
