@@ -12,8 +12,12 @@ identity sits on it: NFTs, decentralized identifiers, pool state,
 DataLayer roots, name registries. The wrapper pattern it embodies,
 a program that runs another program and morphs its conditions, is
 the userspace covenant engine the evaluation document names, and
-this puzzle is its acceptance test. This is tooling and vectors
-only: nothing here changes `spec/` or the consensus implementation.
+this puzzle is its acceptance test. Whether the singleton itself
+earns a place on Bitcoin is a separate question, answered honestly
+in the next section: for the constructions Bitcoin cares about
+first it does not, and what it built is the foundation the asset
+token benchmark needs. This is tooling and vectors only: nothing
+here changes `spec/` or the consensus implementation.
 
 Sources live in `puzzles/singleton/`, shared helpers in
 `puzzles/lib/`. Both programs compile with the two include
@@ -23,6 +27,77 @@ directories on the search path:
 bitlisp-compile puzzles/singleton/singleton.bl -I puzzles/lib -I puzzles/singleton
 bitlisp-compile puzzles/singleton/owner-inner.bl -I puzzles/lib -I puzzles/singleton
 ```
+
+## Is a singleton worth having on Bitcoin
+
+The singleton entered the plan with the repository's first commit
+as one of four puzzles to write, with no recorded rationale, and
+the evaluation document's benchmark suite never lists it. The suite
+lists a fungible asset token, and mentions singletons once, as the
+example of the wrapper pattern. So the question of value was owed
+before review, and it was answered two ways on 2026-08-22: a census
+of what the vendored Chia code actually uses singletons for, and a
+pass over the constructions Bitcoin cares about first.
+
+The test that decides it is the **funded imitation**: anyone can
+pay to a construction's scriptPubKey and then try to spend that coin
+as if it were the real one. A singleton exists to make that coin
+unspendable. The question for each construction is who loses if it
+were spendable.
+
+| construction | identity comes from | state advanced by | a funded imitation hurts | singleton needed |
+| --- | --- | --- | --- | --- |
+| Lightning channel, LN-Symmetry | the funding outpoint | 2-of-2 signatures | the faker only | no |
+| channel factory | the factory outpoint | n-of-n signatures | the faker only | no |
+| Ark round | the round outpoint | the coordinator and the users, timelocks | the faker only | no |
+| vault | the curried policy | the owner's key, then keyless paths | nobody, a funded "fake" vault coin is a deposit | no |
+| payment pool | the pool outpoint | n-of-n, unilateral exit under rules | the faker only, an exit from a fake balance tree returns the faker's own sats | no |
+| oracle or DLC with a fixed key | the key | the key | nobody, ASSERT_SIG_RAW suffices, no co-spend needed | no |
+| fungible asset token | the issuance lineage | anyone holding tokens | everyone, a fake mints value from nothing | yes, this lineage proof |
+| name registry, identity with a changing policy | the lineage | a program, not one key | whoever relied on the name or identity | yes |
+
+Every value-carrying construction gets identity from its root
+outpoint, which base consensus spends exactly once, and authority
+from its parties' signatures, and an imitation is someone buying
+their own coin. The singleton earns its keep only where the coin's
+meaning is external to its own satoshis: a token's provenance, a
+name, an identity whose policy changes over time.
+
+The Chia census says the same. Every dependent in the vendored
+corpora names a singleton by its launcher id: the NFT layers (one
+NFT, one history), the DID inner puzzle (identity across key
+recovery, and a forked DID could cast a recovery vote twice), the
+pool member (a reward absorbed once, keyless), and the tibetswap
+pair, whose reserve coins hold real value claimable only by the one
+live descendant. chia-gaming, a real state channel with off-chain
+state and preemption, never applies the wrapper at all: two keys
+and per-coin curried commitments carry it, the Lightning shape.
+Every Chia use is a token, an identity, or a coin governing other
+coins, and none is a two-party value-carrying state machine.
+
+The census also settled the design question this document records
+as open below. No dependent needs the puzzle hash to move with the
+inner puzzle. The only thing any of them reconstructs from the
+current hash is an announcement target, and each such site
+(`p2_singleton`, the liquidity TAIL, DID recovery) must be handed
+the current inner hash at runtime to do it. Under a constant
+scriptPubKey that overhead disappears, and Chia's singleton
+fast-forward, today usable only for singletons whose inner puzzle
+never changes, would apply to every singleton. The constant
+scriptPubKey is the better shape on Chia's own evidence, not a
+compromise.
+
+Verdict, recorded for the plan: the singleton as a standalone
+identity primitive has thin demand on Bitcoin, and Ark, Lightning,
+vaults, and pools will not import it. What this puzzle built, the
+serialization library, the two-preimage lineage proof, the
+output-index rule, and the condition morph, is exactly what the
+fungible asset token needs, the one construction on the list where
+a funded imitation steals, and the suite's own entry. That is the
+value this work delivered, and the recommendation is to point the
+remaining benchmark effort there. Should that token become a
+standard, its name is BAT1, the Bitcoin asset token standard
+(decision by Evan, 2026-08-22).
 
 ## Why the Chia construction does not port directly
 
@@ -347,6 +422,78 @@ inputs, so every example transaction carries an ordinary fee input
 beside the singleton coin, and the launch transaction is a plain
 wallet transaction whose only BitLisp content is the two outputs it
 creates.
+
+## Authoring observations across the vault and the singleton
+
+Two puzzles in the v0 language, about 500 source lines between
+them, are enough to see repeated shapes. Each is recorded here with
+a concrete candidate, for the typed v1 ledger and for the language
+itself. None is implemented by this change.
+
+1. **Naming a value once is the dominant cost.** The vault's
+   `dispatch` exists to name a reconstructed root, and the
+   singleton's `spend` and `emit` exist to name a txid and an inner
+   hash, each threading nine to eleven parameters through a helper
+   whose only purpose is a binding. The pre-registered `assign`
+   trigger has now fired in both puzzles. Candidate: a `let` form
+   with several bindings, compiled exactly as those helpers are
+   written by hand, a synthetic function taking the bound names as
+   parameters and called once, so it costs one apply and no new
+   compiled shape. Chialisp's modern compiler has `let` and
+   `assign`, and the census that deferred them found two test-only
+   uses. The puzzles are the production evidence that was missing.
+2. **Every curried value gets a domain guard.** Both puzzles open
+   with an `assert` block checking widths and ranges of every fixed
+   value, because a malformed instance must fail on its first
+   spend rather than on the one path that reads the bad value. This
+   is the evidence the typed v1 gate asked for: the curried
+   parameter domains are the main thing a type would check, and a
+   compiler that emitted these guards from declared widths would
+   remove the block and the risk of omitting one entry from it.
+3. **List helpers are rewritten per puzzle.** `sum-amounts`,
+   `require-conditions`, `state-scripts`, `length`, `nth`, and the
+   serializers are all the same recursion skeleton. Without
+   function values or macros there is no `map`, and that is
+   Chialisp's position too, but `length` and `nth` now live in
+   `tx-wire.blib` and take those names for every program that
+   includes it, under the one-namespace rule. Candidate: a standard
+   `puzzles/lib/list.blib` owning the generic names, so a library
+   never claims them incidentally.
+4. **Consing conditions onto a tail.** Condition lists are built as
+   `(c A (c B (c C TAIL)))` in both puzzles because `list` cannot
+   end in a tail. Candidate: a `list*` form consing its arguments
+   onto its last one, a purely syntactic compiler form with an
+   obvious expansion. Chialisp lacks it, so it would be a recorded
+   tooling divergence, and a small one.
+5. **Identity reconstruction is the same call three times.**
+   `vault-root`, `triggered-root`, and `singleton-root` each spell
+   `curried-tree-hash` over a hand-written list of `sha256tree`
+   calls. A `map` would fold them, and its absence is item 3.
+   Until then a helper taking the raw values, one arity per
+   length, is the honest option, and the Phase 4 commitment scheme
+   may replace the whole convention.
+6. **Self data arrives in the solution and is asserted.** The
+   scriptPubKey, amount, and outpoint are supplied and then pinned
+   with the self asserts in every path of both puzzles, because no
+   operator reads the spending input's prevout. That is Chia's
+   shape as well and costs one condition each. A library helper
+   emitting the three asserts together would remove the repetition
+   without touching the vocabulary.
+7. **Byte-level encoding is clumsy at the VM layer.** Little-endian
+   widths are built one byte at a time through
+   `(substr (+ 256 B) 1 2)`, and the serialization library spends
+   most of its lines on compact-size and field widths. A Bitcoin
+   program that reads transactions will do this often. This is a
+   Phase 4 cost question, not a language one: a fixed-width
+   integer encoding operator, or a transaction-field family in the
+   spirit of the "opcodes special to parsing Bitcoin transactions"
+   Bram Cohen suggested for a UTXO-model Lisp, would shrink both the
+   witness and the cost line.
+8. **Test harnesses repeat.** `test_vault_puzzles.py` and
+   `test_singleton_puzzles.py` each define proper-list building,
+   outpoint-bound signing, BitLisp input construction, and the
+   instance helper. A shared puzzle test module is due before the
+   third puzzle.
 
 ## Worked instance
 
