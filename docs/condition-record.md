@@ -38,6 +38,7 @@ Section 4 registers the rules that have no external reference at all.
 | C21 | per-spend base cost | 450,000 (SPEND_COST) charged for each coin spend under the hard fork 2 pricing flag, before any condition's own cost | no per-spend constant, conditions alone charge | A Bitcoin input's fixed overhead, prevout fetch and per-input iteration, is work base consensus performs and prices in weight for every input of every transaction, so a cost-unit constant would charge it twice. Declined with a falsifier pre-registered: the Phase 4 measurement pass isolates per-spend overhead Chia-style, n spends of k conditions against nk conditions in fewer spends, and a measured non-byte-proportional overhead introduces the constant then, a tightening that is cheap before publication. Ratified 2026-08-09, decision 25. | `conditions/costs.json` totals contain no per-list constant |
 | C22 | signature-condition cost | 1,200,000 (AGG_SIG_COST) per occurrence in every regime, pricing one BLS pairing toward the bundle aggregate | 1,300,000 (CONDITION_SIG_ASSERT_COST), equal to the VM's SECP_VERIFY_COST, PROVISIONAL | Both layers of BitLisp price the same BIP340 verification, so the condition constant ties to the operator constant rather than to Chia's BLS figure: one Phase 4 measurement settles both, and a program can never buy the same verification cheaper in one layer than the other. Chia's magnitude corroborates the range, their pairing being work of the same order. Ratified 2026-08-09, decision 25. | `conditions/costs.json` signature cases |
 | C23 | execution-identity addressing | none: puzzle hash is both the coin's script commitment and the executing program, one field carries both meanings | the specifier table composes the executing leaf's tapleaf hash (bit 3) and the spending path's merkle root (bit 4) onto the prevout rows, commitment values 0 to 31, the mode packed as assurer times 32 plus requirer, both fields validator-filled from the control block. The pair itself is renamed ASSURE and REQUIRE (decision 27) | Taproot splits Chia's one identity into two, and the C9 mapping carried only the script commitment, so program-to-program trust had no faithful addressing field. Internal-key addressing declined as attacker-satisfiable (no possession proof in BIP341). Grafted-leaf and moved-root caveats recorded in decision 26 and in rule 3's author guidance. Ratified 2026-08-18, decision 26, landed 2026-08-20. | `validation/messages.json` identity cases, `conditions/messages.json` composed-mode cases |
+| C24 | the cheap identity assert | none: ASSERT_MY_PUZZLEHASH reads the one identity field, and no derive-versus-read split exists because a puzzle hash is a plain tree hash | ASSERT_MY_TAPTREE, a self assert over the control block's internal key and merkle root at the generic cost, the transaction view's identity widened to a triple. ASSERT_MY_TAPROOT, the derivation assert, stays beside it pending the puzzle rework | Taproot's identity is a tweak preimage the control block reveals and base consensus authenticates, so the assert reads it at 200 where the derivation assert re-derives it at a point multiplication, the largest single cost in both landed puzzles. Internal key read by self asserts only: decision 26's attacker-satisfiable objection concerns a counterpart's key, not the spending input's own. Ratified 2026-08-22, decision 28. | `validation/self-asserts.json` taptree cases, `conditions/self-asserts.json` and `conditions/costs.json` taptree cases |
 
 ## 2. Reference provenance
 
@@ -1523,6 +1524,73 @@ Section 4 registers the rules that have no external reference at all.
     the language-level rename is a deliberate source-compatibility
     break pinned by the loader vocabulary.
 
+28. **ASSERT_MY_TAPTREE, the cheap identity assert.** RATIFIED
+    (decision by Evan, 2026-08-22, spec and implementation landed
+    the same day, the puzzle rework following in its own PR). A
+    sixth self assert at 0x38, `(0x38 internal_key merkle_root)`,
+    asserting the spending input's execution identity byte-exact
+    at CONDITION_GENERIC_COST. The transaction view's identity
+    becomes a triple: the internal key joins the tapleaf hash and
+    the merkle root, all three validator-filled from the control
+    block and required together on a condition-carrying input.
+    Rationale: every puzzle spend so far paid 1,300,200 for
+    ASSERT_MY_TAPROOT, the largest single cost in both landed
+    puzzles, to re-derive a scriptPubKey base consensus had already
+    authenticated. Base consensus lifts the control block's key,
+    tweaks it by the root it folds from the leaf and path, and
+    checks the result against the spent scriptPubKey, so the
+    byte-exact pair proves what the derivation proves.
+    Sub-decisions:
+    - The internal key is read by self asserts only. Decision 26's
+      decline of internal-key addressing stands for counterparts:
+      the control block proves no possession, so a specifier over
+      another input's key would read as key-holder identity while
+      proving nothing. A self assert over the spending input's own
+      key claims no possession. It pins which tweak preimage the
+      coin's scriptPubKey was built from, exactly what a program
+      needs to know that no key path exists (a nothing-up-my-sleeve
+      key) and that the tree is the one it reconstructs. No rule 3
+      specifier bit is added.
+    - The view takes the triple as authenticated and derives
+      nothing from it, the stance decision 26 set for the pair.
+      Consequence, stated in the invariants: the taptree and
+      taproot asserts agree on an input whose scriptPubKey is the
+      taproot output of its identity, which every input base
+      consensus admits is, modulo two operand pairs deriving one
+      output key. Family-suite vectors carry filler identities.
+    - The internal key operand is width-checked only, both sides
+      steelmanned. For a lift check: bad_condition_arg at parse is
+      the more diagnostic failure (decision 22), and the two
+      derivation entries already state "must satisfy the point
+      derivation" for an operand of the same name. For width only:
+      the field compared against always lifts, so a non-point
+      operand never matches and is rejected by the assert's own
+      error, the signature asserts already width-check a 32-byte
+      pubkey at parse and lift it where the work is priced, rule
+      3's identity operands are width-only values of the same
+      kind, and a field square root is work the 200 cost line does
+      not price. Width only was taken: the operand-domain split
+      already exists between the signature pubkey and the taproot
+      internal key, and the cost honesty is what the Phase 4
+      re-pricing will hold the constant to.
+    - The merkle root operand is never empty, the rule 3 operand's
+      domain: a BitLisp spend always executes a leaf of some tree.
+      The one parse-level difference from ASSERT_MY_TAPROOT.
+    - One condition over both fields, a stated exception to
+      decision 20's decomposition principle. The pair is one fact,
+      the tweak preimage of the coin's own scriptPubKey, and
+      mirroring ASSERT_MY_TAPROOT operand for operand makes a
+      puzzle's adoption an opcode swap.
+    - Opcode 0x38, the next code after the taproot assert, 0x34 to
+      0x36 staying decision 20's visible decline gap. Error
+      unsatisfied_taptree_assert, one code for the conjunction,
+      named as the seal and signature asserts name theirs.
+    - ASSERT_MY_TAPTREE subsumes ASSERT_MY_TAPROOT on every
+      BitLisp input, the tweak-collision exemption aside. Whether
+      0x37 stays in the vocabulary is decided at the puzzle rework
+      PR, once the measured saving is recorded (decision by Evan,
+      2026-08-22).
+
 ## 4. Novel-layer register
 
 The validation rules have no external reference: no deployed system
@@ -1532,7 +1600,7 @@ for an oracle, per ground rule 4:
 | rule | status | oracle substitute |
 | --- | --- | --- |
 | 1. Injective multiset output matching | normative | hypothesis invariant suite (injectivity, reorder invariance, monotonicity, metamorphic mutations) plus the adversarial corpus in `vectors/validation/`, opening with the duplicate-CREATE_COIN theft vector |
-| 2. Mixed-transaction rule | normative | `vectors/validation/mixed-transaction.json`: five acceptance vectors (mixed, plain-only, unclaimed slots, merge, surplus capture) and one rule 1 boundary rejection, plus the addition-monotonicity, merge, and plain-only invariants. The time assert family checks under this rule's assert clause: `vectors/validation/time-asserts.json` with BIP 65 and BIP 68 field semantics as the double reference, plus the operand-monotonicity and boundary-flip invariants. The self assert family checks under the same clause: `vectors/validation/self-asserts.json` with the probe corpus translated to prevout equality cases, the BIP341 tweak derivation shared with CREATE_OUTPUT_TAPROOT as the taproot assert's oracle, plus the outpoint-implies-txid and recombination-invariance invariants. The seal family checks under the same clause with no Chia reference at all (divergence C20): `vectors/validation/seals.json` with the grafted-output interception regression pair, the sealed-merge rejection case, and the fee-input-addition acceptance pinning what SEAL_OUTPUTS permits, the vendored Bitcoin Core framework as the serialization oracle for the txid and outputs-hash derivations, plus the operand byte-flip, sealed-merge, SEAL-implies-SEAL_OUTPUTS, and outputs-only-dependence invariants |
+| 2. Mixed-transaction rule | normative | `vectors/validation/mixed-transaction.json`: five acceptance vectors (mixed, plain-only, unclaimed slots, merge, surplus capture) and one rule 1 boundary rejection, plus the addition-monotonicity, merge, and plain-only invariants. The time assert family checks under this rule's assert clause: `vectors/validation/time-asserts.json` with BIP 65 and BIP 68 field semantics as the double reference, plus the operand-monotonicity and boundary-flip invariants. The self assert family checks under the same clause: `vectors/validation/self-asserts.json` with the probe corpus translated to prevout equality cases, the BIP341 tweak derivation shared with CREATE_OUTPUT_TAPROOT as the taproot assert's oracle, the taproot assert in turn as the taptree assert's oracle through the agreement invariant over honest inputs, plus the outpoint-implies-txid, recombination-invariance, and scriptPubKey-indifference invariants. The seal family checks under the same clause with no Chia reference at all (divergence C20): `vectors/validation/seals.json` with the grafted-output interception regression pair, the sealed-merge rejection case, and the fee-input-addition acceptance pinning what SEAL_OUTPUTS permits, the vendored Bitcoin Core framework as the serialization oracle for the txid and outputs-hash derivations, plus the operand byte-flip, sealed-merge, SEAL-implies-SEAL_OUTPUTS, and outputs-only-dependence invariants |
 | 3. Message scoping | normative | `vectors/validation/messages.json` and `vectors/validation/announcements.json`: the probe corpus translated from the chia_rs oracle (balance, multiplicity, mode-key, self-send, order cases) plus adversarial wrong-address and forgery cases, and the balanced-pair, announcement-monotonicity, and byte-flip invariants |
 | 4. Duplicates and multiplicity | normative | `vectors/validation/duplicates.json`: the strictest-wins oracle tests translated to identical and differing time asserts within one input, identical asserts across two and three inputs including the diverging final-sequence counterexample, ANNOUNCE duplication within an input and copies across inputs including the new-fact flip, duplicated announcement asserts at loose and script commitments, and duplicated reserved conditions on both sides of the cost floor, plus the identical-signature-triple and copied-triple-across-inputs cases from the signature assert unit, plus the in-place seal duplication and copied-seal-across-inputs cases from the seal unit, plus the in-place duplication-invariance invariant. The counted-sort boundaries stay pinned where they landed: duplicate claims in `vectors/validation/create-output.json`, duplicate message halves in `vectors/validation/messages.json`. Chia's remaining dedup tests are mempool spend-dedup machinery, declined in decision 19 |
 | 5. Per-condition costing | normative | `vectors/conditions/costs.json`: every assigned opcode pinned individually at its cost line plus the all-opcodes sum with its boundary twin, exact-budget boundary pairs for every tier (the inclusive budget passing at equality, bursting one below), the charge-order cases (encoding defects win over cost_exceeded within a condition under a zero budget, an earlier condition's charge precedes a later condition's checks and the tail's shape check, width defects of both derivation entries win under a zero budget, derivation defects of both entries reported only when the charge is covered), reserved declared-cost accounting with the floor check winning over the budget, per-occurrence charging of identical conditions, the mixed-family total, and the COSTS.md worked example, plus the cost-conservation, reorder-invariance, append-additivity, per-occurrence, and inclusive-boundary invariants. No oracle: the deployed CHIP-0049 cost table anchors the magnitudes (section 2) and every constant, all PROVISIONAL, is re-priced by the Phase 4 measurement pass |

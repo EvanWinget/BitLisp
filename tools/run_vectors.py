@@ -146,6 +146,7 @@ def _condition_json(cond):
         AssertMyOutpoint,
         AssertMyScriptPubKey,
         AssertMyTaproot,
+        AssertMyTaptree,
         AssertMyTxid,
         AssertSequenceHeight,
         AssertSequenceTime,
@@ -203,6 +204,12 @@ def _condition_json(cond):
             "internal_key": cond.internal_key.hex(),
             "merkle_root": cond.merkle_root.hex(),
             "script_pubkey": cond.script_pubkey.hex(),
+        }
+    if isinstance(cond, AssertMyTaptree):
+        return {
+            "opcode": cond.opcode,
+            "internal_key": cond.internal_key.hex(),
+            "merkle_root": cond.merkle_root.hex(),
         }
     if isinstance(cond, Announce):
         return {
@@ -277,7 +284,9 @@ def run_conditions_case(case):
     amounts as integers, bytes as hex. ASSERT_MY_TAPROOT pins
     {"opcode", "internal_key", "merkle_root", "script_pubkey"} with
     script_pubkey the derived taproot script, exactly as
-    CREATE_OUTPUT_TAPROOT pins it.
+    CREATE_OUTPUT_TAPROOT pins it. ASSERT_MY_TAPTREE pins
+    {"opcode", "internal_key", "merkle_root"}, its two operands and
+    nothing derived.
 
     The message family pins specifiers as {"commitment", "fields"}
     with fields in operand order, amounts as integers, all other
@@ -344,7 +353,8 @@ def run_validation_case(case):
                             "script_sig": "<hex, optional, default empty>",
                             "conditions": "<hex node, optional>",
                             "tapleaf": "<32-byte hex, required with conditions>",
-                            "merkle_root": "<32-byte hex, required with conditions>"}],
+                            "merkle_root": "<32-byte hex, required with conditions>",
+                            "internal_key": "<32-byte hex, required with conditions>"}],
                 "outputs": [{"script_pubkey": "<hex>", "amount": <int>}]
             },
             "expect": {"valid": true} or {"error": "<bitlisp error code>"}

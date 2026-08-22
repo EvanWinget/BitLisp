@@ -49,10 +49,12 @@ class TxInput:
     sequence, and the legacy scriptSig, empty for every segwit input.
     conditions is None for a non-BitLisp input, else the parsed
     condition list its program evaluation produced. A BitLisp input
-    also carries its execution identity, the pair base consensus
+    also carries its execution identity, the triple base consensus
     authenticates against the spent scriptPubKey through the control
-    block: tapleaf, the executing leaf's leaf hash, and merkle_root,
-    the spending path's root."""
+    block: tapleaf, the executing leaf's leaf hash, merkle_root, the
+    spending path's root, and internal_key, the x-only key the
+    control block carries. The model takes the triple as
+    authenticated and never re-derives the scriptPubKey from it."""
 
     txid: bytes
     index: int
@@ -63,6 +65,7 @@ class TxInput:
     script_sig: bytes = b""
     tapleaf: bytes | None = None
     merkle_root: bytes | None = None
+    internal_key: bytes | None = None
 
     def __post_init__(self):
         if not isinstance(self.txid, bytes) or len(self.txid) != 32:
@@ -85,11 +88,18 @@ class TxInput:
             not isinstance(self.merkle_root, bytes) or len(self.merkle_root) != 32
         ):
             raise ValueError("merkle_root must be 32 bytes")
+        if self.internal_key is not None and (
+            not isinstance(self.internal_key, bytes) or len(self.internal_key) != 32
+        ):
+            raise ValueError("internal_key must be 32 bytes")
         if self.conditions is not None and (
-            self.tapleaf is None or self.merkle_root is None
+            self.tapleaf is None
+            or self.merkle_root is None
+            or self.internal_key is None
         ):
             raise ValueError(
-                "a condition-carrying input must carry tapleaf and merkle_root"
+                "a condition-carrying input must carry tapleaf, merkle_root, "
+                "and internal_key"
             )
 
     @property

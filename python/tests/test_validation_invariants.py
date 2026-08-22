@@ -95,6 +95,7 @@ def build_tx(input_claims, outputs):
                 conditions=conditions,
                 tapleaf=b"\x0a" * 32,
                 merkle_root=b"\x0b" * 32,
+                internal_key=b"\x0c" * 32,
             )
         )
     return Transaction(
@@ -356,12 +357,24 @@ def test_model_requires_identity_with_conditions():
     # A condition-carrying input is a BitLisp input, and a BitLisp
     # input always executes a leaf of some tree, so the model refuses
     # the impossible shape.
-    with pytest.raises(ValueError, match="tapleaf and merkle_root"):
+    identity = {
+        "tapleaf": b"\x0a" * 32,
+        "merkle_root": b"\x0b" * 32,
+        "internal_key": b"\x0c" * 32,
+    }
+    with pytest.raises(ValueError, match="tapleaf, merkle_root, and internal_key"):
         TxInput(b"\x01" * 32, 0, b"\x51", 1, 0, conditions=())
+    for missing in identity:
+        partial = {k: v for k, v in identity.items() if k != missing}
+        with pytest.raises(ValueError, match="tapleaf, merkle_root, and internal_key"):
+            TxInput(b"\x01" * 32, 0, b"\x51", 1, 0, conditions=(), **partial)
+    TxInput(b"\x01" * 32, 0, b"\x51", 1, 0, conditions=(), **identity)
     with pytest.raises(ValueError, match="tapleaf must be 32 bytes"):
         TxInput(b"\x01" * 32, 0, b"\x51", 1, 0, tapleaf=b"\x0a" * 31)
     with pytest.raises(ValueError, match="merkle_root must be 32 bytes"):
         TxInput(b"\x01" * 32, 0, b"\x51", 1, 0, merkle_root=b"\x0b" * 33)
+    with pytest.raises(ValueError, match="internal_key must be 32 bytes"):
+        TxInput(b"\x01" * 32, 0, b"\x51", 1, 0, internal_key=b"\x0c" * 31)
 
 
 def test_model_rejects_out_of_range_amounts():

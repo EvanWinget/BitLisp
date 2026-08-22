@@ -101,6 +101,7 @@ delegate to.
 | own program | `ASSERT_MY_PUZZLEHASH` 72 | `ASSERT_MY_SCRIPTPUBKEY` `0x32`, normative, raw script bytes |
 | own amount | `ASSERT_MY_AMOUNT` 73 | `ASSERT_MY_AMOUNT` `0x33`, normative |
 | own taproot components | absent | `ASSERT_MY_TAPROOT` `0x37`, normative, the D-CC2 mirror |
+| own taptree | absent | `ASSERT_MY_TAPTREE` `0x38`, normative, reads the control block's internal key and merkle root at the generic cost (decision 28) |
 | own birth time or height | `ASSERT_MY_BIRTH_SECONDS` 74, `ASSERT_MY_BIRTH_HEIGHT` 75 | declined, a chain read outside the transaction view (C13) |
 | ephemerality | `ASSERT_EPHEMERAL` 76, the coin was created in the same block it is spent | declined, structurally inexpressible within one transaction (C14) |
 
@@ -210,11 +211,11 @@ specs of the same shape.
 
 ## Observations
 
-- **Where Phase 2 stands.** Twenty-six vocabulary entries are
+- **Where Phase 2 stands.** Twenty-seven vocabulary entries are
   normative and the v0 table is complete: `CREATE_OUTPUT`,
   `CREATE_OUTPUT_TAPROOT`, the eight signature asserts (decision
-  23), the four time asserts, the five self asserts (decision
-  20), the message family (`ASSURE`, `REQUIRE`,
+  23), the four time asserts, the six self asserts (decisions
+  20 and 28), the message family (`ASSURE`, `REQUIRE`,
   `ANNOUNCE`, `ASSERT_ANNOUNCEMENT`), `RESERVE_FEE` (decision
   21), and the seal pair (decision 24). All eight validation
   rules are normative, rule 5 landing last by design so costing

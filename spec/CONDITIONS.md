@@ -83,6 +83,7 @@ block without a vocabulary entry are invalid, not reserved:
 | `0x32` | `ASSERT_MY_SCRIPTPUBKEY` |
 | `0x33` | `ASSERT_MY_AMOUNT` |
 | `0x37` | `ASSERT_MY_TAPROOT` |
+| `0x38` | `ASSERT_MY_TAPTREE` |
 | `0x40` | `ANNOUNCE` |
 | `0x41` | `ASSERT_ANNOUNCEMENT` |
 | `0x42` | `ASSURE` |
@@ -457,33 +458,36 @@ charged after every argument check.
 **Validation rule.** The assert clause of VALIDATION.md
 (claims and asserts, rule 2). Stage 4.
 
-### Self asserts (`0x30` to `0x33`, `0x37`)
+### Self asserts (`0x30` to `0x33`, `0x37`, `0x38`)
 
-The five conditions of this family assert facts of the spending
-input's own prevout data: the outpoint it consumes, the creating
-txid, the spent scriptPubKey, and the amount. Every assert is an
-equality against that input's own data in the transaction view.
-Nothing in this family reads another input, an output slot, or a
-transaction-level field.
+The six conditions of this family assert facts of the spending
+input's own prevout data and execution identity: the outpoint it
+consumes, the creating txid, the spent scriptPubKey, the amount,
+and the internal key and merkle root its control block carries.
+Every assert is an equality against that input's own data in the
+transaction view. Nothing in this family reads another input, an
+output slot, or a transaction-level field.
 
 This family is stage 2 work: each assert reads only the spent
-output's own data, which travels with the spend, so recombining
-spends into a different transaction never changes an outcome, and
-the composition guarantee stated in VALIDATION.md's claims and
+output's own data and the spend's own execution identity, both of
+which travel with the spend, so recombining spends into a
+different transaction never changes an outcome, and the
+composition guarantee stated in VALIDATION.md's claims and
 asserts preamble holds for this family with no discipline
-required. The operands commit to the
-same prevout fields as the participant specifiers of
-VALIDATION.md rule 3
-and carry the recombination-stability classes stated there:
-amount and scriptPubKey are knowable when a program is written,
-the creating txid and the outpoint exist only once the creating
+required. The operands carry the
+recombination-stability classes VALIDATION.md rule 3 states for
+its specifier fields, with the internal key in the content class
+beside the merkle root: amount, scriptPubKey, the merkle root, and
+the internal key are knowable when a program is written, the
+creating txid and the outpoint exist only once the creating
 transaction is final.
 
 Failure of an assert reading the outpoint is the error
 `unsatisfied_outpoint_assert`. Failure of an assert reading the
 spent scriptPubKey is the error `unsatisfied_scriptpubkey_assert`.
 Failure of an assert reading the amount is the error
-`unsatisfied_amount_assert`.
+`unsatisfied_amount_assert`. Failure of an assert reading the
+execution identity is the error `unsatisfied_taptree_assert`.
 
 ### ASSERT_MY_OUTPOINT (`0x30`)
 
@@ -587,6 +591,45 @@ check and before the point derivation.
 **Validation rule.** The assert clause of VALIDATION.md
 (claims and asserts, rule 2), after the derivation above. Stage 2.
 
+### ASSERT_MY_TAPTREE (`0x38`)
+
+`(0x38 internal_key merkle_root)`
+
+**Semantics.** Claims nothing. Asserts that the spending input's
+`internalKey` equals `internal_key` byte-exact and its
+`merkleRoot` equals `merkle_root` byte-exact, both read from the
+execution identity of the transaction view
+(`unsatisfied_taptree_assert`). No derivation runs: base
+consensus has already lifted the key, tweaked it with the root,
+and checked the result against the spent scriptPubKey.
+
+A satisfied assert proves the spent output is the taproot output
+of `internal_key` tweaked with `merkle_root`, the same fact
+ASSERT_MY_TAPROOT proves by derivation. On an input whose spent
+scriptPubKey is the taproot output of its `internalKey` tweaked
+with its `merkleRoot`, the shape of every input base consensus
+admits, the two are satisfied together and fail together, each
+with its own error, except where two distinct operand pairs
+derive one output key. The transaction view does not require that
+shape, so on a view input whose scriptPubKey and identity
+disagree only this assert reads the identity.
+
+**Arguments.** `internal_key` is an atom of exactly 32 bytes
+(`bad_condition_arg`). It is not checked to lift to a curve
+point: the `internalKey` it is compared against always does, so
+an operand that does not lift never matches and fails as
+unsatisfied. `merkle_root` is an atom of exactly 32 bytes
+(`bad_condition_arg`). Never empty: a BitLisp spend always
+executes a leaf of some tree, so there is no no-tree case to
+encode, unlike ASSERT_MY_TAPROOT's `merkle_root` operand. Exactly
+two arguments, both atoms.
+
+**Cost.** `CONDITION_GENERIC_COST` = 200 (COSTS.md section 10),
+charged after every argument check.
+
+**Validation rule.** The assert clause of VALIDATION.md
+(claims and asserts, rule 2). Stage 2.
+
 ### Message family (`0x40` to `0x43`)
 
 The four conditions of this family coordinate the inputs of a
@@ -624,8 +667,8 @@ then the appended execution-identity operands:
 - `merkleRoot` is an atom of exactly 32 bytes, a script-tree
   merkle root (`bad_condition_arg`). Never empty: a BitLisp
   counterpart always executes a leaf of some tree, so there is no
-  no-tree case to encode, unlike ASSERT_MY_TAPROOT's
-  `merkle_root` operand.
+  no-tree case to encode, the domain ASSERT_MY_TAPTREE's
+  `merkle_root` operand shares and ASSERT_MY_TAPROOT's does not.
 
 `message`, `namespace`, and `payload` are atoms of 0 to 1024 bytes
 (`bad_condition_arg`).

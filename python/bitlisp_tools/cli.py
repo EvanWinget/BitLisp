@@ -54,16 +54,17 @@ transaction object:
                  "script_sig": "<hex, optional>",
                  "conditions": "<hex node, optional>",
                  "tapleaf": "<hex, optional>",
-                 "merkle_root": "<hex, optional>"}],
+                 "merkle_root": "<hex, optional>",
+                 "internal_key": "<hex, optional>"}],
      "outputs": [{"script_pubkey": "<hex>", "amount": 600}]}
 
 --input selects which input the program spends, the first by
 default. That input must not carry a conditions field, because the
-runner computes its conditions, and must carry tapleaf and
-merkle_root, the executing input's identity. Any other input
-carrying a conditions field is a BitLisp input whose evaluation
-result is taken as given, and the model requires the same identity
-pair on it.
+runner computes its conditions, and must carry tapleaf,
+merkle_root, and internal_key, the executing input's identity. Any
+other input carrying a conditions field is a BitLisp input whose
+evaluation result is taken as given, and the model requires the
+same identity triple on it.
 
 Exit status 0 when the spend is valid, 1 when it is invalid with
 the error line pinning the consensus code, 2 for unusable input: a

@@ -114,6 +114,7 @@ def build_tx(version, locktime, inputs, outputs, conds, txid_prefix=b"\x01"):
             script_sig=script_sig,
             tapleaf=b"\x0a" * 32,
             merkle_root=b"\x0b" * 32,
+            internal_key=b"\x0c" * 32,
         )
         for n, (txid, script_sig, sequence) in enumerate(inputs)
     )

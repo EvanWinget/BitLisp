@@ -34,8 +34,21 @@ fi
 
 echo "== ruff format =="
 if ! git ls-files '*.py' "${THIRD_PARTY_PATHSPECS[@]}" | xargs ruff format --check --quiet; then
-    fail "ruff format (run: git ls-files '*.py' | xargs ruff format)"
+    fail "ruff format (run: git ls-files '*.py' ':!vectors/upstream/*' ':!tools/oracle/bitcoincore/*' | xargs ruff format)"
 fi
+
+# The vendored Bitcoin Core files must stay byte-identical to the
+# snapshot their README records, so a formatter or editor pass over
+# the tree cannot silently break the verbatim guarantee.
+echo "== oracle provenance =="
+ORACLE_DIR=tools/oracle/bitcoincore
+while IFS='|' read -r _ file _ sha _; do
+    file="${file//[\` ]/}"
+    sha="${sha//[\` ]/}"
+    if ! echo "$sha  $ORACLE_DIR/$file" | shasum -a 256 --check --status; then
+        fail "$ORACLE_DIR/$file differs from the sha256 its README records"
+    fi
+done < <(grep -E '^\| `test_framework/[^`]+` \| `[^`]+` \| `[0-9a-f]{64}` \|$' "$ORACLE_DIR/README.md")
 
 echo "== whitespace =="
 if git grep -In $'[ \t]$' -- "${TEXT_PATHSPECS[@]}"; then

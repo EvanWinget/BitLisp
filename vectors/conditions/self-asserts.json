@@ -275,6 +275,95 @@
    }
   },
   {
+   "name": "taptree_parses",
+   "conditions": "ffff38ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b218080",
+   "expect": {
+    "parsed": [
+     {
+      "opcode": 56,
+      "internal_key": "187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27",
+      "merkle_root": "5b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b21"
+     }
+    ]
+   }
+  },
+  {
+   "name": "taptree_key_not_on_curve_parses",
+   "conditions": "ffff38ffa00000000000000000000000000000000000000000000000000000000000000000ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b218080",
+   "expect": {
+    "parsed": [
+     {
+      "opcode": 56,
+      "internal_key": "0000000000000000000000000000000000000000000000000000000000000000",
+      "merkle_root": "5b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b21"
+     }
+    ]
+   }
+  },
+  {
+   "name": "taptree_key_31_bytes",
+   "conditions": "ffff38ff9f187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cfffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b218080",
+   "expect": {
+    "error": "bad_condition_arg"
+   }
+  },
+  {
+   "name": "taptree_key_33_bytes",
+   "conditions": "ffff38ffa1187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf2700ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b218080",
+   "expect": {
+    "error": "bad_condition_arg"
+   }
+  },
+  {
+   "name": "taptree_root_empty",
+   "conditions": "ffff38ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ff808080",
+   "expect": {
+    "error": "bad_condition_arg"
+   }
+  },
+  {
+   "name": "taptree_root_31_bytes",
+   "conditions": "ffff38ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ff9f5b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b8080",
+   "expect": {
+    "error": "bad_condition_arg"
+   }
+  },
+  {
+   "name": "taptree_root_33_bytes",
+   "conditions": "ffff38ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa15b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b21008080",
+   "expect": {
+    "error": "bad_condition_arg"
+   }
+  },
+  {
+   "name": "taptree_arity_one",
+   "conditions": "ffff38ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf278080",
+   "expect": {
+    "error": "bad_condition_arity"
+   }
+  },
+  {
+   "name": "taptree_arity_three",
+   "conditions": "ffff38ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b21ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b218080",
+   "expect": {
+    "error": "bad_condition_arity"
+   }
+  },
+  {
+   "name": "taptree_key_is_pair",
+   "conditions": "ffff38ffffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf2780ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b218080",
+   "expect": {
+    "error": "bad_condition_arg"
+   }
+  },
+  {
+   "name": "taptree_root_is_pair",
+   "conditions": "ffff38ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b21808080",
+   "expect": {
+    "error": "bad_condition_arg"
+   }
+  },
+  {
    "name": "txid_operand_not_atom",
    "conditions": "ffff31ffffa01111111111111111111111111111111111111111111111111111111111111111808080",
    "expect": {
@@ -317,8 +406,8 @@
    }
   },
   {
-   "name": "gap_0x38_invalid",
-   "conditions": "ffff38ffa011111111111111111111111111111111111111111111111111111111111111118080",
+   "name": "gap_0x39_invalid",
+   "conditions": "ffff39ffa011111111111111111111111111111111111111111111111111111111111111118080",
    "expect": {
     "error": "bad_condition_opcode"
    }

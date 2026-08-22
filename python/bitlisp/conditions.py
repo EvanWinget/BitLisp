@@ -53,6 +53,7 @@ ASSERT_MY_TXID = 0x31
 ASSERT_MY_SCRIPTPUBKEY = 0x32
 ASSERT_MY_AMOUNT = 0x33
 ASSERT_MY_TAPROOT = 0x37
+ASSERT_MY_TAPTREE = 0x38
 ANNOUNCE = 0x40
 ASSERT_ANNOUNCEMENT = 0x41
 ASSURE = 0x42
@@ -182,6 +183,7 @@ CONDITION_COSTS = {
     ASSERT_MY_SCRIPTPUBKEY: CONDITION_GENERIC_COST,
     ASSERT_MY_AMOUNT: CONDITION_GENERIC_COST,
     ASSERT_MY_TAPROOT: CONDITION_GENERIC_COST + TAPROOT_TWEAK_COST,
+    ASSERT_MY_TAPTREE: CONDITION_GENERIC_COST,
     ANNOUNCE: CONDITION_MESSAGE_COST,
     ASSERT_ANNOUNCEMENT: CONDITION_MESSAGE_COST,
     ASSURE: CONDITION_MESSAGE_COST,
@@ -313,6 +315,25 @@ class AssertMyTaproot:
     script_pubkey: bytes
 
     opcode = ASSERT_MY_TAPROOT
+
+
+@dataclass(frozen=True)
+class AssertMyTaptree:
+    """Asserts the input's execution identity: the internal key and
+    merkle root its control block carries, each compared byte-exact.
+
+    Proves what AssertMyTaproot proves without the derivation: base
+    consensus has already tweaked this key by this root and checked
+    the result against the spent scriptPubKey. The internal key is
+    width-checked only. The field it is compared against always
+    lifts to a curve point, so an operand that does not lift never
+    matches and fails as unsatisfied.
+    """
+
+    internal_key: bytes
+    merkle_root: bytes
+
+    opcode = ASSERT_MY_TAPTREE
 
 
 @dataclass(frozen=True)
@@ -488,17 +509,25 @@ def _parse_create_output(args):
     return CreateOutput(script_pubkey, amount)
 
 
+def _fixed_width_atom(atom, what, size):
+    """An atom operand of exactly size bytes, else bad_condition_arg.
+    The one rule behind every 32-byte identity operand (txids, keys,
+    leaf hashes, roots, seal digests) and the 36-byte outpoint, so
+    the operands that share a domain share it in code."""
+    if not is_atom(atom):
+        raise BitLispError("bad_condition_arg", f"{what} must be an atom")
+    if len(atom) != size:
+        raise BitLispError(
+            "bad_condition_arg", f"{what} must be {size} bytes, got {len(atom)}"
+        )
+    return atom
+
+
 def _check_taproot_components(internal_key, merkle_root):
     """The width checks of the two taproot component atoms. Cheap
     work only, run before the condition's charge: the point work
     lives in _derive_taproot_spk, run after it."""
-    if not is_atom(internal_key):
-        raise BitLispError("bad_condition_arg", "internal key must be an atom")
-    if len(internal_key) != 32:
-        raise BitLispError(
-            "bad_condition_arg",
-            f"internal key must be 32 bytes, got {len(internal_key)}",
-        )
+    _fixed_width_atom(internal_key, "internal key", 32)
     if not is_atom(merkle_root):
         raise BitLispError("bad_condition_arg", "merkle root must be an atom")
     if len(merkle_root) not in (0, 32):
@@ -559,15 +588,7 @@ def _parse_fixed_bytes(args, name, cls, size):
         raise BitLispError(
             "bad_condition_arity", f"{name} takes 1 argument, got {len(args)}"
         )
-    atom = args[0]
-    if not is_atom(atom):
-        raise BitLispError("bad_condition_arg", f"{name} operand must be an atom")
-    if len(atom) != size:
-        raise BitLispError(
-            "bad_condition_arg",
-            f"{name} operand must be {size} bytes, got {len(atom)}",
-        )
-    return cls(atom)
+    return cls(_fixed_width_atom(args[0], f"{name} operand", size))
 
 
 def _parse_assert_my_scriptpubkey(args):
@@ -613,6 +634,22 @@ def _parse_assert_my_taproot(args, meter):
     meter.charge(CONDITION_COSTS[ASSERT_MY_TAPROOT])
     script_pubkey = _derive_taproot_spk(internal_key, merkle_root)
     return AssertMyTaproot(internal_key, merkle_root, script_pubkey)
+
+
+def _parse_assert_my_taptree(args):
+    """Two atom operands of exactly 32 bytes each, the internal key
+    then the merkle root. The root is never empty here, unlike the
+    taproot assert's: a BitLisp spend always executes a leaf of some
+    tree."""
+    if len(args) != 2:
+        raise BitLispError(
+            "bad_condition_arity",
+            f"ASSERT_MY_TAPTREE takes 2 arguments, got {len(args)}",
+        )
+    return AssertMyTaptree(
+        _fixed_width_atom(args[0], "ASSERT_MY_TAPTREE internal key", 32),
+        _fixed_width_atom(args[1], "ASSERT_MY_TAPTREE merkle root", 32),
+    )
 
 
 def _parse_assert_sig(opcode, args):
@@ -666,23 +703,19 @@ def _parse_specifier(commitment, args, name):
                 )
             fields.append(value)
             continue
+        if kind == "outpoint":
+            fields.append(_fixed_width_atom(atom, f"{name} outpoint", OUTPOINT_SIZE))
+            continue
+        if kind in ("txid", "tapleaf", "merkle_root"):
+            fields.append(_fixed_width_atom(atom, f"{name} {kind}", 32))
+            continue
         if not is_atom(atom):
             raise BitLispError("bad_condition_arg", f"{name} {kind} must be an atom")
-        if kind == "script_pubkey" and len(atom) > MAX_SCRIPT_PUBKEY_SIZE:
+        if len(atom) > MAX_SCRIPT_PUBKEY_SIZE:
             raise BitLispError(
                 "bad_condition_arg",
                 f"{name} scriptPubKey must be at most "
                 f"{MAX_SCRIPT_PUBKEY_SIZE} bytes, got {len(atom)}",
-            )
-        if kind == "outpoint" and len(atom) != OUTPOINT_SIZE:
-            raise BitLispError(
-                "bad_condition_arg",
-                f"{name} outpoint must be {OUTPOINT_SIZE} bytes, got {len(atom)}",
-            )
-        if kind in ("txid", "tapleaf", "merkle_root") and len(atom) != 32:
-            raise BitLispError(
-                "bad_condition_arg",
-                f"{name} {kind} must be 32 bytes, got {len(atom)}",
             )
         fields.append(atom)
     return Specifier(commitment, tuple(fields))
@@ -867,6 +900,8 @@ def _parse_assigned(opcode, args):
         return _parse_assert_my_scriptpubkey(args)
     if opcode == ASSERT_MY_AMOUNT:
         return _parse_assert_my_amount(args)
+    if opcode == ASSERT_MY_TAPTREE:
+        return _parse_assert_my_taptree(args)
     if opcode == ANNOUNCE:
         return _parse_announce(args)
     if opcode == ASSERT_ANNOUNCEMENT:

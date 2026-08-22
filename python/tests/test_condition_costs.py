@@ -19,6 +19,7 @@ from bitlisp.conditions import (  # noqa: E402
     ANNOUNCE,
     ASSERT_MY_AMOUNT,
     ASSERT_MY_TAPROOT,
+    ASSERT_MY_TAPTREE,
     ASSERT_SIG_RAW,
     ASSURE,
     CONDITION_COSTS,
@@ -64,6 +65,7 @@ def test_cost_table_values_match_spec():
     assert CONDITION_COSTS[CREATE_OUTPUT] == 1_350_000
     assert CONDITION_COSTS[CREATE_OUTPUT_TAPROOT] == 2_650_000
     assert CONDITION_COSTS[ASSERT_MY_TAPROOT] == 1_300_200
+    assert CONDITION_COSTS[ASSERT_MY_TAPTREE] == 200
 
 
 def test_returned_cost_is_the_sum_of_condition_costs():

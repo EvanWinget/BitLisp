@@ -4,10 +4,12 @@ Each self assert is an equality against its own input's prevout
 data, so the family's defining property is environment independence:
 the outcome is a pure function of (conditions, own prevout data) and
 nothing else in the transaction can change it. The other properties
-pin the txid-outpoint subset relation and the taproot assert's
-equivalence to a plain script assert over the derived scriptPubKey.
-Field values and operands are drawn from small colliding pools so
-satisfied and unsatisfied asserts are both dense.
+pin the txid-outpoint subset relation, the taproot assert's
+equivalence to a plain script assert over the derived scriptPubKey,
+and the taptree assert's indifference to the scriptPubKey plus its
+agreement with the taproot assert on an honest input. Field values
+and operands are drawn from small colliding pools so satisfied and
+unsatisfied asserts are both dense.
 """
 
 from bitlisp import (
@@ -22,6 +24,7 @@ from bitlisp.conditions import (
     AssertMyOutpoint,
     AssertMyScriptPubKey,
     AssertMyTaproot,
+    AssertMyTaptree,
     AssertMyTxid,
 )
 from bitlisp.secp256k1 import taproot_output_key
@@ -33,6 +36,10 @@ TXID_B = b"\xbb" * 32
 IK = bytes.fromhex("187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27")
 NUMS = bytes.fromhex("50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0")
 ROOT = b"\x77" * 32
+ROOT_B = b"\x78" * 32
+# The execution identity every transaction carries unless a property
+# draws one: filler no assert in the pools names.
+FILLER_IDENTITY = (b"\x0c" * 32, b"\x0b" * 32)
 
 SPK_IK_ROOT = b"\x51\x20" + taproot_output_key(IK, ROOT)
 SPK_IK_PLAIN = b"\x51\x20" + taproot_output_key(IK, b"")
@@ -45,6 +52,10 @@ scripts = st.sampled_from(
     (b"", b"\x51", SPK_IK_ROOT, SPK_IK_PLAIN, SPK_NUMS_ROOT, SPK_P2WSH_TWIN)
 )
 amounts = st.sampled_from((0, 1, 50_000, 50_000 + 2**32, 2_100_000_000_000_000))
+# (internal key, merkle root) pairs, drawn both as the input's own
+# identity and as taptree operands, so the two collide often.
+IDENTITIES = ((IK, ROOT), (IK, ROOT_B), (NUMS, ROOT))
+identities = st.sampled_from(IDENTITIES)
 
 
 def _outpoint(txid, index):
@@ -56,12 +67,18 @@ def _taproot(internal_key, merkle_root):
     return AssertMyTaproot(internal_key, merkle_root, spk)
 
 
+# Derived once: the tweak is the one expensive step in this module,
+# and the pools are fixed, so no property recomputes it per example.
+TAPROOT_ASSERTS = {pair: _taproot(*pair) for pair in (*IDENTITIES, (IK, b""))}
+HONEST_SPKS = {pair: TAPROOT_ASSERTS[pair].script_pubkey for pair in IDENTITIES}
+
 self_asserts = st.one_of(
     st.tuples(txids, indexes).map(lambda t: AssertMyOutpoint(_outpoint(*t))),
     txids.map(AssertMyTxid),
     scripts.map(AssertMyScriptPubKey),
     amounts.map(AssertMyAmount),
-    st.sampled_from(((IK, ROOT), (IK, b""), (NUMS, ROOT))).map(lambda t: _taproot(*t)),
+    st.sampled_from(tuple(TAPROOT_ASSERTS.values())),
+    identities.map(lambda t: AssertMyTaptree(*t)),
 )
 cond_lists = st.lists(self_asserts, max_size=4)
 
@@ -73,12 +90,13 @@ environments = st.tuples(
 )
 
 
-def build_tx(txid, index, script, amount, conds, env):
+def build_tx(txid, index, script, amount, conds, env, identity=FILLER_IDENTITY):
     """One BitLisp input carrying only self asserts, an unclaimed
     zero output, and an environment the family must never read. The
     unrelated input can sit before the carrying input, so an
     implementation reading a fixed input position dies here."""
     version, locktime, sequence, extra_position = env
+    internal_key, merkle_root = identity
     inputs = [
         TxInput(
             txid=txid,
@@ -88,7 +106,8 @@ def build_tx(txid, index, script, amount, conds, env):
             sequence=sequence,
             conditions=tuple(conds),
             tapleaf=b"\x0a" * 32,
-            merkle_root=b"\x0b" * 32,
+            merkle_root=merkle_root,
+            internal_key=internal_key,
         )
     ]
     if extra_position != "none":
@@ -115,16 +134,18 @@ def outcome(tx):
         return exc.code
 
 
-@given(txids, indexes, scripts, amounts, cond_lists, environments, environments)
+@given(
+    txids, indexes, scripts, amounts, identities, cond_lists, environments, environments
+)
 def test_outcome_is_environment_independent(
-    txid, index, script, amount, conds, env_a, env_b
+    txid, index, script, amount, identity, conds, env_a, env_b
 ):
     """The family outcome depends only on the conditions and the
-    input's own prevout data. Version, locktime, sequence, and
-    unrelated inputs never change it, the stage 2 property that
-    makes every self assert recombination-invariant."""
-    tx_a = build_tx(txid, index, script, amount, conds, env_a)
-    tx_b = build_tx(txid, index, script, amount, conds, env_b)
+    input's own prevout data and identity. Version, locktime,
+    sequence, and unrelated inputs never change it, the stage 2
+    property that makes every self assert recombination-invariant."""
+    tx_a = build_tx(txid, index, script, amount, conds, env_a, identity)
+    tx_b = build_tx(txid, index, script, amount, conds, env_b, identity)
     assert outcome(tx_a) == outcome(tx_b)
 
 
@@ -142,11 +163,11 @@ def test_satisfied_outpoint_assert_implies_txid_assert(
         assert outcome(with_txid) is None
 
 
-@given(txids, indexes, scripts, amounts, self_asserts, environments)
+@given(txids, indexes, scripts, amounts, identities, self_asserts, environments)
 def test_single_assert_outcome_matches_field_equality(
-    txid, index, script, amount, cond, env
+    txid, index, script, amount, identity, cond, env
 ):
-    """A lone self assert is satisfied exactly when its operand
+    """A lone self assert is satisfied exactly when each operand
     equals the field it reads, and fails with its field's error
     otherwise."""
     if isinstance(cond, AssertMyOutpoint):
@@ -158,11 +179,51 @@ def test_single_assert_outcome_matches_field_equality(
     elif isinstance(cond, (AssertMyScriptPubKey, AssertMyTaproot)):
         satisfied = cond.script_pubkey == script
         error = "unsatisfied_scriptpubkey_assert"
+    elif isinstance(cond, AssertMyTaptree):
+        satisfied = (cond.internal_key, cond.merkle_root) == identity
+        error = "unsatisfied_taptree_assert"
     else:
         satisfied = cond.amount == amount
         error = "unsatisfied_amount_assert"
-    got = outcome(build_tx(txid, index, script, amount, [cond], env))
+    got = outcome(build_tx(txid, index, script, amount, [cond], env, identity))
     assert got == (None if satisfied else error)
+
+
+@given(txids, indexes, scripts, scripts, amounts, identities, identities, environments)
+def test_taptree_assert_ignores_scriptpubkey(
+    txid, index, script_a, script_b, amount, identity, operands, env
+):
+    """ASSERT_MY_TAPTREE reads the execution identity and nothing
+    else: the spent scriptPubKey never changes its outcome. The
+    model takes the identity as authenticated and derives nothing
+    from it."""
+    cond = AssertMyTaptree(*operands)
+    got_a = outcome(build_tx(txid, index, script_a, amount, [cond], env, identity))
+    got_b = outcome(build_tx(txid, index, script_b, amount, [cond], env, identity))
+    assert got_a == got_b
+
+
+@given(txids, indexes, amounts, identities, identities, environments)
+def test_taptree_assert_agrees_with_taproot_assert_on_honest_input(
+    txid, index, amount, identity, operands, env
+):
+    """On an input whose scriptPubKey is the taproot output of its
+    own identity, the shape every input base consensus admits has,
+    ASSERT_MY_TAPTREE and ASSERT_MY_TAPROOT over equal operands are
+    satisfied together and fail together. The pools hold no two
+    pairs deriving one output key, so the collision exemption never
+    fires here."""
+    honest = HONEST_SPKS[identity]
+    taptree = AssertMyTaptree(*operands)
+    taproot = TAPROOT_ASSERTS[operands]
+    got_taptree = outcome(
+        build_tx(txid, index, honest, amount, [taptree], env, identity)
+    )
+    got_taproot = outcome(
+        build_tx(txid, index, honest, amount, [taproot], env, identity)
+    )
+    assert (got_taptree is None) == (got_taproot is None)
+    assert (got_taptree is None) == (operands == identity)
 
 
 @given(

@@ -51,6 +51,7 @@ def _input_identity(salt, n):
         conditions=None,
         tapleaf=bytes([0xA0 ^ (salt + n) & 0xFF]) * 32,
         merkle_root=bytes([0xB0 ^ (salt + n) & 0xFF]) * 32,
+        internal_key=bytes([0xC0 ^ (salt + n) & 0xFF]) * 32,
     )
 
 
