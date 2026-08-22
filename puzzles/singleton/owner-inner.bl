@@ -1,19 +1,26 @@
 ; An inner program for the singleton wrapper: one key owns the state.
 ;
-; The wrapper runs this program over its truths consed onto the inner
-; solution, so the environment is (OWNER_KEY TRUTHS . ARGS) once
-; OWNER_KEY is curried. The owner signs the next inner program's
-; hash, the next coin's amount, and the extra conditions, bound to
-; the singleton coin's own outpoint, so an authorization fits exactly
-; one spend of exactly one coin. The odd-amount CREATE_OUTPUT is the
-; wrapper's child marker, rewritten by the wrapper into the next
+; The wrapper runs this program over the coin's own data consed onto
+; the inner solution, so the environment is (OWNER_KEY OWN . ARGS)
+; once OWNER_KEY is curried. The owner signs the next inner program's
+; hash, the next coin's amount, the extra conditions, and the
+; spending transaction's outputs hash, bound to the singleton coin's
+; own outpoint, so an authorization fits exactly one spend of exactly
+; one coin. The outputs hash is sealed: the wrapper can claim the
+; child and its state output but cannot place them, and the seal is
+; what makes the signed placement immutable while leaving the input
+; side open for anyone's fee input. The odd-amount CREATE_OUTPUT is
+; the wrapper's child marker, rewritten by the wrapper into the next
 ; singleton coin and its state output. NEXT_AMOUNT of -113 ends the
-; lineage. EXTRA_CONDITIONS pass through the wrapper unchanged and
-; must therefore create only even-amount outputs.
+; lineage. EXTRA_CONDITIONS pass through the wrapper unchanged: they
+; may create only even-amount outputs, and none tagged with this
+; lineage.
 (program (OWNER_KEY (LAUNCHER MY_OUTPOINT MY_SPK MY_AMOUNT MY_INNER_HASH)
-          NEXT_INNER_HASH NEXT_AMOUNT EXTRA_CONDITIONS SIG)
+          NEXT_INNER_HASH NEXT_AMOUNT EXTRA_CONDITIONS OUTPUTS_HASH SIG)
   (c (list ASSERT_SIG_MY_OUTPOINT OWNER_KEY
-           (sha256tree (list NEXT_INNER_HASH NEXT_AMOUNT EXTRA_CONDITIONS))
+           (sha256tree (list NEXT_INNER_HASH NEXT_AMOUNT EXTRA_CONDITIONS
+                             OUTPUTS_HASH))
            SIG)
+  (c (list SEAL_OUTPUTS OUTPUTS_HASH)
   (c (list CREATE_OUTPUT NEXT_INNER_HASH NEXT_AMOUNT)
-     EXTRA_CONDITIONS)))
+     EXTRA_CONDITIONS))))

@@ -7,17 +7,22 @@
 ; that serialization from its fields and hashing it proves the fields:
 ; which outpoints the transaction spent and which outputs it created.
 ; Every length prefix is emitted in Bitcoin's canonical compact-size
-; encoding, the only encoding the consensus parser accepts, so a byte
-; string built here parses back to exactly the fields it was built
-; from, and no other field list serializes to the same bytes.
+; encoding, the only encoding the consensus parser accepts, and every
+; fixed-width field is width-checked, so Bitcoin's parser reads back
+; from the bytes built here exactly the fields they were built from.
+; Each shape binds by position and ignores anything after its last
+; field, and a transaction with no inputs or no outputs is rejected,
+; since base consensus never creates one.
 ;
 ; A transaction is (VERSION INPUTS OUTPUTS LOCKTIME), each input
 ; (OUTPOINT SCRIPTSIG SEQUENCE), each output (AMOUNT SCRIPT). Fixed
 ; width fields arrive as raw wire bytes, little-endian where Bitcoin
-; is, and are width-checked: the version and locktime 4 bytes, an
-; outpoint 36, a sequence 4, an amount 8. Scripts are raw bytes of
-; any length, the scriptSig empty for every segwit input.
+; is: the version and locktime 4 bytes, an outpoint 36, a sequence 4,
+; an amount 8. Scripts are raw bytes of any length, the scriptSig
+; empty for every segwit input.
 (
+  (include "list.blib")
+
   ; One byte holding an integer 0 to 255. Adding 256 forces a two
   ; byte encoding whose low byte is the value, whatever its sign bit.
   (defun-inline byte (VALUE) (substr (+ 256 VALUE) 1 2))
@@ -36,12 +41,6 @@
     (if (> 4294967296 VALUE)
         (concat 0xfe (le-bytes VALUE 4))
         (concat 0xff (le-bytes VALUE 8))))))
-
-  (defun length (ITEMS)
-    (if ITEMS (+ 1 (length (r ITEMS))) 0))
-
-  (defun nth (ITEMS INDEX)
-    (if INDEX (nth (r ITEMS) (- INDEX 1)) (f ITEMS)))
 
   (defun-inline tx-inputs (TX) (f (r TX)))
   (defun-inline tx-outputs (TX) (f (r (r TX))))
@@ -70,6 +69,8 @@
   (defun serialize-tx ((VERSION INPUTS OUTPUTS LOCKTIME))
     (assert (= (strlen VERSION) 4)
             (= (strlen LOCKTIME) 4)
+            INPUTS
+            OUTPUTS
       (concat VERSION
               (compact-size (length INPUTS)) (serialize-inputs INPUTS)
               (compact-size (length OUTPUTS)) (serialize-outputs OUTPUTS)
