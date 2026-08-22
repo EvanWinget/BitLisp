@@ -165,7 +165,7 @@ end in `.blib`, though nothing enforces an extension.
 
 Every condition name of `CONDITIONS.md` section 2 is a built-in
 constant whose value is its one-byte opcode, `CREATE_OUTPUT`
-through `SEAL_OUTPUTS`, 26 names. They inline like any constant,
+through `SEAL_OUTPUTS`, 27 names. They inline like any constant,
 cannot be redefined, and need no declaration:
 
 ```

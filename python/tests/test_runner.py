@@ -30,6 +30,7 @@ from bitlisp.conditions import (  # noqa: E402
     AssertMyOutpoint,
     AssertMyScriptPubKey,
     AssertMyTaproot,
+    AssertMyTaptree,
     AssertMyTxid,
     AssertSequenceHeight,
     AssertSequenceTime,
@@ -120,6 +121,10 @@ RENDER_CASES = [
         + "04" * 32
         + " script_pubkey=0x"
         + SPK_TAPROOT,
+    ),
+    (
+        AssertMyTaptree(b"\x02" * 32, b"\x04" * 32),
+        "ASSERT_MY_TAPTREE internal_key=0x" + "02" * 32 + " merkle_root=0x" + "04" * 32,
     ),
     (
         AssertSig(ASSERT_SIG_RAW, b"\x05" * 32, b"", b"\x06" * 64),

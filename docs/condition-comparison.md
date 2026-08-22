@@ -211,11 +211,11 @@ specs of the same shape.
 
 ## Observations
 
-- **Where Phase 2 stands.** Twenty-six vocabulary entries are
+- **Where Phase 2 stands.** Twenty-seven vocabulary entries are
   normative and the v0 table is complete: `CREATE_OUTPUT`,
   `CREATE_OUTPUT_TAPROOT`, the eight signature asserts (decision
-  23), the four time asserts, the five self asserts (decision
-  20), the message family (`ASSURE`, `REQUIRE`,
+  23), the four time asserts, the six self asserts (decisions
+  20 and 28), the message family (`ASSURE`, `REQUIRE`,
   `ANNOUNCE`, `ASSERT_ANNOUNCEMENT`), `RESERVE_FEE` (decision
   21), and the seal pair (decision 24). All eight validation
   rules are normative, rule 5 landing last by design so costing

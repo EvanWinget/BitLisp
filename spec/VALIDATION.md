@@ -284,7 +284,7 @@ fields:
 
 Bit 3 (value 8) additionally commits to the input's `tapleaf` and
 bit 4 (value 16) to its `merkleRoot`, the two execution-identity
-fields of the transaction view. Each set bit appends its one
+fields specifiers read. Each set bit appends its one
 operand after the low bits' operands, `tapleaf` before
 `merkleRoot`. Every combination is a valid commitment value: the
 32 values are the 8 prevout rows composed with the 4
@@ -697,7 +697,8 @@ it enforceable, and lands with that rule:
 - A self assert's outcome is unchanged by the transaction's
   version, locktime, its input's sequence, and the presence of
   unrelated inputs: the outcome is a function of the condition and
-  its input's own prevout data alone (self asserts).
+  its input's own prevout data and execution identity alone (self
+  asserts).
 - Whenever an ASSERT_MY_OUTPOINT is satisfied, the ASSERT_MY_TXID
   built from its operand's first 32 bytes is satisfied on the same
   input (self asserts).
@@ -711,11 +712,11 @@ it enforceable, and lands with that rule:
   scriptPubKey: it reads the execution identity and nothing else
   (self asserts).
 - On an input whose spent scriptPubKey is the taproot output of
-  its `internalKey` tweaked with its `merkleRoot`, which every
-  input base consensus admits is, ASSERT_MY_TAPTREE and
-  ASSERT_MY_TAPROOT over equal operands produce identical
-  outcomes, except where two distinct operand pairs derive one
-  output key (self asserts).
+  its `internalKey` tweaked with its `merkleRoot`, the shape of
+  every input base consensus admits, ASSERT_MY_TAPTREE and
+  ASSERT_MY_TAPROOT over equal operands are satisfied together and
+  fail together, each with its own error, except where two
+  distinct operand pairs derive one output key (self asserts).
 - Adding a balanced ASSURE and REQUIRE pair to a valid
   transaction keeps it valid, and adding either half alone
   invalidates it (rule 3).

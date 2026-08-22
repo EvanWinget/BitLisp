@@ -54,7 +54,8 @@ scripts = st.sampled_from(
 amounts = st.sampled_from((0, 1, 50_000, 50_000 + 2**32, 2_100_000_000_000_000))
 # (internal key, merkle root) pairs, drawn both as the input's own
 # identity and as taptree operands, so the two collide often.
-identities = st.sampled_from(((IK, ROOT), (IK, ROOT_B), (NUMS, ROOT)))
+IDENTITIES = ((IK, ROOT), (IK, ROOT_B), (NUMS, ROOT))
+identities = st.sampled_from(IDENTITIES)
 
 
 def _outpoint(txid, index):
@@ -66,12 +67,17 @@ def _taproot(internal_key, merkle_root):
     return AssertMyTaproot(internal_key, merkle_root, spk)
 
 
+# Derived once: the tweak is the one expensive step in this module,
+# and the pools are fixed, so no property recomputes it per example.
+TAPROOT_ASSERTS = {pair: _taproot(*pair) for pair in (*IDENTITIES, (IK, b""))}
+HONEST_SPKS = {pair: TAPROOT_ASSERTS[pair].script_pubkey for pair in IDENTITIES}
+
 self_asserts = st.one_of(
     st.tuples(txids, indexes).map(lambda t: AssertMyOutpoint(_outpoint(*t))),
     txids.map(AssertMyTxid),
     scripts.map(AssertMyScriptPubKey),
     amounts.map(AssertMyAmount),
-    st.sampled_from(((IK, ROOT), (IK, b""), (NUMS, ROOT))).map(lambda t: _taproot(*t)),
+    st.sampled_from(tuple(TAPROOT_ASSERTS.values())),
     identities.map(lambda t: AssertMyTaptree(*t)),
 )
 cond_lists = st.lists(self_asserts, max_size=4)
@@ -207,9 +213,9 @@ def test_taptree_assert_agrees_with_taproot_assert_on_honest_input(
     satisfied together and fail together. The pools hold no two
     pairs deriving one output key, so the collision exemption never
     fires here."""
-    honest = b"\x51\x20" + taproot_output_key(*identity)
+    honest = HONEST_SPKS[identity]
     taptree = AssertMyTaptree(*operands)
-    taproot = _taproot(*operands)
+    taproot = TAPROOT_ASSERTS[operands]
     got_taptree = outcome(
         build_tx(txid, index, honest, amount, [taptree], env, identity)
     )

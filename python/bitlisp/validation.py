@@ -192,7 +192,8 @@ def check_time_asserts(tx):
 
 def check_self_asserts(tx):
     """The self assert family: each condition is an equality against
-    its own input's prevout data, checked as a conjunction."""
+    its own input's prevout data or execution identity, checked as a
+    conjunction."""
     for tx_input in tx.inputs:
         outpoint = tx_input.txid + tx_input.index.to_bytes(4, "little")
         for cond in tx_input.conditions or ():
@@ -250,7 +251,7 @@ def self_specifier(tx_input, commitment):
     commitment value: what an ASSURE or REQUIRE says about its
     emitting input, and what an announcement assert compares its
     announcer operands against. Only condition-carrying inputs emit
-    conditions, and those carry both execution-identity fields by
+    conditions, and those carry the execution-identity triple by
     the transaction model's construction rule."""
     fields = []
     for kind in SPECIFIER_OPERANDS[commitment]:

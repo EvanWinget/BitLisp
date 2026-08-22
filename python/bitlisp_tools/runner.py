@@ -188,7 +188,7 @@ def run_spend(program, solution, tx, input_index=0, max_cost=DEFAULT_MAX_COST):
     when the selection is unusable: an index out of range, a
     target input that already carries conditions, since the runner
     exists to compute them, or a target missing the
-    execution-identity pair its computed conditions will require.
+    execution-identity triple its computed conditions will require.
     """
     if not 0 <= input_index < len(tx.inputs):
         raise ContextError(

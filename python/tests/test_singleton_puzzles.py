@@ -818,3 +818,21 @@ def test_validation_vectors_match_source():
             if "conditions" in entry:
                 observed.add(entry["conditions"])
     assert observed == validation_conditions()
+
+
+def test_validation_vector_identities_derive_their_scripts():
+    # The corpus carries each lineage input's execution identity as
+    # data the model takes on trust, so this is where the trust is
+    # checked: every condition-carrying input's scriptPubKey must be
+    # the tweak of its internal key by its merkle root, with the
+    # single-leaf tree's root equal to its leaf hash. No input in
+    # this file carries filler.
+    for case in load_vector("validation/singleton-lineage.json").values():
+        for entry in case["tx"]["inputs"]:
+            if "conditions" not in entry:
+                continue
+            root = bytes.fromhex(entry["merkle_root"])
+            assert entry["tapleaf"] == entry["merkle_root"]
+            assert entry["internal_key"] == NUMS.hex()
+            expected = b"\x51\x20" + secp256k1.taproot_output_key(NUMS, root)
+            assert entry["script_pubkey"] == expected.hex(), case["name"]

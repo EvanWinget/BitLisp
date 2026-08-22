@@ -474,13 +474,13 @@ which travel with the spend, so recombining spends into a
 different transaction never changes an outcome, and the
 composition guarantee stated in VALIDATION.md's claims and
 asserts preamble holds for this family with no discipline
-required. The operands commit to the
-same prevout and execution-identity fields as the participant
-specifiers of VALIDATION.md rule 3, plus the internal key, and
-carry the recombination-stability classes stated there: amount,
-scriptPubKey, the merkle root, and the internal key are knowable
-when a program is written, the creating txid and the outpoint
-exist only once the creating transaction is final.
+required. The operands carry the
+recombination-stability classes VALIDATION.md rule 3 states for
+its specifier fields, with the internal key in the content class
+beside the merkle root: amount, scriptPubKey, the merkle root, and
+the internal key are knowable when a program is written, the
+creating txid and the outpoint exist only once the creating
+transaction is final.
 
 Failure of an assert reading the outpoint is the error
 `unsatisfied_outpoint_assert`. Failure of an assert reading the
@@ -605,9 +605,14 @@ and checked the result against the spent scriptPubKey.
 
 A satisfied assert proves the spent output is the taproot output
 of `internal_key` tweaked with `merkle_root`, the same fact
-ASSERT_MY_TAPROOT proves by derivation. The two are satisfied on
-the same inputs, except where two distinct operand pairs derive
-one output key.
+ASSERT_MY_TAPROOT proves by derivation. On an input whose spent
+scriptPubKey is the taproot output of its `internalKey` tweaked
+with its `merkleRoot`, the shape of every input base consensus
+admits, the two are satisfied together and fail together, each
+with its own error, except where two distinct operand pairs
+derive one output key. The transaction view does not require that
+shape, so on a view input whose scriptPubKey and identity
+disagree only this assert reads the identity.
 
 **Arguments.** `internal_key` is an atom of exactly 32 bytes
 (`bad_condition_arg`). It is not checked to lift to a curve

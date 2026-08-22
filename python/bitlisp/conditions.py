@@ -509,17 +509,25 @@ def _parse_create_output(args):
     return CreateOutput(script_pubkey, amount)
 
 
+def _fixed_width_atom(atom, what, size):
+    """An atom operand of exactly size bytes, else bad_condition_arg.
+    The one rule behind every 32-byte identity operand (txids, keys,
+    leaf hashes, roots, seal digests) and the 36-byte outpoint, so
+    the operands that share a domain share it in code."""
+    if not is_atom(atom):
+        raise BitLispError("bad_condition_arg", f"{what} must be an atom")
+    if len(atom) != size:
+        raise BitLispError(
+            "bad_condition_arg", f"{what} must be {size} bytes, got {len(atom)}"
+        )
+    return atom
+
+
 def _check_taproot_components(internal_key, merkle_root):
     """The width checks of the two taproot component atoms. Cheap
     work only, run before the condition's charge: the point work
     lives in _derive_taproot_spk, run after it."""
-    if not is_atom(internal_key):
-        raise BitLispError("bad_condition_arg", "internal key must be an atom")
-    if len(internal_key) != 32:
-        raise BitLispError(
-            "bad_condition_arg",
-            f"internal key must be 32 bytes, got {len(internal_key)}",
-        )
+    _fixed_width_atom(internal_key, "internal key", 32)
     if not is_atom(merkle_root):
         raise BitLispError("bad_condition_arg", "merkle root must be an atom")
     if len(merkle_root) not in (0, 32):
@@ -580,15 +588,7 @@ def _parse_fixed_bytes(args, name, cls, size):
         raise BitLispError(
             "bad_condition_arity", f"{name} takes 1 argument, got {len(args)}"
         )
-    atom = args[0]
-    if not is_atom(atom):
-        raise BitLispError("bad_condition_arg", f"{name} operand must be an atom")
-    if len(atom) != size:
-        raise BitLispError(
-            "bad_condition_arg",
-            f"{name} operand must be {size} bytes, got {len(atom)}",
-        )
-    return cls(atom)
+    return cls(_fixed_width_atom(args[0], f"{name} operand", size))
 
 
 def _parse_assert_my_scriptpubkey(args):
@@ -646,17 +646,10 @@ def _parse_assert_my_taptree(args):
             "bad_condition_arity",
             f"ASSERT_MY_TAPTREE takes 2 arguments, got {len(args)}",
         )
-    for atom, what in zip(args, ("internal key", "merkle root"), strict=True):
-        if not is_atom(atom):
-            raise BitLispError(
-                "bad_condition_arg", f"ASSERT_MY_TAPTREE {what} must be an atom"
-            )
-        if len(atom) != 32:
-            raise BitLispError(
-                "bad_condition_arg",
-                f"ASSERT_MY_TAPTREE {what} must be 32 bytes, got {len(atom)}",
-            )
-    return AssertMyTaptree(*args)
+    return AssertMyTaptree(
+        _fixed_width_atom(args[0], "ASSERT_MY_TAPTREE internal key", 32),
+        _fixed_width_atom(args[1], "ASSERT_MY_TAPTREE merkle root", 32),
+    )
 
 
 def _parse_assert_sig(opcode, args):
@@ -710,23 +703,19 @@ def _parse_specifier(commitment, args, name):
                 )
             fields.append(value)
             continue
+        if kind == "outpoint":
+            fields.append(_fixed_width_atom(atom, f"{name} outpoint", OUTPOINT_SIZE))
+            continue
+        if kind in ("txid", "tapleaf", "merkle_root"):
+            fields.append(_fixed_width_atom(atom, f"{name} {kind}", 32))
+            continue
         if not is_atom(atom):
             raise BitLispError("bad_condition_arg", f"{name} {kind} must be an atom")
-        if kind == "script_pubkey" and len(atom) > MAX_SCRIPT_PUBKEY_SIZE:
+        if len(atom) > MAX_SCRIPT_PUBKEY_SIZE:
             raise BitLispError(
                 "bad_condition_arg",
                 f"{name} scriptPubKey must be at most "
                 f"{MAX_SCRIPT_PUBKEY_SIZE} bytes, got {len(atom)}",
-            )
-        if kind == "outpoint" and len(atom) != OUTPOINT_SIZE:
-            raise BitLispError(
-                "bad_condition_arg",
-                f"{name} outpoint must be {OUTPOINT_SIZE} bytes, got {len(atom)}",
-            )
-        if kind in ("txid", "tapleaf", "merkle_root") and len(atom) != 32:
-            raise BitLispError(
-                "bad_condition_arg",
-                f"{name} {kind} must be 32 bytes, got {len(atom)}",
             )
         fields.append(atom)
     return Specifier(commitment, tuple(fields))
