@@ -1,0 +1,80 @@
+; The non-witness wire serialization of a Bitcoin transaction, the
+; preimage of its txid.
+;
+; A program that knows its own outpoint knows the txid of the
+; transaction that created it, and that txid is the double SHA-256 of
+; the transaction's serialization without witness data. Rebuilding
+; that serialization from its fields and hashing it proves the fields:
+; which outpoints the transaction spent and which outputs it created.
+; Every length prefix is emitted in Bitcoin's canonical compact-size
+; encoding, the only encoding the consensus parser accepts, so a byte
+; string built here parses back to exactly the fields it was built
+; from, and no other field list serializes to the same bytes.
+;
+; A transaction is (VERSION INPUTS OUTPUTS LOCKTIME), each input
+; (OUTPOINT SCRIPTSIG SEQUENCE), each output (AMOUNT SCRIPT). Fixed
+; width fields arrive as raw wire bytes, little-endian where Bitcoin
+; is, and are width-checked: the version and locktime 4 bytes, an
+; outpoint 36, a sequence 4, an amount 8. Scripts are raw bytes of
+; any length, the scriptSig empty for every segwit input.
+(
+  ; One byte holding an integer 0 to 255. Adding 256 forces a two
+  ; byte encoding whose low byte is the value, whatever its sign bit.
+  (defun-inline byte (VALUE) (substr (+ 256 VALUE) 1 2))
+
+  ; COUNT little-endian bytes of a non-negative integer.
+  (defun le-bytes (VALUE COUNT)
+    (if COUNT
+        (concat (byte (logand VALUE 255)) (le-bytes (ash VALUE -8) (- COUNT 1)))
+        ()))
+
+  (defun compact-size (VALUE)
+    (if (> 253 VALUE)
+        (byte VALUE)
+    (if (> 65536 VALUE)
+        (concat 0xfd (le-bytes VALUE 2))
+    (if (> 4294967296 VALUE)
+        (concat 0xfe (le-bytes VALUE 4))
+        (concat 0xff (le-bytes VALUE 8))))))
+
+  (defun length (ITEMS)
+    (if ITEMS (+ 1 (length (r ITEMS))) 0))
+
+  (defun nth (ITEMS INDEX)
+    (if INDEX (nth (r ITEMS) (- INDEX 1)) (f ITEMS)))
+
+  (defun-inline tx-inputs (TX) (f (r TX)))
+  (defun-inline tx-outputs (TX) (f (r (r TX))))
+  (defun-inline input-outpoint (INPUT) (f INPUT))
+  (defun-inline output-script (OUTPUT) (f (r OUTPUT)))
+
+  (defun serialize-input ((OUTPOINT SCRIPTSIG SEQUENCE))
+    (assert (= (strlen OUTPOINT) 36)
+            (= (strlen SEQUENCE) 4)
+      (concat OUTPOINT (compact-size (strlen SCRIPTSIG)) SCRIPTSIG SEQUENCE)))
+
+  (defun serialize-inputs (INPUTS)
+    (if INPUTS
+        (concat (serialize-input (f INPUTS)) (serialize-inputs (r INPUTS)))
+        ()))
+
+  (defun serialize-output ((AMOUNT SCRIPT))
+    (assert (= (strlen AMOUNT) 8)
+      (concat AMOUNT (compact-size (strlen SCRIPT)) SCRIPT)))
+
+  (defun serialize-outputs (OUTPUTS)
+    (if OUTPUTS
+        (concat (serialize-output (f OUTPUTS)) (serialize-outputs (r OUTPUTS)))
+        ()))
+
+  (defun serialize-tx ((VERSION INPUTS OUTPUTS LOCKTIME))
+    (assert (= (strlen VERSION) 4)
+            (= (strlen LOCKTIME) 4)
+      (concat VERSION
+              (compact-size (length INPUTS)) (serialize-inputs INPUTS)
+              (compact-size (length OUTPUTS)) (serialize-outputs OUTPUTS)
+              LOCKTIME)))
+
+  ; The txid in the byte order outpoints carry.
+  (defun-inline txid (TX) (sha256 (sha256 (serialize-tx TX))))
+)
