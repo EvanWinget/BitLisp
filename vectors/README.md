@@ -71,7 +71,8 @@ differs, each cites its divergence row.
 condition (`{"opcode", "script_pubkey", "amount"}` for CREATE_OUTPUT,
 `{"opcode", "internal_key", "merkle_root", "amount", "script_pubkey"}`
 for CREATE_OUTPUT_TAPROOT with `script_pubkey` the derived taproot
-script, `{"opcode"}` plus the operand under its entry's argument name
+script, `{"opcode", "internal_key", "merkle_root"}` for
+ASSERT_MY_TAPTREE, `{"opcode"}` plus the operand under its entry's argument name
 (`"height"`, `"time"`, `"blocks"`, `"units"`) for the time asserts,
 `{"opcode", "cost", "args": ["<hex node>"]}` for reserved
 conditions) or `{"error": "<code>"}`. The message family pins
@@ -101,7 +102,8 @@ CONDITIONS.md section 1 and VALIDATION.md rule 6 has at least one case.
                 "script_sig": "<hex, optional>",
                 "conditions": "<hex node>",
                 "tapleaf": "<hex, 32 bytes>",
-                "merkle_root": "<hex, 32 bytes>"
+                "merkle_root": "<hex, 32 bytes>",
+                "internal_key": "<hex, 32 bytes>"
             }
         ],
         "outputs": [{"script_pubkey": "<hex>", "amount": 50000}]
@@ -116,10 +118,12 @@ input: it exists because a SEAL reads legacy scriptSig bytes through
 the txid. An input without a `conditions` key is a non-BitLisp
 input, one with the key is a BitLisp input whose program evaluation
 produced that condition list. A BitLisp input also carries its
-execution identity, `tapleaf` and `merkle_root`, each exactly 32
-bytes: the pair base consensus authenticates from the control
-block, which rule 3's composed specifiers read. The model rejects
-a condition-carrying input without both. `expect`
+execution identity, `tapleaf`, `merkle_root`, and `internal_key`,
+each exactly 32 bytes: the triple base consensus authenticates from
+the control block. Rule 3's composed specifiers read the first two,
+ASSERT_MY_TAPTREE reads the last two. The model rejects a
+condition-carrying input without all three, and derives nothing
+from them, so a family-suite input may carry filler. `expect`
 is `{"valid": true}` or `{"error": "<code>"}`. The transaction must
 satisfy the model's base rules (value conservation, ranges, distinct
 outpoints): a case violating them is a malformed vector, not an
