@@ -1,0 +1,14 @@
+; Generic list helpers.
+;
+; Declarations share one namespace with the program that includes
+; them, so these names belong to this file and nothing else defines
+; them: a library needing a list helper includes this file rather
+; than spelling its own.
+(
+  (defun length (ITEMS)
+    (if ITEMS (+ 1 (length (r ITEMS))) 0))
+
+  ; The element at INDEX, raising past the end of the list.
+  (defun nth (ITEMS INDEX)
+    (if INDEX (nth (r ITEMS) (- INDEX 1)) (f ITEMS)))
+)

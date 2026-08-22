@@ -1,0 +1,189 @@
+; The singleton wrapper: a coin that exists exactly once.
+;
+; A singleton is a lineage of coins, one live at a time, carrying an
+; identity fixed at launch and a state that each spend may replace.
+; The identity is LAUNCHER_OUTPOINT, the outpoint of an ordinary coin
+; whose spend created the first singleton coin. Every coin of the
+; lineage sits at one scriptPubKey: the taproot output of the BIP341
+; nothing-up-my-sleeve point tweaked with this program curried with
+; its two fixed values, recomputed here and asserted on every spend,
+; so no key path exists and a coin there moves only by running this
+; program. The state is an inner program, which the spend supplies in
+; full and this program runs. The transaction that created the coin
+; commits the state in a zero-value OP_RETURN output tagged with the
+; lineage, whose payload hashes the inner program's tree hash, the
+; coin's amount, and the coin's output index together, so the
+; committed state names one output of that transaction and the
+; state is read back through the txid rather than carried in the
+; scriptPubKey.
+;
+; Anyone can pay to the lineage's scriptPubKey, so the coin proves
+; its descent before it does anything. Its creating transaction is
+; supplied in full and must hash to its own txid. One input of that
+; transaction is the parent, and the parent must itself have sat at
+; this same scriptPubKey, proven by the parent's creating transaction
+; in turn, unless the parent is the launcher itself. Base consensus
+; spends an outpoint once, so one transaction creates the child of
+; any singleton coin, and that transaction's one tagged output names
+; one child by amount and index: the lineage never forks, and a coin
+; at this scriptPubKey that no singleton spend created is
+; unspendable.
+;
+; The solution is (MY_AMOUNT MY_INDEX CHILD_INDEX PARENT_TX
+; PARENT_INPUT PARENT_VOUT GRANDPARENT_TX INNER INNER_SOLUTION).
+; PARENT_TX is the creating transaction in the field shape the
+; serialization library reads, MY_INDEX the coin's output index in
+; it, PARENT_INPUT the parent's input index in it, PARENT_VOUT the
+; parent's output index in GRANDPARENT_TX, which is nil when the
+; parent is the launcher, and CHILD_INDEX the output index the
+; child will take in the spending transaction. The inner program
+; runs over the cons of the coin's own data (LAUNCHER_OUTPOINT
+; MY_OUTPOINT MY_SPK MY_AMOUNT INNER_HASH) onto INNER_SOLUTION and
+; yields conditions. Exactly one of them must be a CREATE_OUTPUT
+; with an odd amount: its scriptPubKey operand is the next inner
+; program's tree hash, and this program rewrites it into the next
+; singleton coin at this same scriptPubKey plus the state output
+; committing that hash, the amount, and CHILD_INDEX. An odd amount
+; of -113 ends the lineage instead: no child, and a state output
+; whose payload no inner program matches, so the ended slot cannot
+; be refilled. Every other condition passes through unchanged, and
+; an odd-amount CREATE_OUTPUT_TAPROOT is rejected, so a spend
+; creates one odd output and no more. A singleton coin's own amount
+; is always odd.
+(program (SINGLETON_MOD_HASH LAUNCHER_OUTPOINT
+          MY_AMOUNT MY_INDEX CHILD_INDEX PARENT_TX PARENT_INPUT PARENT_VOUT
+          GRANDPARENT_TX INNER INNER_SOLUTION)
+  (include "curry-hash.blib")
+  (include "list.blib")
+  (include "tx-wire.blib")
+
+  ; The BIP341 nothing-up-my-sleeve point. Every lineage proof rests
+  ; on a coin at the lineage scriptPubKey moving only through this
+  ; program, so the internal key is fixed here rather than curried.
+  (defconstant INTERNAL_KEY
+    0x50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0)
+
+  (defconstant END_AMOUNT -113)
+
+  ; OP_RETURN then a direct push of 68 bytes: the 36-byte lineage tag
+  ; followed by the 32-byte state payload.
+  (defconstant STATE_OPCODES 0x6a44)
+  (defconstant STATE_TAG_LENGTH (+ (strlen STATE_OPCODES) 36))
+
+  ; The payload of an ended lineage. A live state's payload is a
+  ; tree hash, and nothing hashes to this.
+  (defconstant END_PAYLOAD
+    0x0000000000000000000000000000000000000000000000000000000000000000)
+
+  (defun singleton-root (SMH L)
+    (curried-tree-hash SMH (list (sha256tree SMH) (sha256tree L))))
+
+  (defun-inline state-tag (L) (concat STATE_OPCODES L))
+  (defun-inline state-script (L PAYLOAD) (concat (state-tag L) PAYLOAD))
+  (defun-inline state-payload (INNER_HASH AMOUNT INDEX)
+    (sha256tree (list INNER_HASH AMOUNT INDEX)))
+
+  ; The parent is the launcher, or it sat at this scriptPubKey: its
+  ; own creating transaction must hash to the txid half of its
+  ; outpoint and show this scriptPubKey at the index half.
+  (defun parent-proven (L MY_SPK PARENT PARENT_VOUT GRANDPARENT_TX)
+    (if (= PARENT L)
+        1
+        (and (l GRANDPARENT_TX)
+             (= (substr PARENT 0 32) (txid GRANDPARENT_TX))
+             (= (substr PARENT 32 36) (le-bytes PARENT_VOUT 4))
+             (= (output-script (nth (tx-outputs GRANDPARENT_TX) PARENT_VOUT))
+                MY_SPK))))
+
+  ; The scripts of every output carrying this lineage's state tag.
+  (defun state-scripts (OUTPUTS TAG)
+    (if OUTPUTS
+        (if (and (not (> STATE_TAG_LENGTH (strlen (output-script (f OUTPUTS)))))
+                 (= (substr (output-script (f OUTPUTS)) 0 STATE_TAG_LENGTH) TAG))
+            (c (output-script (f OUTPUTS)) (state-scripts (r OUTPUTS) TAG))
+            (state-scripts (r OUTPUTS) TAG))
+        ()))
+
+  ; Exactly one tagged output, and it commits this coin's inner
+  ; program, amount, and index. Two tagged outputs would let whoever
+  ; assembled the creating transaction choose between two states, so
+  ; they commit nothing.
+  (defun state-proven (SCRIPTS EXPECTED)
+    (and SCRIPTS (not (r SCRIPTS)) (= (f SCRIPTS) EXPECTED)))
+
+  ; The amount an output-creating condition carries, else zero.
+  (defun-inline created-amount (CONDITION)
+    (if (= (f CONDITION) CREATE_OUTPUT)
+        (f (r (r CONDITION)))
+    (if (= (f CONDITION) CREATE_OUTPUT_TAPROOT)
+        (f (r (r (r CONDITION))))
+        0)))
+
+  ; Rewrites the inner program's conditions: the one odd CREATE_OUTPUT
+  ; becomes the child coin and its state output, or the ending state
+  ; output alone, and everything else passes through. FOUND records
+  ; whether the odd condition has been seen, so a second one raises
+  ; and a list without one raises at its end.
+  (defun morph (L MY_SPK CHILD_INDEX CONDITIONS FOUND)
+    (if CONDITIONS
+        (morph-one L MY_SPK CHILD_INDEX (f CONDITIONS) (r CONDITIONS) FOUND
+                   (logand (created-amount (f CONDITIONS)) 1))
+        (assert FOUND ())))
+
+  (defun morph-one (L MY_SPK CHILD_INDEX CONDITION REST FOUND ODD)
+    (if ODD
+        (assert (not FOUND)
+                (= (f CONDITION) CREATE_OUTPUT)
+          (if (= (f (r (r CONDITION))) END_AMOUNT)
+              (c (list CREATE_OUTPUT (state-script L END_PAYLOAD) 0)
+                 (morph L MY_SPK CHILD_INDEX REST 1))
+              (assert (= (strlen (f (r CONDITION))) 32)
+                (c (list CREATE_OUTPUT MY_SPK (f (r (r CONDITION))))
+                (c (list CREATE_OUTPUT
+                         (state-script L (state-payload (f (r CONDITION))
+                                                        (f (r (r CONDITION)))
+                                                        CHILD_INDEX))
+                         0)
+                   (morph L MY_SPK CHILD_INDEX REST 1))))))
+        (c CONDITION (morph L MY_SPK CHILD_INDEX REST FOUND))))
+
+  (defun emit (L ROOT MY_SPK MY_AMOUNT MY_INDEX CHILD_INDEX MY_OUTPOINT
+               PARENT_PROVEN STATES INNER INNER_HASH INNER_SOLUTION)
+    (assert PARENT_PROVEN
+            (state-proven STATES
+              (state-script L (state-payload INNER_HASH MY_AMOUNT MY_INDEX)))
+      (c (list ASSERT_MY_TAPROOT INTERNAL_KEY ROOT)
+      (c (list ASSERT_MY_AMOUNT MY_AMOUNT)
+      (c (list ASSERT_MY_OUTPOINT MY_OUTPOINT)
+         (morph L MY_SPK CHILD_INDEX
+           (a INNER (c (list L MY_OUTPOINT MY_SPK MY_AMOUNT INNER_HASH)
+                       INNER_SOLUTION))
+           ()))))))
+
+  ; Exists to name the scriptPubKey, the txid, and the inner hash
+  ; once. The scriptPubKey is the creating transaction's output at
+  ; the coin's own index, which the outpoint assert makes the coin's
+  ; own.
+  (defun spend (L ROOT MY_AMOUNT MY_INDEX CHILD_INDEX PARENT_TX PARENT_INPUT
+                PARENT_VOUT GRANDPARENT_TX INNER INNER_SOLUTION)
+    (emit L ROOT
+          (output-script (nth (tx-outputs PARENT_TX) MY_INDEX))
+          MY_AMOUNT MY_INDEX CHILD_INDEX
+          (concat (txid PARENT_TX) (le-bytes MY_INDEX 4))
+          (parent-proven L
+                         (output-script (nth (tx-outputs PARENT_TX) MY_INDEX))
+                         (input-outpoint (nth (tx-inputs PARENT_TX) PARENT_INPUT))
+                         PARENT_VOUT GRANDPARENT_TX)
+          (state-scripts (tx-outputs PARENT_TX) (state-tag L))
+          INNER (sha256tree INNER) INNER_SOLUTION))
+
+  ; The fixed values are checked first so a malformed instance fails
+  ; on its first spend, and the coin's own amount must be odd, the
+  ; mark every child carries and no pass-through output may.
+  (assert (= (strlen SINGLETON_MOD_HASH) 32)
+          (= (strlen LAUNCHER_OUTPOINT) 36)
+          (logand MY_AMOUNT 1)
+    (spend LAUNCHER_OUTPOINT
+           (singleton-root SINGLETON_MOD_HASH LAUNCHER_OUTPOINT)
+           MY_AMOUNT MY_INDEX CHILD_INDEX PARENT_TX PARENT_INPUT PARENT_VOUT
+           GRANDPARENT_TX INNER INNER_SOLUTION)))
