@@ -39,16 +39,24 @@ fi
 
 # The vendored Bitcoin Core files must stay byte-identical to the
 # snapshot their README records, so a formatter or editor pass over
-# the tree cannot silently break the verbatim guarantee.
+# the tree cannot silently break the verbatim guarantee. The row
+# count is asserted first: a README edit that reshaped the table
+# would otherwise match zero rows and the check would pass while
+# verifying nothing.
 echo "== oracle provenance =="
 ORACLE_DIR=tools/oracle/bitcoincore
+ORACLE_ROW_COUNT=4
+ORACLE_ROW_RE='^\| `test_framework/[^`]+` \| `[^`]+` \| `[0-9a-f]{64}` \|$'
+if [ "$(grep -cE "$ORACLE_ROW_RE" "$ORACLE_DIR/README.md")" -ne "$ORACLE_ROW_COUNT" ]; then
+    fail "oracle provenance: expected exactly $ORACLE_ROW_COUNT rows in the $ORACLE_DIR/README.md table (reshaped table, or a vendored file added without bumping ORACLE_ROW_COUNT)"
+fi
 while IFS='|' read -r _ file _ sha _; do
     file="${file//[\` ]/}"
     sha="${sha//[\` ]/}"
     if ! echo "$sha  $ORACLE_DIR/$file" | shasum -a 256 --check --status; then
         fail "$ORACLE_DIR/$file differs from the sha256 its README records"
     fi
-done < <(grep -E '^\| `test_framework/[^`]+` \| `[^`]+` \| `[0-9a-f]{64}` \|$' "$ORACLE_DIR/README.md")
+done < <(grep -E "$ORACLE_ROW_RE" "$ORACLE_DIR/README.md")
 
 echo "== whitespace =="
 if git grep -In $'[ \t]$' -- "${TEXT_PATHSPECS[@]}"; then
