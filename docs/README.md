@@ -16,6 +16,10 @@
   and the novel-layer register. Cited by CLAUDE.md ground rule 3.
 - [opcode-comparison.md](opcode-comparison.md): informative side-by-side
   of the CLVM, bllsh, and BitLisp operator sets.
+- [objection-register.md](objection-register.md): every objection on
+  the public record to a Lisp VM for Bitcoin or to the conditions
+  architecture, with BitLisp's answer, its status, and where it
+  lives. The skeleton of the Phase 5 essay.
 - [condition-comparison.md](condition-comparison.md): informative
   side-by-side of Chia's deployed condition vocabulary and BitLisp's
   v0 vocabulary, plus the validation-layer architecture comparison.
