@@ -786,7 +786,10 @@ class _Compilation:
         entries = []
         node = items[0]
         while is_pair(node):
-            entry = _proper_items(node[0], "a let binding")
+            # A bare name in entry position is the classic unnested
+            # spelling (let (A 1) ...), so the error names the shape
+            # instead of complaining about the argument list.
+            entry = _proper_items(node[0], "a let binding") if is_pair(node[0]) else []
             if len(entry) != 2 or not isinstance(entry[0], Symbol):
                 raise CompileError(
                     "a let binding takes a name and a value", head.offset

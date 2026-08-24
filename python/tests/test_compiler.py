@@ -183,6 +183,13 @@ def test_pin_let_shapes():
     assert result == int_to_atom(25)
     program, _, _ = _run_program("(program (X) (let () (+ X 1)))", "(9)")
     assert disassemble(program) == "(+ 2 (q . 1))"
+    # Two bindings: the second name reads one rest step deeper, and
+    # the old environment lands behind both consed values.
+    program, _, result = _run_program(
+        "(program (X Y) (let ((A X) (B Y)) (c A B)))", "(7 9)"
+    )
+    assert disassemble(program) == "(a (q 4 2 5) (c 2 (c 5 1)))"
+    assert result == (int_to_atom(7), int_to_atom(9))
 
 
 def test_pin_constant_inlines():
@@ -976,6 +983,7 @@ def test_included_body_error_names_function_and_file(tmp_path):
         ("(program (X) (let ((A 1))))", "let takes bindings and a body"),
         ("(program (X) (let ((A 1) . B) A))", "let takes a binding list"),
         ("(program (X) (let ((A)) A))", "a let binding takes a name and a value"),
+        ("(program (X) (let (A 1) A))", "a let binding takes a name and a value"),
         ("(program (X) (let ((A 1 2)) A))", "a let binding takes a name and a value"),
         (
             "(program (X) (let ((A 1 . 2)) A))",

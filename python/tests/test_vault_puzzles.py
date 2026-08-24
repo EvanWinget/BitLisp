@@ -114,7 +114,7 @@ def test_mod_hashes_pinned():
 def test_curried_identity_matches_tooling():
     # Three independent computations of each instance's identity
     # must agree: the tooling's tree_hash over the curried node, the
-    # spec-rule reimplementation above, and the program's own
+    # shared spec-rule reimplementation, and the program's own
     # reconstruction read off the taptree assert it emits. uncurry
     # must also read back the inner program and the fixed values.
     for node, inst, root, values in (
@@ -511,7 +511,7 @@ def test_same_target_withdrawals_merge_and_burn():
     run_spend(trig_inst, assemble("(1)"), merged)
 
 
-def test_unknown_run_error():
+def test_unknown_path_raises():
     assert run_error(VAULT, "(9)") == "user_raise"
 
 
