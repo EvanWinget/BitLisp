@@ -156,7 +156,7 @@
    }
   },
   {
-   "name": "path_interior_zero_byte",
+   "name": "path_trailing_zero_byte",
    "program": "820100",
    "env": "ffffffffffffffff0a8080808080808080",
    "expect": {
@@ -165,7 +165,7 @@
    }
   },
   {
-   "name": "path_leading_and_interior_zero_bytes",
+   "name": "path_leading_and_trailing_zero_bytes",
    "program": "83000100",
    "env": "ffffffffffffffff0a8080808080808080",
    "expect": {
