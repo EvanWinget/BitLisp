@@ -6,7 +6,8 @@ operator names, and decimals keep exactly their raw meaning and the
 language occupies only text that previously errored. Atoms quote
 themselves, names resolve to environment paths or inline constant
 values, and the special forms are program, defun, defun-inline,
-defconstant, include, if, list, assert, and, and or. Everything
+defconstant, include, if, list, list*, assert, and, and or.
+Everything
 else a source expression can say is an operator application.
 
 A compiled program's environment is the pair (function tree . args).
@@ -71,6 +72,7 @@ _TOP, _LEFT, _RIGHT = 1, 2, 3
     _INCLUDE,
     _IF,
     _LIST,
+    _LIST_STAR,
     _ASSERT,
     _AND,
     _OR,
@@ -82,6 +84,7 @@ _TOP, _LEFT, _RIGHT = 1, 2, 3
     "include",
     "if",
     "list",
+    "list*",
     "assert",
     "and",
     "or",
@@ -95,6 +98,7 @@ RESERVED_WORDS = frozenset(
         _INCLUDE,
         _IF,
         _LIST,
+        _LIST_STAR,
         _ASSERT,
         _AND,
         _OR,
@@ -670,6 +674,8 @@ class _Compilation:
             return self._if(head, tail, bindings)
         if name == _LIST:
             return self._list(head, tail, bindings)
+        if name == _LIST_STAR:
+            return self._list_star(head, tail, bindings)
         if name == _ASSERT:
             return self._assert(head, tail, bindings)
         if name == _AND:
@@ -702,6 +708,19 @@ class _Compilation:
         result = NIL
         for item in reversed(items):
             result = _proper_list(_CONS, self.expression(item, bindings), result)
+        return result
+
+    def _list_star(self, head, tail, bindings):
+        # The last argument is the tail the others cons onto, so
+        # the built list ends in it instead of nil, and a lone
+        # tail compiles bare.
+        items = _proper_items(tail, _LIST_STAR, head.offset)
+        if not items:
+            raise CompileError("list* takes items and a final tail", head.offset)
+        compiled = [self.expression(item, bindings) for item in items]
+        result = compiled[-1]
+        for item in reversed(compiled[:-1]):
+            result = _proper_list(_CONS, item, result)
         return result
 
     def _assert(self, head, tail, bindings):

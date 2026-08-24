@@ -149,6 +149,17 @@ def test_pin_list_and_nil():
     assert result == assemble("(1 () ())")
 
 
+def test_pin_list_star_shapes():
+    # A lone tail has nothing to cons and compiles bare, and each
+    # further item adds one cons, the built list ending in the tail
+    # instead of nil.
+    program, _, _ = _run_program("(program (T) (list* T))", "((5 6))")
+    assert disassemble(program) == "2"
+    program, _, result = _run_program("(program (A B T) (list* A B T))", "(1 2 (5 6))")
+    assert disassemble(program) == "(c 2 (c 5 11))"
+    assert result == assemble("(1 2 5 6)")
+
+
 def test_pin_constant_inlines():
     program, _, result = _run_program(
         "(program (AMT) (defconstant FEE 500) (- AMT FEE))", "(1200)"
@@ -248,6 +259,15 @@ def test_and_or_are_boolean_and_lazy():
     assert result == NIL
     _, _, result = _run_program("(program (X) (or X (x)))", "(1)")
     assert result == int_to_atom(1)
+
+
+def test_list_star_extends_an_inherited_tail():
+    # The shape condition lists take when a program conses its own
+    # conditions onto a tail it was handed.
+    source = """(program (SCRIPT AMT TAIL)
+        (list* (list CREATE_OUTPUT SCRIPT AMT) TAIL))"""
+    _, _, result = _run_program(source, "(0xaa 700 ((81 1)))")
+    assert result == assemble("((1 0xaa 700) (81 1))")
 
 
 def test_destructured_parameters():
@@ -421,7 +441,7 @@ def test_load_symbols_tracks_the_reserved_words():
     _, table = compile_program("(program (X) (defun fun (N) (* 2 N)) (fun X))")
     data = symbols_to_json(table)
     (key,) = data["functions"]
-    for name in ("assert", "and", "or", "include", "defun-inline"):
+    for name in ("assert", "and", "or", "include", "defun-inline", "list*"):
         data["functions"][key]["name"] = name
         with pytest.raises(ValueError) as excinfo:
             load_symbols(data)
@@ -836,7 +856,11 @@ def test_included_body_error_names_function_and_file(tmp_path):
         ("(program (X) (defun f N) X)", "defun takes 3 parts"),
         ("(program (X) (defconstant K) X)", "defconstant takes 2 parts"),
         ("(program (X) (assert))", "assert takes conditions and a final value"),
+        ("(program (X) (list*))", "list* takes items and a final tail"),
+        ("(program (X) (list* 1 . 2))", "list* takes a proper argument list"),
         ("(program (assert) 1)", "'assert' is a reserved word"),
+        ("(program (list*) 1)", "'list*' is a reserved word"),
+        ("(program (X) (defun list* (N) N) X)", "'list*' is a reserved word"),
         ("(program (X) (defun and (N) N) X)", "'and' is a reserved word"),
         ("(program (X) (defconstant or 1) X)", "'or' is a reserved word"),
         ("(program (X) (defun include (N) N) X)", "'include' is a reserved word"),
@@ -926,6 +950,7 @@ def test_reserved_words_are_pinned_and_all_dispatch():
             "include",
             "if",
             "list",
+            "list*",
             "assert",
             "and",
             "or",
@@ -959,6 +984,28 @@ def test_list_builds_the_literal_list(values):
     program, _ = compile_expression(text, defs)
     cost, result = run(program, NIL, BUDGET)
     expected = NIL
+    for value in reversed(values):
+        expected = (int_to_atom(value), expected)
+    assert result == expected
+
+
+@given(
+    st.lists(st.integers(min_value=0, max_value=2**63 - 1), max_size=6),
+    st.lists(st.integers(min_value=0, max_value=2**63 - 1), max_size=4),
+)
+def test_list_star_conses_onto_its_tail(values, tail_values):
+    # Against Python's own cons fold: the built list is the items
+    # ended by the quoted tail rather than nil.
+    defs = Definitions()
+    tail = NIL
+    for value in reversed(tail_values):
+        tail = (int_to_atom(value), tail)
+    text = "(list* {} (q . {}))".format(
+        " ".join(str(value) for value in values), disassemble(tail)
+    )
+    program, _ = compile_expression(text, defs)
+    cost, result = run(program, NIL, BUDGET)
+    expected = tail
     for value in reversed(values):
         expected = (int_to_atom(value), expected)
     assert result == expected
