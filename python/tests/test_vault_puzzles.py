@@ -516,8 +516,9 @@ def test_unknown_path_raises():
 
 
 def test_vm_vectors_match_source():
-    # Every pinned program is byte-identical to a fresh compile and
-    # curry of the sources, so the corpus cannot drift from them.
+    # Every pinned program and solution is byte-identical to a fresh
+    # compile, curry, and construction from the sources, so the
+    # corpus cannot drift from them.
     malformed_rkey = instance(VAULT_NODE, vault_values(b"\x02" + RKEY_PK))[0]
     overlong_delay = instance(
         VAULT_NODE,
@@ -547,29 +548,55 @@ def test_vm_vectors_match_source():
             b"\x00\x00\x90",
         ],
     )[0]
-    by_program = {
-        "vault_trigger_no_revault": VAULT,
-        "vault_trigger_with_revault": VAULT,
-        "vault_recover_keyless": VAULT,
-        "vault_recover_keyed": KVAULT,
-        "vault_follow": VAULT,
-        "vault_lead_two_followers": VAULT,
-        "triggered_withdraw": TRIG,
-        "triggered_recover": TRIG,
-        "vault_trigger_value_shortfall": VAULT,
-        "vault_trigger_negative_revault": VAULT,
-        "vault_trigger_zero_amount": VAULT,
-        "vault_malformed_recovery_key_unspendable": malformed_rkey,
-        "vault_overlong_delay_unspendable": overlong_delay,
-        "vault_nil_recovery_spk_unspendable": nil_recovery_spk,
-        "vault_padded_delay_unspendable": padded_delay,
-        "vault_lead_no_followers": VAULT,
-        "vault_unknown_path": VAULT,
-    }
-    assert_vm_vectors_match(
-        "vm/vault-programs.json",
-        {name: (node, None) for name, node in by_program.items()},
+    follow = assemble(f"(3 0x{VSPK.hex()})")
+    nr_sig = sig_my_outpoint(
+        AUTH_SK, TXID, 0, assemble(f"(1 0x{TARGET.hex()} 60000 0)")
     )
+
+    def hostile_trigger(trig_amt, revault_amt, my_amt):
+        # The failing trigger paths raise on their amount guards
+        # before the signature assert runs, and the corpus pins
+        # them carrying the captured no-revault signature, the
+        # replay an observer could actually attempt.
+        return assemble(
+            f"(1 0x{TARGET.hex()} {trig_amt} {revault_amt} {my_amt} 0x{nr_sig.hex()})"
+        )
+
+    expected = {
+        "vault_trigger_no_revault": (
+            VAULT,
+            trigger_solution(AUTH_SK, TXID, 0, TARGET, 60_000, 0, 60_000),
+        ),
+        "vault_trigger_with_revault": (
+            VAULT,
+            trigger_solution(AUTH_SK, TXID, 0, TARGET, 40_000, 20_000, 60_000),
+        ),
+        "vault_recover_keyless": (VAULT, assemble("(2 60000 60000)")),
+        "vault_recover_keyed": (
+            KVAULT,
+            keyed_recovery_solution(TXID, 60_000, 60_000),
+        ),
+        "vault_follow": (VAULT, follow),
+        "vault_lead_two_followers": (
+            VAULT,
+            assemble(f"(4 0x{VSPK.hex()} 60000 140000 (50000 30000))"),
+        ),
+        "triggered_withdraw": (TRIG, assemble("(1)")),
+        "triggered_recover": (TRIG, assemble("(2 40000 40000)")),
+        "vault_trigger_value_shortfall": (VAULT, hostile_trigger(30_000, 0, 60_000)),
+        "vault_trigger_negative_revault": (VAULT, hostile_trigger(60_001, -1, 60_000)),
+        "vault_trigger_zero_amount": (VAULT, hostile_trigger(0, 60_000, 60_000)),
+        "vault_malformed_recovery_key_unspendable": (malformed_rkey, follow),
+        "vault_overlong_delay_unspendable": (overlong_delay, follow),
+        "vault_nil_recovery_spk_unspendable": (nil_recovery_spk, follow),
+        "vault_padded_delay_unspendable": (padded_delay, follow),
+        "vault_lead_no_followers": (
+            VAULT,
+            assemble(f"(4 0x{VSPK.hex()} 60000 60000 ())"),
+        ),
+        "vault_unknown_path": (VAULT, assemble("(9)")),
+    }
+    assert_vm_vectors_match("vm/vault-programs.json", expected)
 
 
 def lead_hex(listed, out_amt):
