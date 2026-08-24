@@ -59,10 +59,10 @@ AUX = b"\x00" * 32
 # so any source change is a deliberate re-pin of both literals and
 # the vector files.
 VAULT_MOD_HASH = bytes.fromhex(
-    "2fc2096c3167018bc0210e061d4add87f081360a77ec352bcfb1456243ca34a2"
+    "802e8fda9a74a0fdf0170b2e974ae3d9b91805c4f7640997f05b1b0d0268dc13"
 )
 TRIG_MOD_HASH = bytes.fromhex(
-    "214b0347c7df10d8d7c95769dd4cc3e0fdcee183b281b3d96ebda71bb739ec1b"
+    "8c7afe4710a59fc8dfa7534f0fef404b45acb8dc494b681e17f1b08f4609b461"
 )
 
 VAULT_NODE, _ = compile_program((PUZZLES / "vault" / "vault.bl").read_text(), INCLUDES)
@@ -188,7 +188,7 @@ def test_curried_identity_matches_tooling():
     # Three independent computations of each instance's identity
     # must agree: the tooling's tree_hash over the curried node, the
     # spec-rule reimplementation above, and the program's own
-    # reconstruction read off the taproot assert it emits. uncurry
+    # reconstruction read off the taptree assert it emits. uncurry
     # must also read back the inner program and the fixed values.
     for node, inst, root, values in (
         (VAULT_NODE, VAULT, VROOT, vault_values(b"")),
@@ -200,8 +200,8 @@ def test_curried_identity_matches_tooling():
         assert inner == node
         assert read_back == values
     conds = conditions_of(VAULT, f"(3 0x{VSPK.hex()})")
+    assert conds[0].internal_key == NUMS
     assert conds[0].merkle_root == VROOT
-    assert conds[0].script_pubkey == VSPK
 
 
 def test_trigger_spend_with_revault():

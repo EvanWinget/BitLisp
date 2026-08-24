@@ -65,7 +65,7 @@
             (> TRIG_AMT 0)
             (not (> 0 REVAULT_AMT))
             (not (> MY_AMT (+ TRIG_AMT REVAULT_AMT)))
-      (c (list ASSERT_MY_TAPROOT IK VROOT)
+      (c (list ASSERT_MY_TAPTREE IK VROOT)
       (c (list ASSERT_MY_AMOUNT MY_AMT)
       (c (list ASSERT_SIG_MY_OUTPOINT AK
                (sha256tree (list TRIGGER_SIG_TAG TARGET TRIG_AMT REVAULT_AMT))
@@ -81,7 +81,7 @@
   ; to the coin's own before it assures or requires anything.
   (defun follow-path (VROOT IK (MY_SPK))
     (list
-      (list ASSERT_MY_TAPROOT IK VROOT)
+      (list ASSERT_MY_TAPTREE IK VROOT)
       (list ASSERT_MY_SCRIPTPUBKEY MY_SPK)
       (list ASSURE CONSOLIDATE_MODE CONSOLIDATE_PAYLOAD MY_SPK)))
 
@@ -102,7 +102,7 @@
   (defun lead-path (VROOT IK (MY_SPK MY_AMT OUT_AMT FOLLOWER_AMOUNTS))
     (assert FOLLOWER_AMOUNTS
             (not (> (+ MY_AMT (sum-amounts FOLLOWER_AMOUNTS)) OUT_AMT))
-      (c (list ASSERT_MY_TAPROOT IK VROOT)
+      (c (list ASSERT_MY_TAPTREE IK VROOT)
       (c (list ASSERT_MY_SCRIPTPUBKEY MY_SPK)
       (c (list ASSERT_MY_AMOUNT MY_AMT)
          (require-conditions MY_SPK FOLLOWER_AMOUNTS
