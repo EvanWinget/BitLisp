@@ -38,6 +38,13 @@ class VectorError(Exception):
     """A vector file is malformed or a case failed."""
 
 
+class MalformedCase(VectorError):
+    """A case raised outside the error taxonomy: a malformed vector,
+    or an implementation raising something no vector can expect.
+    Distinct so tooling that judges implementations by vector verdict
+    (the mutation harness) can tell the two apart."""
+
+
 def validate_envelope(obj, path="<memory>"):
     """Checks the envelope shape. Returns the validated object.
 
@@ -412,7 +419,9 @@ def _make_suite_runner(case_runner):
             except VectorError as exc:
                 raise VectorError(f"{path}: {name}: {exc}") from None
             except (KeyError, ValueError) as exc:
-                raise VectorError(f"{path}: {name}: malformed case: {exc!r}") from None
+                raise MalformedCase(
+                    f"{path}: {name}: malformed case: {exc!r}"
+                ) from None
 
     return run_suite
 

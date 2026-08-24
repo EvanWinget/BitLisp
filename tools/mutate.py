@@ -7,25 +7,34 @@ constant, a deleted raise, a negated branch) and runs the vector
 corpus against each one. A mutant the corpus fails is killed. A
 mutant the corpus passes survived: either no vector pins the behavior
 that line implements, or the mutant is equivalent to the original.
-Both readings need a human, so every survivor is reported with its
-diff. A mutant that makes the reference raise something outside its
-error taxonomy, so the runner stops on an escaping exception rather
-than a vector's verdict, crashed: detected, but by Python rather than
-by the corpus, and counted apart so the corpus's own coverage is not
-overstated.
+Both readings need a human, so survivors are reported with their
+sites and any mutant's diff is printable with --only. A mutant that
+makes the reference raise something outside its error taxonomy on
+every file that does not pass, so no vector ever reaches a verdict,
+crashed: detected, but by Python rather than by the corpus, and
+counted apart so the corpus's own coverage is not overstated. When
+one file crashes and another file's vector fails, the vector's
+verdict wins and the mutant is killed.
 
 The corpus is the source of truth between sessions, so the corpus is
 the primary oracle. With --tests, each survivor is additionally run
 through the pytest suite (hypothesis invariants, oracle differentials,
 unit tests), separating survivors nothing catches from survivors the
 tests catch but the corpus does not. The first class is a gap in the
-tests too. The second is a missing vector.
+tests too. The second is a missing vector. The mirror's copies of
+this harness's own test and of the corpus-runner test are excluded:
+the first would recurse into nested mirrors, the second repeats the
+corpus run every survivor already passed. Hypothesis deadlines are
+disabled for the pass, since parallel full suites on a loaded
+machine would otherwise turn deadline overruns into false kills.
 
-Each worker runs in its own mirror of the repository under a temporary
-directory (python/ and tools/ copied, vectors/ and puzzles/ linked),
-so mutants never touch the checkout and workers never see each
-other's edits. The unmutated tree must pass every oracle the mutants
-face before any mutant runs.
+Each worker runs in its own mirror of the repository under a
+temporary directory (python/ and tools/ copied, vectors/ and puzzles/
+linked, removed when the worker exits), so mutants never touch the
+checkout and workers never see each other's edits. The unmutated tree
+must pass every oracle the mutants face before any mutant runs, and
+that baseline run also times each vector file so every worker visits
+the cheap files first.
 
     tools/mutate.py                  run everything, summary on stdout
     tools/mutate.py --list           print the mutant inventory, run nothing
@@ -34,12 +43,13 @@ face before any mutant runs.
     tools/mutate.py --tests          second pass over survivors
     tools/mutate.py --report out.json  machine-readable results
 
-Exit status: 0 when every mutant was killed or crashed, 1 when any
-survived, 2 on a harness error (baseline failure, bad arguments).
+Exit status: 0 when no mutant survived, 1 when any survived, 2 on a
+harness error (baseline failure, bad arguments).
 """
 
 import argparse
 import ast
+import atexit
 import difflib
 import json
 import os
@@ -66,6 +76,11 @@ COMPARE_SWAPS = {
     ast.In: ast.NotIn,
     ast.NotIn: ast.In,
 }
+
+# The comparison operators whose swap is their own negation. Negating
+# a test that is one bare comparison over these would duplicate the
+# comparison mutant, so the negation site is skipped there.
+NEGATION_SWAPS = (ast.Eq, ast.NotEq, ast.Is, ast.IsNot, ast.In, ast.NotIn)
 
 BINOP_SWAPS = {
     ast.Add: ast.Sub,
@@ -96,6 +111,18 @@ def _op_name(op):
     return type(op).__name__
 
 
+def _negation_duplicates_another_site(test):
+    """True when negating this test would repeat a comparison swap (a
+    bare negation-swap comparison) or a `not` removal."""
+    if isinstance(test, ast.UnaryOp) and isinstance(test.op, ast.Not):
+        return True
+    return (
+        isinstance(test, ast.Compare)
+        and len(test.ops) == 1
+        and isinstance(test.ops[0], NEGATION_SWAPS)
+    )
+
+
 class _Sites(ast.NodeVisitor):
     """Enumerates mutation sites in one module, in source order."""
 
@@ -104,6 +131,25 @@ class _Sites(ast.NodeVisitor):
 
     def _add(self, node, description, mutate):
         self.sites.append((node.lineno, len(self.sites), description, mutate))
+
+    def _negate_test(self, node, what):
+        if _negation_duplicates_another_site(node.test):
+            return
+        test = node.test
+
+        def mutate():
+            node.test = ast.UnaryOp(op=ast.Not(), operand=test)
+
+        self._add(node, f"{what} test negated", mutate)
+
+    def _swap_op(self, node):
+        swap = BINOP_SWAPS.get(type(node.op))
+        if swap is not None:
+
+            def mutate(swap=swap):
+                node.op = swap()
+
+            self._add(node, f"{_op_name(node.op)} -> {swap.__name__}", mutate)
 
     def visit_Compare(self, node):
         for index, op in enumerate(node.ops):
@@ -117,13 +163,11 @@ class _Sites(ast.NodeVisitor):
         self.generic_visit(node)
 
     def visit_BinOp(self, node):
-        swap = BINOP_SWAPS.get(type(node.op))
-        if swap is not None:
+        self._swap_op(node)
+        self.generic_visit(node)
 
-            def mutate(swap=swap):
-                node.op = swap()
-
-            self._add(node, f"{_op_name(node.op)} -> {swap.__name__}", mutate)
+    def visit_AugAssign(self, node):
+        self._swap_op(node)
         self.generic_visit(node)
 
     def visit_BoolOp(self, node):
@@ -152,12 +196,15 @@ class _Sites(ast.NodeVisitor):
                 self._add(node, f"{value} -> {value + delta}", mutate)
 
     def visit_If(self, node):
-        test = node.test
+        self._negate_test(node, "if")
+        self.generic_visit(node)
 
-        def mutate():
-            node.test = ast.UnaryOp(op=ast.Not(), operand=test)
+    def visit_IfExp(self, node):
+        self._negate_test(node, "ifexp")
+        self.generic_visit(node)
 
-        self._add(node, "if test negated", mutate)
+    def visit_While(self, node):
+        self._negate_test(node, "while")
         self.generic_visit(node)
 
     def visit_Raise(self, node):
@@ -202,10 +249,9 @@ def _not_sites(tree):
     return sites
 
 
-def generate(module_path):
-    """Yields every mutant of one module, deterministically ordered."""
-    source = module_path.read_text(encoding="utf-8")
-    name = module_path.stem
+def mutants_of(name, source):
+    """Yields every mutant of one module's source, deterministically
+    ordered."""
     baseline = ast.parse(source)
     visitor = _Sites()
     visitor.visit(baseline)
@@ -238,10 +284,16 @@ def generate(module_path):
         )
 
 
+def generate(module_path):
+    yield from mutants_of(module_path.stem, module_path.read_text(encoding="utf-8"))
+
+
 def inventory(modules):
+    # __init__ only re-exports names, so its mutants would measure the
+    # export list, not the reference.
     mutants = []
     for path in sorted(PACKAGE.glob("*.py")):
-        if modules and path.stem not in modules:
+        if path.stem == "__init__" or (modules and path.stem not in modules):
             continue
         mutants.extend(generate(path))
     return mutants
@@ -266,20 +318,40 @@ def mutant_diff(mutant):
 # mutant it is handed.
 
 _MIRROR = None
-# The corpus driver exits with this code on a vector's verdict. Any
-# other nonzero exit is an exception escaping the reference.
+
+# The corpus driver exits with VECTOR_FAILURE on a vector's verdict
+# and CRASH when the reference raised outside its error taxonomy on
+# some file and no vector verdict was reached. Timing mode (the
+# MUTATE_TIME_FILES environment variable) runs every file on the
+# unmutated tree and prints per-file seconds for the visit order.
 VECTOR_FAILURE = 3
+CRASH = 4
 _CORPUS_DRIVER = f"""
-VECTOR_FAILURE = {VECTOR_FAILURE}
-import sys
+import os, sys, time
 sys.path.insert(0, sys.argv[1])
 import run_vectors
-for path in run_vectors.discover():
+files = [run_vectors.REPO_ROOT / f for f in sys.argv[2:]]
+if not files:
+    files = list(run_vectors.discover())
+timing = bool(os.environ.get("MUTATE_TIME_FILES"))
+crashed = False
+for path in files:
+    started = time.monotonic()
     try:
         run_vectors.run_file(path)
+    except run_vectors.MalformedCase as exc:
+        print(exc)
+        crashed = True
     except run_vectors.VectorError as exc:
         print(exc)
-        sys.exit(VECTOR_FAILURE)
+        sys.exit({VECTOR_FAILURE})
+    except Exception as exc:
+        print(f"{{path}}: {{exc!r}}")
+        crashed = True
+    if timing:
+        rel = path.relative_to(run_vectors.REPO_ROOT)
+        print(f"{{time.monotonic() - started:.3f}}\\t{{rel}}", file=sys.stderr)
+sys.exit({CRASH} if crashed else 0)
 """
 
 
@@ -291,6 +363,16 @@ def _build_mirror():
     shutil.copy(REPO_ROOT / "pyproject.toml", root / "pyproject.toml")
     for shared in ("vectors", "puzzles"):
         os.symlink(REPO_ROOT / shared, root / shared)
+    # Hypothesis's default 200 ms deadline is a latency check, not an
+    # oracle: parallel full suites on a loaded machine would fail it
+    # nondeterministically and report false kills.
+    (root / "python" / "tests" / "conftest.py").write_text(
+        "from hypothesis import settings\n"
+        'settings.register_profile("mutate", deadline=None)\n'
+        'settings.load_profile("mutate")\n',
+        encoding="utf-8",
+    )
+    atexit.register(shutil.rmtree, root, ignore_errors=True)
     return root
 
 
@@ -313,11 +395,13 @@ def _restore(root, module):
     shutil.copy(PACKAGE / f"{module}.py", root / "python" / "bitlisp" / f"{module}.py")
 
 
-def _run(root, argv, timeout, verdict_codes):
-    """Runs argv in the mirror. Returns 'survived' on exit 0, 'killed' on
-    an exit code in verdict_codes (the oracle judged the mutant),
-    'crashed' on any other exit, or 'timeout'."""
+def _run(root, argv, timeout, verdict_codes, env_extra=None):
+    """Runs argv in the mirror. Returns (verdict, detail): 'survived'
+    on exit 0, 'killed' on an exit code in verdict_codes (the oracle
+    judged the mutant), 'crashed' on any other exit, or 'timeout'.
+    detail is the output's tail, kept for the report."""
     env = dict(os.environ, PYTHONPATH=str(root / "python"), PYTHONDONTWRITEBYTECODE="1")
+    env.update(env_extra or {})
     try:
         proc = subprocess.run(
             argv,
@@ -328,58 +412,84 @@ def _run(root, argv, timeout, verdict_codes):
             timeout=timeout,
         )
     except subprocess.TimeoutExpired:
-        return "timeout"
+        return "timeout", ""
+    detail = (proc.stdout + proc.stderr)[-2000:]
     if proc.returncode == 0:
-        return "survived"
-    return "killed" if proc.returncode in verdict_codes else "crashed"
+        return "survived", detail
+    return ("killed" if proc.returncode in verdict_codes else "crashed"), detail
 
 
-def run_corpus(root, timeout):
-    argv = [sys.executable, "-c", _CORPUS_DRIVER, str(root / "tools")]
+def run_corpus(root, timeout, order=()):
+    argv = [sys.executable, "-c", _CORPUS_DRIVER, str(root / "tools"), *order]
     return _run(root, argv, timeout, {VECTOR_FAILURE})
 
 
 def run_tests(root, timeout):
+    tests = root / "python" / "tests"
     argv = [
         sys.executable,
         "-m",
         "pytest",
-        str(root / "python" / "tests"),
+        str(tests),
+        # The harness's own test would recurse into nested mirrors,
+        # and the corpus-runner test repeats the corpus run every
+        # survivor already passed.
+        f"--ignore={tests / 'test_mutate.py'}",
+        f"--ignore={tests / 'test_vectors.py'}",
         "-q",
         "-x",
         "-p",
         "no:cacheprovider",
     ]
     # pytest exits 1 on failing tests. Its other codes (interrupted,
-    # internal error, usage error, no tests collected) judge nothing.
+    # collection or internal error, usage error, no tests) judge
+    # nothing.
     return _run(root, argv, timeout, {1})
 
 
-def evaluate(mutant, timeout, tests):
+def evaluate(mutant, timeout, tests, order=()):
     root = _mirror()
     _install(root, mutant)
     try:
-        corpus = run_corpus(root, timeout)
+        corpus, detail = run_corpus(root, timeout, order)
         suite = None
         if tests and corpus == "survived":
-            suite = run_tests(root, timeout * 10)
+            suite, detail = run_tests(root, timeout * 10)
     finally:
         _restore(root, mutant.module)
-    return mutant.id, corpus, suite
+    return mutant.id, corpus, suite, detail
 
 
 def _evaluate_star(args):
     return evaluate(*args)
 
 
-def baseline_passes(timeout, tests):
-    """The unmutated tree must pass every oracle the mutants face,
-    else a broken mirror would report every mutant killed."""
+def baseline_order(timeout, tests):
+    """Runs the unmutated tree against every oracle the mutants will
+    face. Returns the vector files ordered cheapest first, or None
+    when the baseline fails: a broken mirror would otherwise report
+    every mutant killed."""
     root = _build_mirror()
     try:
-        if run_corpus(root, timeout) != "survived":
-            return False
-        return not tests or run_tests(root, timeout * 10) == "survived"
+        verdict, detail = _run(
+            root,
+            [sys.executable, "-c", _CORPUS_DRIVER, str(root / "tools")],
+            timeout * 10,
+            {VECTOR_FAILURE},
+            env_extra={"MUTATE_TIME_FILES": "1"},
+        )
+        if verdict != "survived":
+            return None
+        timed = []
+        for line in detail.splitlines():
+            seconds, _, rel = line.partition("\t")
+            try:
+                timed.append((float(seconds), rel))
+            except ValueError:
+                continue
+        if tests and run_tests(root, timeout * 10)[0] != "survived":
+            return None
+        return tuple(rel for _, rel in sorted(timed))
     finally:
         shutil.rmtree(root)
 
@@ -431,7 +541,8 @@ def main():
         print(f"{len(mutants)} mutant(s)")
         return 0
 
-    if not baseline_passes(args.timeout, args.tests):
+    order = baseline_order(args.timeout, args.tests)
+    if order is None:
         print(
             "the unmutated tree fails its oracle, refusing to mutate", file=sys.stderr
         )
@@ -439,28 +550,24 @@ def main():
 
     by_id = {m.id: m for m in mutants}
     results = []
-    work = [(m, args.timeout, args.tests) for m in mutants]
+    work = [(m, args.timeout, args.tests, order) for m in mutants]
     with ProcessPoolExecutor(max_workers=args.jobs) as pool:
-        for done, (mutant_id, corpus, suite) in enumerate(
+        for done, (mutant_id, corpus, suite, detail) in enumerate(
             pool.map(_evaluate_star, work, chunksize=4), start=1
         ):
-            results.append((mutant_id, corpus, suite))
+            results.append((mutant_id, corpus, suite, detail))
             if done % 50 == 0 or done == len(work):
                 print(f"{done}/{len(work)}", file=sys.stderr)
 
-    survivors = [r for r in results if r[1] == "survived"]
-    timeouts = [r for r in results if r[1] == "timeout"]
-
     verdicts = ("killed", "crashed", "survived", "timeout")
     per_module = {}
-    for mutant_id, corpus, _ in results:
+    for mutant_id, corpus, _, _ in results:
         counts = per_module.setdefault(
             by_id[mutant_id].module, dict.fromkeys(verdicts, 0)
         )
         counts[corpus] += 1
     totals = dict.fromkeys(verdicts, 0)
-    header = f"{'module':<14} {'mutants':>7}" + "".join(f" {v:>8}" for v in verdicts)
-    print(header)
+    print(f"{'module':<14} {'mutants':>7}" + "".join(f" {v:>8}" for v in verdicts))
     for module, counts in sorted(per_module.items()):
         row = f"{module:<14} {sum(counts.values()):>7}"
         print(row + "".join(f" {counts[v]:>8}" for v in verdicts))
@@ -469,17 +576,15 @@ def main():
     row = f"{'total':<14} {len(results):>7}"
     print(row + "".join(f" {totals[v]:>8}" for v in verdicts))
 
-    if survivors:
-        print("\nsurvivors:")
-        for mutant_id, _, suite in survivors:
+    for verdict in ("survived", "crashed", "timeout"):
+        listed = [r for r in results if r[1] == verdict]
+        if not listed:
+            continue
+        print(f"\n{verdict}:")
+        for mutant_id, _, suite, _ in listed:
             m = by_id[mutant_id]
             tag = "" if suite is None else f"  [tests: {suite}]"
             print(f"  {m.id:<20} {m.module}.py:{m.line:<5} {m.description}{tag}")
-    if timeouts:
-        print("\ntimeouts:")
-        for mutant_id, _, _ in timeouts:
-            m = by_id[mutant_id]
-            print(f"  {m.id:<20} {m.module}.py:{m.line:<5} {m.description}")
 
     if args.report:
         report = [
@@ -487,15 +592,16 @@ def main():
                 asdict(by_id[mutant_id]),
                 corpus=corpus,
                 tests=suite,
+                detail=detail,
                 diff=mutant_diff(by_id[mutant_id]),
             )
-            for mutant_id, corpus, suite in results
+            for mutant_id, corpus, suite, detail in results
         ]
         for entry in report:
             del entry["source"]
         args.report.write_text(json.dumps(report, indent=1), encoding="utf-8")
 
-    return 1 if survivors else 0
+    return 1 if totals["survived"] else 0
 
 
 if __name__ == "__main__":
