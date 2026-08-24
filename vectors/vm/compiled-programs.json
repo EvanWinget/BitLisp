@@ -153,6 +153,33 @@
    "expect": {
     "error": "user_raise"
    }
+  },
+  {
+   "name": "let_names_a_value_once",
+   "program": "ff02ffff01ff02ffff01ff10ff05ff05ff0b80ffff04ff02ffff04ffff02ff02ffff04ff02ffff04ff05ff80808080ff03808080ffff04ffff01ff12ffff0102ff0580ff018080",
+   "env": "ff0580",
+   "expect": {
+    "result": "19",
+    "cost": 3231
+   }
+  },
+  {
+   "name": "nested_let_shadows_outer",
+   "program": "ff02ffff01ff02ffff0102ffff04ffff10ff02ffff010180ff018080ffff04ffff12ff02ff0280ff018080",
+   "env": "ff0680",
+   "expect": {
+    "result": "25",
+    "cost": 2380
+   }
+  },
+  {
+   "name": "list_star_conses_onto_tail",
+   "program": "ff04ff02ffff04ff05ff0b8080",
+   "env": "ff01ff02ffff05ff068080",
+   "expect": {
+    "result": "ff01ff02ff05ff0680",
+    "cost": 258
+   }
   }
  ]
 }
