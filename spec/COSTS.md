@@ -354,21 +354,19 @@ implementation.
 
 | Constant | Value | Charged for |
 | --- | --- | --- |
-| `CONDITION_GENERIC_COST` | 200 (PROVISIONAL) | Each time assert, each self assert except ASSERT_MY_TAPROOT, each RESERVE_FEE, each SEAL and SEAL_OUTPUTS |
+| `CONDITION_GENERIC_COST` | 200 (PROVISIONAL) | Each time assert, each self assert, each RESERVE_FEE, each SEAL and SEAL_OUTPUTS |
 | `CONDITION_MESSAGE_COST` | 700 (PROVISIONAL) | Each ANNOUNCE, ASSERT_ANNOUNCEMENT, ASSURE, and REQUIRE |
 | `CONDITION_SIG_ASSERT_COST` | 1,300,000 (PROVISIONAL) | Each signature assert |
-| `TAPROOT_TWEAK_COST` | 1,300,000 (PROVISIONAL) | The point derivation, once per CREATE_OUTPUT_TAPROOT and ASSERT_MY_TAPROOT |
+| `TAPROOT_TWEAK_COST` | 1,300,000 (PROVISIONAL) | The point derivation, once per CREATE_OUTPUT_TAPROOT |
 | `CREATE_OUTPUT_COST` | 1,350,000 (PROVISIONAL) | Each output claim |
 
-The derivation entries charge sums: CREATE_OUTPUT_TAPROOT charges
-`CREATE_OUTPUT_COST + TAPROOT_TWEAK_COST = 2,650,000` and
-ASSERT_MY_TAPROOT charges
-`CONDITION_GENERIC_COST + TAPROOT_TWEAK_COST = 1,300,200`, each as
+The derivation entry charges a sum: CREATE_OUTPUT_TAPROOT
+charges `CREATE_OUTPUT_COST + TAPROOT_TWEAK_COST = 2,650,000` as
 one charge before its derivation runs. ASSERT_MY_TAPTREE proves
-what ASSERT_MY_TAPROOT proves by reading the internal key and
-merkle root base consensus already authenticated from the control
-block, so it performs no derivation and charges
-`CONDITION_GENERIC_COST` alone. A reserved condition
+its identity fact by reading the internal key and merkle root
+base consensus already authenticated from the control block, so
+it performs no derivation and charges `CONDITION_GENERIC_COST`
+alone. A reserved condition
 charges exactly its declared cost, floor 500 (VALIDATION.md rule
 6). There is no per-spend constant: this table charges conditions
 only, and any fixed per-input overhead belongs to the weight

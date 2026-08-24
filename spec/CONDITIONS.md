@@ -82,7 +82,6 @@ block without a vocabulary entry are invalid, not reserved:
 | `0x31` | `ASSERT_MY_TXID` |
 | `0x32` | `ASSERT_MY_SCRIPTPUBKEY` |
 | `0x33` | `ASSERT_MY_AMOUNT` |
-| `0x37` | `ASSERT_MY_TAPROOT` |
 | `0x38` | `ASSERT_MY_TAPTREE` |
 | `0x40` | `ANNOUNCE` |
 | `0x41` | `ASSERT_ANNOUNCEMENT` |
@@ -458,9 +457,9 @@ charged after every argument check.
 **Validation rule.** The assert clause of VALIDATION.md
 (claims and asserts, rule 2). Stage 4.
 
-### Self asserts (`0x30` to `0x33`, `0x37`, `0x38`)
+### Self asserts (`0x30` to `0x33`, `0x38`)
 
-The six conditions of this family assert facts of the spending
+The five conditions of this family assert facts of the spending
 input's own prevout data and execution identity: the outpoint it
 consumes, the creating txid, the spent scriptPubKey, the amount,
 and the internal key and merkle root its control block carries.
@@ -565,32 +564,6 @@ charged after every argument check.
 **Validation rule.** The assert clause of VALIDATION.md
 (claims and asserts, rule 2). Stage 2.
 
-### ASSERT_MY_TAPROOT (`0x37`)
-
-`(0x37 internal_key merkle_root)`
-
-**Semantics.** Claims nothing. Derives `spk` from `internal_key`
-and `merkle_root` by the derivation stated in the
-CREATE_OUTPUT_TAPROOT entry, including its `bad_condition_arg`
-failures, then asserts that the spent output's scriptPubKey
-equals `spk` byte-exact (`unsatisfied_scriptpubkey_assert`).
-
-A satisfied assert proves the spent output is the taproot output
-of `internal_key` tweaked with `merkle_root`.
-
-**Arguments.** `internal_key` is an atom of exactly 32 bytes and
-must satisfy the point derivation (`bad_condition_arg`).
-`merkle_root` is an atom of exactly 0 or exactly 32 bytes
-(`bad_condition_arg`). The empty atom means the output commits to
-no script tree. Exactly two arguments, both atoms.
-
-**Cost.** `CONDITION_GENERIC_COST + TAPROOT_TWEAK_COST` =
-1,300,200 (COSTS.md section 10), charged after every argument
-check and before the point derivation.
-
-**Validation rule.** The assert clause of VALIDATION.md
-(claims and asserts, rule 2), after the derivation above. Stage 2.
-
 ### ASSERT_MY_TAPTREE (`0x38`)
 
 `(0x38 internal_key merkle_root)`
@@ -604,15 +577,15 @@ consensus has already lifted the key, tweaked it with the root,
 and checked the result against the spent scriptPubKey.
 
 A satisfied assert proves the spent output is the taproot output
-of `internal_key` tweaked with `merkle_root`, the same fact
-ASSERT_MY_TAPROOT proves by derivation. On an input whose spent
-scriptPubKey is the taproot output of its `internalKey` tweaked
-with its `merkleRoot`, the shape of every input base consensus
-admits, the two are satisfied together and fail together, each
-with its own error, except where two distinct operand pairs
-derive one output key. The transaction view does not require that
-shape, so on a view input whose scriptPubKey and identity
-disagree only this assert reads the identity.
+of `internal_key` tweaked with `merkle_root`. On an input whose
+spent scriptPubKey is the taproot output of its `internalKey`
+tweaked with its `merkleRoot`, the shape of every input base
+consensus admits, this assert over an operand pair and an
+ASSERT_MY_SCRIPTPUBKEY carrying the scriptPubKey that pair
+derives are satisfied together, except where two distinct operand
+pairs derive one output key. The transaction view does not
+require that shape, so on a view input whose scriptPubKey and
+identity disagree only this assert reads the identity.
 
 **Arguments.** `internal_key` is an atom of exactly 32 bytes
 (`bad_condition_arg`). It is not checked to lift to a curve
@@ -621,8 +594,8 @@ an operand that does not lift never matches and fails as
 unsatisfied. `merkle_root` is an atom of exactly 32 bytes
 (`bad_condition_arg`). Never empty: a BitLisp spend always
 executes a leaf of some tree, so there is no no-tree case to
-encode, unlike ASSERT_MY_TAPROOT's `merkle_root` operand. Exactly
-two arguments, both atoms.
+encode, unlike CREATE_OUTPUT_TAPROOT's `merkle_root` operand.
+Exactly two arguments, both atoms.
 
 **Cost.** `CONDITION_GENERIC_COST` = 200 (COSTS.md section 10),
 charged after every argument check.
@@ -668,7 +641,8 @@ then the appended execution-identity operands:
   merkle root (`bad_condition_arg`). Never empty: a BitLisp
   counterpart always executes a leaf of some tree, so there is no
   no-tree case to encode, the domain ASSERT_MY_TAPTREE's
-  `merkle_root` operand shares and ASSERT_MY_TAPROOT's does not.
+  `merkle_root` operand shares and CREATE_OUTPUT_TAPROOT's does
+  not.
 
 `message`, `namespace`, and `payload` are atoms of 0 to 1024 bytes
 (`bad_condition_arg`).

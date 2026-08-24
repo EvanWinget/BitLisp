@@ -506,12 +506,11 @@ condition's own encoding precedes its charge: the condition's own
 list-shape check, the opcode tier check, then the arity and
 argument checks its vocabulary entry states, in the order the
 entry states them. The condition's whole cost then lands as one
-checked charge. The two derivation entries,
-CREATE_OUTPUT_TAPROOT and ASSERT_MY_TAPROOT, run their point
-derivation after the charge: their width checks are argument
-checks and precede it, and their derivation failures follow it,
-so a derivation defect is reported only when the budget covers
-the charge. A reserved condition charges exactly its declared
+checked charge. The derivation entry CREATE_OUTPUT_TAPROOT runs
+its point derivation after the charge: its width checks are
+argument checks and precede it, and its derivation failures
+follow it, so a derivation defect is reported only when the
+budget covers the charge. A reserved condition charges exactly its declared
 cost, after the declared cost's own checks including rule 6's
 floor.
 
@@ -705,18 +704,16 @@ it enforceable, and lands with that rule:
 - A lone self assert is satisfied exactly when each operand equals
   the field it reads, failing otherwise with its field's error
   (self asserts).
-- ASSERT_MY_TAPROOT and an ASSERT_MY_SCRIPTPUBKEY carrying its
-  derived scriptPubKey produce identical outcomes on every input
-  (self asserts).
 - An ASSERT_MY_TAPTREE's outcome is unchanged by the spent
   scriptPubKey: it reads the execution identity and nothing else
   (self asserts).
 - On an input whose spent scriptPubKey is the taproot output of
   its `internalKey` tweaked with its `merkleRoot`, the shape of
-  every input base consensus admits, ASSERT_MY_TAPTREE and
-  ASSERT_MY_TAPROOT over equal operands are satisfied together and
-  fail together, each with its own error, except where two
-  distinct operand pairs derive one output key (self asserts).
+  every input base consensus admits, ASSERT_MY_TAPTREE over an
+  operand pair and an ASSERT_MY_SCRIPTPUBKEY carrying the
+  scriptPubKey that pair derives are satisfied together, except
+  where two distinct operand pairs derive one output key (self
+  asserts).
 - Adding a balanced ASSURE and REQUIRE pair to a valid
   transaction keeps it valid, and adding either half alone
   invalidates it (rule 3).
