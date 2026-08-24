@@ -43,17 +43,24 @@ A transaction is:
   `scriptSig`, the legacy signature field, empty for every segwit
   input. A BitLisp input additionally carries the condition list its
   evaluation produced and its execution identity: `tapleaf`, the
-  32-byte leaf hash of the executing leaf, and `merkleRoot`, the
-  32-byte merkle root of the spending path. Base consensus
-  authenticates both during every script-path spend, hashing the
-  revealed leaf into `tapleaf`, combining it with the control
-  block's path into `merkleRoot`, and checking that root against
-  the spent scriptPubKey through the taproot tweak, so the pair is
-  witness data the spender chooses but cannot forge. Only
-  conditions reach these fields: an input without a condition
-  list, whether a non-BitLisp input or a BitLisp spend whose
-  evaluation has not yet produced one, may carry the pair or not,
-  and no rule reads it from either.
+  32-byte leaf hash of the executing leaf, `merkleRoot`, the
+  32-byte merkle root of the spending path, and `internalKey`, the
+  32-byte x-only internal key the control block carries. Base
+  consensus authenticates all three during every script-path
+  spend, hashing the revealed leaf into `tapleaf`, combining it
+  with the control block's path into `merkleRoot`, lifting
+  `internalKey` to a curve point, and checking the tweak of that
+  point by that root against the spent scriptPubKey, so the triple
+  is witness data the spender chooses but cannot forge. This
+  document takes the triple as authenticated and derives nothing
+  from it: no rule recomputes the scriptPubKey from the key and
+  the root. Rule 3's specifiers read `tapleaf` and `merkleRoot`,
+  the self assert family of `spec/CONDITIONS.md` reads
+  `internalKey` and `merkleRoot`, and no specifier reads
+  `internalKey`. Only conditions reach these fields: an input
+  without a condition list, whether a non-BitLisp input or a
+  BitLisp spend whose evaluation has not yet produced one, may
+  carry the triple or not, and no rule reads it from either.
 - `outputs`, an ordered list of slots. Each slot's content is the
   pair (`scriptPubKey`, `amount`). Slots are addressed by index.
 
@@ -277,7 +284,7 @@ fields:
 
 Bit 3 (value 8) additionally commits to the input's `tapleaf` and
 bit 4 (value 16) to its `merkleRoot`, the two execution-identity
-fields of the transaction view. Each set bit appends its one
+fields specifiers read. Each set bit appends its one
 operand after the low bits' operands, `tapleaf` before
 `merkleRoot`. Every combination is a valid commitment value: the
 32 values are the 8 prevout rows composed with the 4
@@ -690,16 +697,26 @@ it enforceable, and lands with that rule:
 - A self assert's outcome is unchanged by the transaction's
   version, locktime, its input's sequence, and the presence of
   unrelated inputs: the outcome is a function of the condition and
-  its input's own prevout data alone (self asserts).
+  its input's own prevout data and execution identity alone (self
+  asserts).
 - Whenever an ASSERT_MY_OUTPOINT is satisfied, the ASSERT_MY_TXID
   built from its operand's first 32 bytes is satisfied on the same
   input (self asserts).
-- A lone self assert is satisfied exactly when its operand equals
+- A lone self assert is satisfied exactly when each operand equals
   the field it reads, failing otherwise with its field's error
   (self asserts).
 - ASSERT_MY_TAPROOT and an ASSERT_MY_SCRIPTPUBKEY carrying its
   derived scriptPubKey produce identical outcomes on every input
   (self asserts).
+- An ASSERT_MY_TAPTREE's outcome is unchanged by the spent
+  scriptPubKey: it reads the execution identity and nothing else
+  (self asserts).
+- On an input whose spent scriptPubKey is the taproot output of
+  its `internalKey` tweaked with its `merkleRoot`, the shape of
+  every input base consensus admits, ASSERT_MY_TAPTREE and
+  ASSERT_MY_TAPROOT over equal operands are satisfied together and
+  fail together, each with its own error, except where two
+  distinct operand pairs derive one output key (self asserts).
 - Adding a balanced ASSURE and REQUIRE pair to a valid
   transaction keeps it valid, and adding either half alone
   invalidates it (rule 3).

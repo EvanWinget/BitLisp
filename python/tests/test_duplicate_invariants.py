@@ -43,6 +43,7 @@ from bitlisp.conditions import (
     AssertMyOutpoint,
     AssertMyScriptPubKey,
     AssertMyTaproot,
+    AssertMyTaptree,
     AssertMyTxid,
 )
 from bitlisp.secp256k1 import taproot_output_key
@@ -59,6 +60,7 @@ IDEMPOTENT = (
     AssertMyScriptPubKey,
     AssertMyAmount,
     AssertMyTaproot,
+    AssertMyTaptree,
     Announce,
     AssertAnnouncement,
     Reserved,
@@ -88,9 +90,11 @@ def _pool(own_txid, own_script, other_txid, other_script):
     every landed rule, and the never-announced payload keeps the
     announcement error path exercised. The self asserts pair each
     input's own values with the other input's, so satisfied and
-    failing asserts are both dense, and the taproot assert always
+    failing asserts are both dense, the taproot assert always
     fails here (neither input script is a taproot script), keeping
-    a failing assert's idempotence exercised."""
+    a failing assert's idempotence exercised, and the taptree
+    asserts pair the identity build_tx installs with a wrong
+    root."""
     return (
         CreateOutput(SCRIPT_A, 1),
         CreateOutput(SCRIPT_B, 1),
@@ -103,6 +107,8 @@ def _pool(own_txid, own_script, other_txid, other_script):
         AssertMyAmount(0),
         AssertMyAmount(1),
         AssertMyTaproot(_TAPROOT_IK, b"", _TAPROOT_SPK),
+        AssertMyTaptree(b"\x0c" * 32, b"\x0b" * 32),
+        AssertMyTaptree(b"\x0c" * 32, b"\x0a" * 32),
         AssertLocktimeHeight(600),
         AssertLocktimeHeight(700),
         AssertLocktimeTime(500_000_600),
@@ -148,6 +154,7 @@ def build_tx(version, locktime, cond_lists, seq_pair, output_contents):
             conditions=tuple(conditions),
             tapleaf=b"\x0a" * 32,
             merkle_root=b"\x0b" * 32,
+            internal_key=b"\x0c" * 32,
         )
         for txid, script, sequence, conditions in (
             (TXID_A, SCRIPT_A, seq_pair[0], cond_lists[0]),

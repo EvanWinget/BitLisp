@@ -16,7 +16,8 @@
       "amount": 50000,
       "conditions": "ffff30ffa41111111111111111111111111111111111111111111111111111111111111111010000008080",
       "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
-      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+      "internal_key": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c"
      }
     ],
     "outputs": [
@@ -43,7 +44,8 @@
       "amount": 50000,
       "conditions": "ffff30ffa41111111111111111111111111111111111111111111111111111111111111111000000008080",
       "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
-      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+      "internal_key": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c"
      }
     ],
     "outputs": [
@@ -70,7 +72,8 @@
       "amount": 50000,
       "conditions": "ffff30ffa41111111111111111111111111111111111111111111111111111111111111111000100008080",
       "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
-      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+      "internal_key": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c"
      }
     ],
     "outputs": [
@@ -97,7 +100,8 @@
       "amount": 50000,
       "conditions": "ffff30ffa41111111111111111111111111111111111111111111111111111111111111111000000008080",
       "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
-      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+      "internal_key": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c"
      }
     ],
     "outputs": [
@@ -124,7 +128,8 @@
       "amount": 50000,
       "conditions": "ffff30ffa41111111111111111111111111111111111111111111111111111111111111111000000008080",
       "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
-      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+      "internal_key": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c"
      }
     ],
     "outputs": [
@@ -151,7 +156,8 @@
       "amount": 50000,
       "conditions": "ffff30ffa42222222222222222222222222222222222222222222222222222222222222222010000008080",
       "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
-      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+      "internal_key": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c"
      }
     ],
     "outputs": [
@@ -178,7 +184,8 @@
       "amount": 50000,
       "conditions": "ffff30ffa41111111111111111111111111111111111111111111111111111111111111111000000018080",
       "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
-      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+      "internal_key": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c"
      }
     ],
     "outputs": [
@@ -205,7 +212,8 @@
       "amount": 50000,
       "conditions": "ffff31ffa011111111111111111111111111111111111111111111111111111111111111118080",
       "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
-      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+      "internal_key": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c"
      }
     ],
     "outputs": [
@@ -232,7 +240,8 @@
       "amount": 50000,
       "conditions": "ffff31ffa022222222222222222222222222222222222222222222222222222222222222228080",
       "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
-      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+      "internal_key": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c"
      }
     ],
     "outputs": [
@@ -259,7 +268,8 @@
       "amount": 50000,
       "conditions": "ffff31ffa011111111111111111111111111111111111111111111111111111111111111118080",
       "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
-      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+      "internal_key": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c"
      }
     ],
     "outputs": [
@@ -286,7 +296,8 @@
       "amount": 50000,
       "conditions": "ffff30ffa41111111111111111111111111111111111111111111111111111111111111111000000008080",
       "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
-      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+      "internal_key": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c"
      }
     ],
     "outputs": [
@@ -313,7 +324,8 @@
       "amount": 50000,
       "conditions": "ffff32ffa25120aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa8080",
       "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
-      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+      "internal_key": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c"
      }
     ],
     "outputs": [
@@ -340,7 +352,8 @@
       "amount": 50000,
       "conditions": "ffff32ff960014bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb8080",
       "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
-      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+      "internal_key": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c"
      }
     ],
     "outputs": [
@@ -367,7 +380,8 @@
       "amount": 50000,
       "conditions": "ffff32ff808080",
       "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
-      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+      "internal_key": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c"
      }
     ],
     "outputs": [
@@ -394,7 +408,8 @@
       "amount": 50000,
       "conditions": "ffff33ff8300c3508080",
       "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
-      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+      "internal_key": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c"
      }
     ],
     "outputs": [
@@ -421,7 +436,8 @@
       "amount": 50000,
       "conditions": "ffff33ff8300c34f8080",
       "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
-      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+      "internal_key": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c"
      }
     ],
     "outputs": [
@@ -448,7 +464,8 @@
       "amount": 2100000000000000,
       "conditions": "ffff33ff870775f05a0740008080",
       "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
-      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+      "internal_key": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c"
      }
     ],
     "outputs": [
@@ -475,7 +492,8 @@
       "amount": 4295017296,
       "conditions": "ffff33ff8300c3508080",
       "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
-      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+      "internal_key": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c"
      }
     ],
     "outputs": [
@@ -502,7 +520,8 @@
       "amount": 50000,
       "conditions": "ffff32ff808080",
       "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
-      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+      "internal_key": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c"
      }
     ],
     "outputs": [
@@ -529,7 +548,8 @@
       "amount": 50000,
       "conditions": "ffff32ffa25120bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb8080",
       "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
-      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+      "internal_key": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c"
      }
     ],
     "outputs": [
@@ -556,7 +576,8 @@
       "amount": 50000,
       "conditions": "ffff32ffa25120147c9c57132f6e7ecddba9800bb0c4449251c92a1e60371ee77557b6620f3ea38080",
       "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
-      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+      "internal_key": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c"
      }
     ],
     "outputs": [
@@ -583,7 +604,8 @@
       "amount": 50000,
       "conditions": "ffff37ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b218080",
       "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
-      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+      "internal_key": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c"
      }
     ],
     "outputs": [
@@ -610,7 +632,8 @@
       "amount": 50000,
       "conditions": "ffff37ffa0d6889cb081036e0faefa3a35157ad71086b123b2b144b649798b494c300a961dff808080",
       "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
-      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+      "internal_key": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c"
      }
     ],
     "outputs": [
@@ -637,7 +660,8 @@
       "amount": 50000,
       "conditions": "ffff37ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa099999999999999999999999999999999999999999999999999999999999999998080",
       "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
-      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+      "internal_key": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c"
      }
     ],
     "outputs": [
@@ -664,7 +688,8 @@
       "amount": 50000,
       "conditions": "ffff37ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b218080",
       "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
-      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+      "internal_key": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c"
      }
     ],
     "outputs": [
@@ -691,7 +716,8 @@
       "amount": 50000,
       "conditions": "ffff37ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b218080",
       "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
-      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+      "internal_key": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c"
      }
     ],
     "outputs": [
@@ -718,7 +744,8 @@
       "amount": 50000,
       "conditions": "ffff37ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b218080",
       "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
-      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+      "internal_key": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c"
      }
     ],
     "outputs": [
@@ -745,7 +772,8 @@
       "amount": 50000,
       "conditions": "ffff37ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b218080",
       "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
-      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+      "internal_key": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c"
      }
     ],
     "outputs": [
@@ -757,6 +785,306 @@
    },
    "expect": {
     "valid": true
+   }
+  },
+  {
+   "name": "taptree_satisfied",
+   "tx": {
+    "version": 2,
+    "locktime": 0,
+    "inputs": [
+     {
+      "txid": "1111111111111111111111111111111111111111111111111111111111111111",
+      "index": 1,
+      "script_pubkey": "5120147c9c57132f6e7ecddba9800bb0c4449251c92a1e60371ee77557b6620f3ea3",
+      "amount": 50000,
+      "conditions": "ffff38ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b218080",
+      "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+      "merkle_root": "5b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b21",
+      "internal_key": "187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27"
+     }
+    ],
+    "outputs": [
+     {
+      "script_pubkey": "0014bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "amount": 40000
+     }
+    ]
+   },
+   "expect": {
+    "valid": true
+   }
+  },
+  {
+   "name": "taptree_wrong_key",
+   "tx": {
+    "version": 2,
+    "locktime": 0,
+    "inputs": [
+     {
+      "txid": "1111111111111111111111111111111111111111111111111111111111111111",
+      "index": 1,
+      "script_pubkey": "5120147c9c57132f6e7ecddba9800bb0c4449251c92a1e60371ee77557b6620f3ea3",
+      "amount": 50000,
+      "conditions": "ffff38ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b218080",
+      "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+      "merkle_root": "5b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b21",
+      "internal_key": "187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27"
+     }
+    ],
+    "outputs": [
+     {
+      "script_pubkey": "0014bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "amount": 40000
+     }
+    ]
+   },
+   "expect": {
+    "error": "unsatisfied_taptree_assert"
+   }
+  },
+  {
+   "name": "taptree_wrong_root",
+   "tx": {
+    "version": 2,
+    "locktime": 0,
+    "inputs": [
+     {
+      "txid": "1111111111111111111111111111111111111111111111111111111111111111",
+      "index": 1,
+      "script_pubkey": "5120147c9c57132f6e7ecddba9800bb0c4449251c92a1e60371ee77557b6620f3ea3",
+      "amount": 50000,
+      "conditions": "ffff38ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa00b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b8080",
+      "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+      "merkle_root": "5b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b21",
+      "internal_key": "187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27"
+     }
+    ],
+    "outputs": [
+     {
+      "script_pubkey": "0014bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "amount": 40000
+     }
+    ]
+   },
+   "expect": {
+    "error": "unsatisfied_taptree_assert"
+   }
+  },
+  {
+   "name": "taptree_key_not_on_curve_fails",
+   "tx": {
+    "version": 2,
+    "locktime": 0,
+    "inputs": [
+     {
+      "txid": "1111111111111111111111111111111111111111111111111111111111111111",
+      "index": 1,
+      "script_pubkey": "5120147c9c57132f6e7ecddba9800bb0c4449251c92a1e60371ee77557b6620f3ea3",
+      "amount": 50000,
+      "conditions": "ffff38ffa00000000000000000000000000000000000000000000000000000000000000000ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b218080",
+      "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+      "merkle_root": "5b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b21",
+      "internal_key": "187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27"
+     }
+    ],
+    "outputs": [
+     {
+      "script_pubkey": "0014bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "amount": 40000
+     }
+    ]
+   },
+   "expect": {
+    "error": "unsatisfied_taptree_assert"
+   }
+  },
+  {
+   "name": "taptree_ignores_scriptpubkey",
+   "tx": {
+    "version": 2,
+    "locktime": 0,
+    "inputs": [
+     {
+      "txid": "1111111111111111111111111111111111111111111111111111111111111111",
+      "index": 1,
+      "script_pubkey": "0014bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "amount": 50000,
+      "conditions": "ffff38ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b218080",
+      "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+      "merkle_root": "5b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b21",
+      "internal_key": "187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27"
+     }
+    ],
+    "outputs": [
+     {
+      "script_pubkey": "0014bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "amount": 40000
+     }
+    ]
+   },
+   "expect": {
+    "valid": true
+   }
+  },
+  {
+   "name": "taptree_agrees_with_taproot_on_honest_spk",
+   "tx": {
+    "version": 2,
+    "locktime": 0,
+    "inputs": [
+     {
+      "txid": "1111111111111111111111111111111111111111111111111111111111111111",
+      "index": 1,
+      "script_pubkey": "5120147c9c57132f6e7ecddba9800bb0c4449251c92a1e60371ee77557b6620f3ea3",
+      "amount": 50000,
+      "conditions": "ffff38ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b2180ffff37ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b218080",
+      "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+      "merkle_root": "5b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b21",
+      "internal_key": "187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27"
+     }
+    ],
+    "outputs": [
+     {
+      "script_pubkey": "0014bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "amount": 40000
+     }
+    ]
+   },
+   "expect": {
+    "valid": true
+   }
+  },
+  {
+   "name": "taptree_covenant_recreate",
+   "tx": {
+    "version": 2,
+    "locktime": 0,
+    "inputs": [
+     {
+      "txid": "1111111111111111111111111111111111111111111111111111111111111111",
+      "index": 1,
+      "script_pubkey": "5120147c9c57132f6e7ecddba9800bb0c4449251c92a1e60371ee77557b6620f3ea3",
+      "amount": 50000,
+      "conditions": "ffff38ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b2180ffff02ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b21ff83009c408080",
+      "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+      "merkle_root": "5b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b21",
+      "internal_key": "187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27"
+     }
+    ],
+    "outputs": [
+     {
+      "script_pubkey": "5120147c9c57132f6e7ecddba9800bb0c4449251c92a1e60371ee77557b6620f3ea3",
+      "amount": 40000
+     }
+    ]
+   },
+   "expect": {
+    "valid": true
+   }
+  },
+  {
+   "name": "taptree_duplicate_idempotent",
+   "tx": {
+    "version": 2,
+    "locktime": 0,
+    "inputs": [
+     {
+      "txid": "1111111111111111111111111111111111111111111111111111111111111111",
+      "index": 1,
+      "script_pubkey": "5120147c9c57132f6e7ecddba9800bb0c4449251c92a1e60371ee77557b6620f3ea3",
+      "amount": 50000,
+      "conditions": "ffff38ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b2180ffff38ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b218080",
+      "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+      "merkle_root": "5b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b21",
+      "internal_key": "187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27"
+     }
+    ],
+    "outputs": [
+     {
+      "script_pubkey": "0014bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "amount": 40000
+     }
+    ]
+   },
+   "expect": {
+    "valid": true
+   }
+  },
+  {
+   "name": "multi_input_taptree_each_own_identity",
+   "tx": {
+    "version": 2,
+    "locktime": 0,
+    "inputs": [
+     {
+      "txid": "1111111111111111111111111111111111111111111111111111111111111111",
+      "index": 0,
+      "script_pubkey": "5120147c9c57132f6e7ecddba9800bb0c4449251c92a1e60371ee77557b6620f3ea3",
+      "amount": 50000,
+      "conditions": "ffff38ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b218080",
+      "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+      "merkle_root": "5b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b21",
+      "internal_key": "187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27"
+     },
+     {
+      "txid": "1111111111111111111111111111111111111111111111111111111111111111",
+      "index": 1,
+      "script_pubkey": "5120aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "amount": 70000,
+      "conditions": "ffff38ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa00b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b8080",
+      "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+      "internal_key": "50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0"
+     }
+    ],
+    "outputs": [
+     {
+      "script_pubkey": "0014bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "amount": 40000
+     }
+    ]
+   },
+   "expect": {
+    "valid": true
+   }
+  },
+  {
+   "name": "multi_input_taptree_neighbor_key",
+   "tx": {
+    "version": 2,
+    "locktime": 0,
+    "inputs": [
+     {
+      "txid": "1111111111111111111111111111111111111111111111111111111111111111",
+      "index": 0,
+      "script_pubkey": "5120147c9c57132f6e7ecddba9800bb0c4449251c92a1e60371ee77557b6620f3ea3",
+      "amount": 50000,
+      "conditions": "ffff38ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa00b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b8080",
+      "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+      "merkle_root": "5b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b21",
+      "internal_key": "187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27"
+     },
+     {
+      "txid": "1111111111111111111111111111111111111111111111111111111111111111",
+      "index": 1,
+      "script_pubkey": "5120aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "amount": 70000,
+      "conditions": "ffff38ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa00b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b8080",
+      "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+      "internal_key": "50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0"
+     }
+    ],
+    "outputs": [
+     {
+      "script_pubkey": "0014bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "amount": 40000
+     }
+    ]
+   },
+   "expect": {
+    "error": "unsatisfied_taptree_assert"
    }
   },
   {
@@ -772,7 +1100,8 @@
       "amount": 50000,
       "conditions": "ffff37ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b2180ffff02ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b21ff83009c408080",
       "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
-      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+      "internal_key": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c"
      }
     ],
     "outputs": [
@@ -799,7 +1128,8 @@
       "amount": 50000,
       "conditions": "ffff37ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b2180ffff02ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b21ff83009c408080",
       "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
-      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+      "internal_key": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c"
      }
     ],
     "outputs": [
@@ -826,7 +1156,8 @@
       "amount": 50000,
       "conditions": "ffff31ffa0111111111111111111111111111111111111111111111111111111111111111180ffff31ffa011111111111111111111111111111111111111111111111111111111111111118080",
       "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
-      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+      "internal_key": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c"
      }
     ],
     "outputs": [
@@ -853,7 +1184,8 @@
       "amount": 50000,
       "conditions": "ffff33ff8300c35080ffff33ff018080",
       "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
-      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+      "internal_key": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c"
      }
     ],
     "outputs": [
@@ -880,7 +1212,8 @@
       "amount": 50000,
       "conditions": "ffff33ff8300c3508080",
       "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
-      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+      "internal_key": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c"
      },
      {
       "txid": "1111111111111111111111111111111111111111111111111111111111111111",
@@ -889,7 +1222,8 @@
       "amount": 70000,
       "conditions": "ffff33ff830111708080",
       "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
-      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+      "internal_key": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c"
      }
     ],
     "outputs": [
@@ -916,7 +1250,8 @@
       "amount": 50000,
       "conditions": "ffff33ff8300c3508080",
       "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
-      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+      "internal_key": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c"
      },
      {
       "txid": "1111111111111111111111111111111111111111111111111111111111111111",
@@ -925,7 +1260,8 @@
       "amount": 70000,
       "conditions": "ffff33ff8300c3508080",
       "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
-      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+      "internal_key": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c"
      }
     ],
     "outputs": [
@@ -952,7 +1288,8 @@
       "amount": 50000,
       "conditions": "ffff30ffa41111111111111111111111111111111111111111111111111111111111111111010000008080",
       "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
-      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
+      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+      "internal_key": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c"
      },
      {
       "txid": "3333333333333333333333333333333333333333333333333333333333333333",

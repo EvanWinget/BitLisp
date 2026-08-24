@@ -19,7 +19,9 @@ each is an equality against the spending input's own prevout data,
 which travels with the spend, so no recombination of spends into a
 different transaction can change an outcome. The taproot assert's
 scriptPubKey is derived at parse, so here it compares like the
-plain script assert.
+plain script assert. The taptree assert compares the control
+block's internal key and merkle root, which the input carries as
+its execution identity, and derives nothing.
 
 Rule 8, the signature asserts, check under the same clause and
 read the same own-prevout data as the self asserts, plus their own
@@ -65,6 +67,7 @@ from .conditions import (
     AssertMyOutpoint,
     AssertMyScriptPubKey,
     AssertMyTaproot,
+    AssertMyTaptree,
     AssertMyTxid,
     AssertSequenceHeight,
     AssertSequenceTime,
@@ -189,7 +192,8 @@ def check_time_asserts(tx):
 
 def check_self_asserts(tx):
     """The self assert family: each condition is an equality against
-    its own input's prevout data, checked as a conjunction."""
+    its own input's prevout data or execution identity, checked as a
+    conjunction."""
     for tx_input in tx.inputs:
         outpoint = tx_input.txid + tx_input.index.to_bytes(4, "little")
         for cond in tx_input.conditions or ():
@@ -228,6 +232,18 @@ def check_self_asserts(tx):
                         f"ASSERT_MY_AMOUNT demands {cond.amount}, "
                         f"the spent amount is {tx_input.amount}",
                     )
+            elif isinstance(cond, AssertMyTaptree):
+                if (cond.internal_key, cond.merkle_root) != (
+                    tx_input.internal_key,
+                    tx_input.merkle_root,
+                ):
+                    raise BitLispError(
+                        "unsatisfied_taptree_assert",
+                        f"ASSERT_MY_TAPTREE demands key {cond.internal_key.hex()} "
+                        f"root {cond.merkle_root.hex()}, the control block carries "
+                        f"key {tx_input.internal_key.hex()} "
+                        f"root {tx_input.merkle_root.hex()}",
+                    )
 
 
 def self_specifier(tx_input, commitment):
@@ -235,7 +251,7 @@ def self_specifier(tx_input, commitment):
     commitment value: what an ASSURE or REQUIRE says about its
     emitting input, and what an announcement assert compares its
     announcer operands against. Only condition-carrying inputs emit
-    conditions, and those carry both execution-identity fields by
+    conditions, and those carry the execution-identity triple by
     the transaction model's construction rule."""
     fields = []
     for kind in SPECIFIER_OPERANDS[commitment]:

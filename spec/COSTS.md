@@ -364,7 +364,11 @@ The derivation entries charge sums: CREATE_OUTPUT_TAPROOT charges
 `CREATE_OUTPUT_COST + TAPROOT_TWEAK_COST = 2,650,000` and
 ASSERT_MY_TAPROOT charges
 `CONDITION_GENERIC_COST + TAPROOT_TWEAK_COST = 1,300,200`, each as
-one charge before its derivation runs. A reserved condition
+one charge before its derivation runs. ASSERT_MY_TAPTREE proves
+what ASSERT_MY_TAPROOT proves by reading the internal key and
+merkle root base consensus already authenticated from the control
+block, so it performs no derivation and charges
+`CONDITION_GENERIC_COST` alone. A reserved condition
 charges exactly its declared cost, floor 500 (VALIDATION.md rule
 6). There is no per-spend constant: this table charges conditions
 only, and any fixed per-input overhead belongs to the weight

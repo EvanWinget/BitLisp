@@ -75,6 +75,7 @@ def build_tx(version, locktime, spec):
             conditions=tuple(asserts),
             tapleaf=b"\x0a" * 32,
             merkle_root=b"\x0b" * 32,
+            internal_key=b"\x0c" * 32,
         )
         for n, (sequence, asserts) in enumerate(spec)
     )
