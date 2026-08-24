@@ -37,6 +37,7 @@ from bitlisp_tools import assemble  # noqa: E402
 from bitlisp_tools.compiler import compile_program, tree_hash  # noqa: E402
 from bitlisp_tools.curry import curry, uncurry  # noqa: E402
 from bitlisp_tools.runner import run_spend  # noqa: E402
+from conftest import assert_corpus_identities  # noqa: E402
 from test_framework.key import compute_xonly_pubkey, sign_schnorr  # noqa: E402
 
 PUZZLES = REPO_ROOT / "puzzles"
@@ -736,29 +737,13 @@ def test_validation_vectors_match_source():
 def test_validation_vector_identities_derive_their_scripts():
     # The corpus carries each instance input's execution identity as
     # data the model takes on trust, so this is where the trust is
-    # checked: every instance input's scriptPubKey must be the tweak
-    # of its internal key by its merkle root, with the single-leaf
-    # tree's root equal to its leaf hash. The hostile foreign-script
-    # inputs carry the corpus filler triple, counted so the exemption
-    # cannot widen unnoticed.
-    filler = ("0a" * 32, "0b" * 32, "0c" * 32)
-    filler_seen = 0
-    for name in ("validation/vault-core.json", "validation/vault-consolidation.json"):
-        for case in load_vector(name).values():
-            for entry in case["tx"]["inputs"]:
-                if "conditions" not in entry:
-                    continue
-                identity = (
-                    entry["tapleaf"],
-                    entry["merkle_root"],
-                    entry["internal_key"],
-                )
-                if identity == filler:
-                    filler_seen += 1
-                    continue
-                root = bytes.fromhex(entry["merkle_root"])
-                assert entry["tapleaf"] == entry["merkle_root"]
-                assert entry["internal_key"] == NUMS.hex()
-                expected = b"\x51\x20" + secp256k1.taproot_output_key(NUMS, root)
-                assert entry["script_pubkey"] == expected.hex(), case["name"]
-    assert filler_seen == 2
+    # checked, by the shared audit. The two hostile foreign-script
+    # inputs carry the corpus filler triple.
+    assert_corpus_identities(
+        [
+            load_vector("validation/vault-core.json"),
+            load_vector("validation/vault-consolidation.json"),
+        ],
+        NUMS,
+        filler_expected=2,
+    )

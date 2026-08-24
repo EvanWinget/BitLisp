@@ -38,6 +38,7 @@ from bitlisp.sexp import NIL, int_to_atom, iter_proper_list  # noqa: E402
 from bitlisp_tools.compiler import compile_program, tree_hash  # noqa: E402
 from bitlisp_tools.curry import curry, uncurry  # noqa: E402
 from bitlisp_tools.runner import run_spend  # noqa: E402
+from conftest import assert_corpus_identities  # noqa: E402
 from test_framework.key import compute_xonly_pubkey, sign_schnorr  # noqa: E402
 
 PUZZLES = REPO_ROOT / "puzzles"
@@ -822,16 +823,10 @@ def test_validation_vectors_match_source():
 def test_validation_vector_identities_derive_their_scripts():
     # The corpus carries each lineage input's execution identity as
     # data the model takes on trust, so this is where the trust is
-    # checked: every condition-carrying input's scriptPubKey must be
-    # the tweak of its internal key by its merkle root, with the
-    # single-leaf tree's root equal to its leaf hash. No input in
-    # this file carries filler.
-    for case in load_vector("validation/singleton-lineage.json").values():
-        for entry in case["tx"]["inputs"]:
-            if "conditions" not in entry:
-                continue
-            root = bytes.fromhex(entry["merkle_root"])
-            assert entry["tapleaf"] == entry["merkle_root"]
-            assert entry["internal_key"] == NUMS.hex()
-            expected = b"\x51\x20" + secp256k1.taproot_output_key(NUMS, root)
-            assert entry["script_pubkey"] == expected.hex(), case["name"]
+    # checked, by the shared audit. No input in this file carries
+    # filler.
+    assert_corpus_identities(
+        [load_vector("validation/singleton-lineage.json")],
+        NUMS,
+        filler_expected=0,
+    )
