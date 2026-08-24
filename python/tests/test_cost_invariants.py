@@ -20,9 +20,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from bitlisp import BitLispError, condition_cost, parse_conditions  # noqa: E402
 from bitlisp.sexp import NIL, int_to_atom  # noqa: E402
 
-# The taproot menu entries derive a point per parse in pure Python,
-# so these properties run over few examples with no deadline, the
-# convention of the other EC-heavy invariant suites.
+# The taproot output claim derives a point per parse in pure
+# Python, so these properties run over few examples with no
+# deadline, the convention of the other EC-heavy invariant suites.
 EXAMPLES = settings(max_examples=25, deadline=None)
 
 GOOD_KEY = bytes.fromhex(
@@ -50,7 +50,7 @@ MENU = (
     cond(0x16, b"\x02" * 32, b"msg", b"\x03" * 64),
     cond(0x01, b"\x51", int_to_atom(1000)),
     cond(0x02, GOOD_KEY, b"", int_to_atom(1000)),
-    cond(0x37, GOOD_KEY, b""),
+    cond(0x38, GOOD_KEY, b"\x11" * 32),
     cond(0x80, int_to_atom(600)),
 )
 

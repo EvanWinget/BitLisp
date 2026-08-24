@@ -18,7 +18,6 @@ from bitlisp import BitLispError, condition_cost, parse_conditions  # noqa: E402
 from bitlisp.conditions import (  # noqa: E402
     ANNOUNCE,
     ASSERT_MY_AMOUNT,
-    ASSERT_MY_TAPROOT,
     ASSERT_MY_TAPTREE,
     ASSERT_SIG_RAW,
     ASSURE,
@@ -64,7 +63,6 @@ def test_cost_table_values_match_spec():
     assert CONDITION_COSTS[ASSERT_SIG_RAW] == 1_300_000
     assert CONDITION_COSTS[CREATE_OUTPUT] == 1_350_000
     assert CONDITION_COSTS[CREATE_OUTPUT_TAPROOT] == 2_650_000
-    assert CONDITION_COSTS[ASSERT_MY_TAPROOT] == 1_300_200
     assert CONDITION_COSTS[ASSERT_MY_TAPTREE] == 200
 
 
@@ -126,15 +124,6 @@ def test_derivation_defect_reported_only_when_paid():
     assert excinfo.value.code == "bad_condition_arg"
     with pytest.raises(BitLispError) as excinfo:
         parse_conditions(node, max_cost=2_649_999)
-    assert excinfo.value.code == "cost_exceeded"
-
-
-def test_taproot_assert_charges_before_deriving():
-    node = clist(cond(ASSERT_MY_TAPROOT, GOOD_INTERNAL_KEY, b""))
-    cost, _ = parse_conditions(node, max_cost=1_300_200)
-    assert cost == 1_300_200
-    with pytest.raises(BitLispError) as excinfo:
-        parse_conditions(node, max_cost=1_300_199)
     assert excinfo.value.code == "cost_exceeded"
 
 
