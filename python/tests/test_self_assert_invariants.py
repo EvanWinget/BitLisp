@@ -75,7 +75,6 @@ def _taproot(internal_key, merkle_root):
 # Derived once: the tweak is the one expensive step in this module,
 # and the pools are fixed, so no property recomputes it per example.
 TAPROOT_ASSERTS = {pair: _taproot(*pair) for pair in (*IDENTITIES, (IK, b""))}
-HONEST_SPKS = {pair: TAPROOT_ASSERTS[pair].script_pubkey for pair in IDENTITIES}
 
 self_asserts = st.one_of(
     st.tuples(txids, indexes).map(lambda t: AssertMyOutpoint(_outpoint(*t))),
@@ -218,7 +217,7 @@ def test_taptree_assert_agrees_with_taproot_assert_on_honest_input(
     satisfied together and fail together. The pools hold no two
     pairs deriving one output key, so the collision exemption never
     fires here."""
-    honest = HONEST_SPKS[identity]
+    honest = TAPROOT_ASSERTS[identity].script_pubkey
     taptree = AssertMyTaptree(*operands)
     taproot = TAPROOT_ASSERTS[operands]
     got_taptree = outcome(
