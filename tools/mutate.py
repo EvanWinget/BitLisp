@@ -8,7 +8,11 @@ corpus against each one. A mutant the corpus fails is killed. A
 mutant the corpus passes survived: either no vector pins the behavior
 that line implements, or the mutant is equivalent to the original.
 Both readings need a human, so every survivor is reported with its
-diff.
+diff. A mutant that makes the reference raise something outside its
+error taxonomy, so the runner stops on an escaping exception rather
+than a vector's verdict, crashed: detected, but by Python rather than
+by the corpus, and counted apart so the corpus's own coverage is not
+overstated.
 
 The corpus is the source of truth between sessions, so the corpus is
 the primary oracle. With --tests, each survivor is additionally run
@@ -30,8 +34,8 @@ face before any mutant runs.
     tools/mutate.py --tests          second pass over survivors
     tools/mutate.py --report out.json  machine-readable results
 
-Exit status: 0 when every mutant was killed, 1 when any survived, 2
-on a harness error (baseline failure, bad arguments).
+Exit status: 0 when every mutant was killed or crashed, 1 when any
+survived, 2 on a harness error (baseline failure, bad arguments).
 """
 
 import argparse
@@ -262,7 +266,11 @@ def mutant_diff(mutant):
 # mutant it is handed.
 
 _MIRROR = None
-_CORPUS_DRIVER = """
+# The corpus driver exits with this code on a vector's verdict. Any
+# other nonzero exit is an exception escaping the reference.
+VECTOR_FAILURE = 3
+_CORPUS_DRIVER = f"""
+VECTOR_FAILURE = {VECTOR_FAILURE}
 import sys
 sys.path.insert(0, sys.argv[1])
 import run_vectors
@@ -271,7 +279,7 @@ for path in run_vectors.discover():
         run_vectors.run_file(path)
     except run_vectors.VectorError as exc:
         print(exc)
-        sys.exit(1)
+        sys.exit(VECTOR_FAILURE)
 """
 
 
@@ -305,8 +313,10 @@ def _restore(root, module):
     shutil.copy(PACKAGE / f"{module}.py", root / "python" / "bitlisp" / f"{module}.py")
 
 
-def _run(root, argv, timeout):
-    """Runs argv in the mirror. Returns 'killed', 'survived', or 'timeout'."""
+def _run(root, argv, timeout, verdict_codes):
+    """Runs argv in the mirror. Returns 'survived' on exit 0, 'killed' on
+    an exit code in verdict_codes (the oracle judged the mutant),
+    'crashed' on any other exit, or 'timeout'."""
     env = dict(os.environ, PYTHONPATH=str(root / "python"), PYTHONDONTWRITEBYTECODE="1")
     try:
         proc = subprocess.run(
@@ -319,12 +329,14 @@ def _run(root, argv, timeout):
         )
     except subprocess.TimeoutExpired:
         return "timeout"
-    return "survived" if proc.returncode == 0 else "killed"
+    if proc.returncode == 0:
+        return "survived"
+    return "killed" if proc.returncode in verdict_codes else "crashed"
 
 
 def run_corpus(root, timeout):
     argv = [sys.executable, "-c", _CORPUS_DRIVER, str(root / "tools")]
-    return _run(root, argv, timeout)
+    return _run(root, argv, timeout, {VECTOR_FAILURE})
 
 
 def run_tests(root, timeout):
@@ -338,7 +350,9 @@ def run_tests(root, timeout):
         "-p",
         "no:cacheprovider",
     ]
-    return _run(root, argv, timeout)
+    # pytest exits 1 on failing tests. Its other codes (interrupted,
+    # internal error, usage error, no tests collected) judge nothing.
+    return _run(root, argv, timeout, {1})
 
 
 def evaluate(mutant, timeout, tests):
@@ -436,19 +450,24 @@ def main():
 
     survivors = [r for r in results if r[1] == "survived"]
     timeouts = [r for r in results if r[1] == "timeout"]
-    killed = len(results) - len(survivors) - len(timeouts)
 
+    verdicts = ("killed", "crashed", "survived", "timeout")
     per_module = {}
     for mutant_id, corpus, _ in results:
-        entry = per_module.setdefault(by_id[mutant_id].module, [0, 0, 0])
-        entry[{"killed": 0, "survived": 1, "timeout": 2}[corpus]] += 1
-    print(f"{'module':<14} {'mutants':>7} {'killed':>7} {'survived':>8} {'timeout':>7}")
-    for module, (k, s, t) in sorted(per_module.items()):
-        print(f"{module:<14} {k + s + t:>7} {k:>7} {s:>8} {t:>7}")
-    total = len(results)
-    print(
-        f"{'total':<14} {total:>7} {killed:>7} {len(survivors):>8} {len(timeouts):>7}"
-    )
+        counts = per_module.setdefault(
+            by_id[mutant_id].module, dict.fromkeys(verdicts, 0)
+        )
+        counts[corpus] += 1
+    totals = dict.fromkeys(verdicts, 0)
+    header = f"{'module':<14} {'mutants':>7}" + "".join(f" {v:>8}" for v in verdicts)
+    print(header)
+    for module, counts in sorted(per_module.items()):
+        row = f"{module:<14} {sum(counts.values()):>7}"
+        print(row + "".join(f" {counts[v]:>8}" for v in verdicts))
+        for verdict in verdicts:
+            totals[verdict] += counts[verdict]
+    row = f"{'total':<14} {len(results):>7}"
+    print(row + "".join(f" {totals[v]:>8}" for v in verdicts))
 
     if survivors:
         print("\nsurvivors:")

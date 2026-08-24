@@ -56,3 +56,19 @@ def test_corpus_kills_a_broken_error_code_table():
     broken = next(m for m in mutants if m.description != "raise deleted")
     mutant_id, corpus, suite = mutate.evaluate(broken, timeout=120, tests=False)
     assert (mutant_id, corpus, suite) == (broken.id, "killed", None)
+
+
+def test_verdict_separates_the_oracle_from_an_escaping_exception():
+    # Exit 0 survives, the oracle's own code kills, any other exit is
+    # an exception escaping the reference and counts apart.
+    root = mutate._build_mirror()
+    try:
+        verdicts = {
+            code: mutate._run(
+                root, [sys.executable, "-c", f"raise SystemExit({code})"], 30, {3}
+            )
+            for code in (0, 3, 1)
+        }
+    finally:
+        shutil.rmtree(root)
+    assert verdicts == {0: "survived", 3: "killed", 1: "crashed"}
