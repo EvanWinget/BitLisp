@@ -46,7 +46,7 @@ from bitlisp import conditions
 from bitlisp.errors import BitLispError
 from bitlisp.machine import run
 from bitlisp.operators import OPERATORS
-from bitlisp.sexp import NIL, int_to_atom, is_atom, is_pair
+from bitlisp.sexp import NIL, atom_to_int, int_to_atom, is_atom, is_pair
 
 from .keywords import ATOM_TO_NAME
 from .printer import _atom_text
@@ -820,7 +820,7 @@ class _Compilation:
             if bound == NIL:
                 rebound[name] = bound
             elif is_atom(bound):
-                path = int.from_bytes(bound, "big")
+                path = atom_to_int(bound)
                 if has_tree:
                     # Drop the leading rest step: the path continues
                     # from the old arguments, which the tail reaches.
