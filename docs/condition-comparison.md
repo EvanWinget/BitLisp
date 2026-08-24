@@ -100,7 +100,7 @@ delegate to.
 | own parent | `ASSERT_MY_PARENT_ID` 71 | `ASSERT_MY_TXID` `0x31`, normative, the txid half of the outpoint |
 | own program | `ASSERT_MY_PUZZLEHASH` 72 | `ASSERT_MY_SCRIPTPUBKEY` `0x32`, normative, raw script bytes |
 | own amount | `ASSERT_MY_AMOUNT` 73 | `ASSERT_MY_AMOUNT` `0x33`, normative |
-| own taproot components | absent | `ASSERT_MY_TAPROOT` `0x37`, normative, the D-CC2 mirror |
+| own taproot components | absent | removed (decision 29): `ASSERT_MY_TAPTREE` `0x38` subsumes the derivation assert, `0x37` now a visible gap |
 | own taptree | absent | `ASSERT_MY_TAPTREE` `0x38`, normative, reads the control block's internal key and merkle root at the generic cost (decision 28) |
 | own birth time or height | `ASSERT_MY_BIRTH_SECONDS` 74, `ASSERT_MY_BIRTH_HEIGHT` 75 | declined, a chain read outside the transaction view (C13) |
 | ephemerality | `ASSERT_EPHEMERAL` 76, the coin was created in the same block it is spent | declined, structurally inexpressible within one transaction (C14) |
