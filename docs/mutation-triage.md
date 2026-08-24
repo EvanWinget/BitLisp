@@ -21,6 +21,11 @@ negated, each `not` removed, each `raise` deleted, and `break` and
 `continue` exchanged. Each mutant runs the whole corpus in a private
 mirror of the tree. A mutant the corpus fails is killed. One the
 corpus passes survived and is triaged by hand into a class below.
+One that makes the reference raise outside its error taxonomy, so
+the runner stops on an escaping exception before any vector's
+verdict, crashed: detected by Python rather than by the corpus, and
+counted apart so the corpus's coverage is not overstated by kills it
+did not earn.
 With `--tests`, every corpus survivor also runs the pytest suite
 (hypothesis invariants, oracle differentials, unit tests), which
 separates survivors nothing catches from survivors the tests catch
@@ -29,15 +34,16 @@ but the corpus does not.
     .venv/bin/python tools/mutate.py --tests --report mutants.json
 
 The run refuses to start unless the unmutated tree passes every
-oracle the mutants face. Timeouts count as kills: a mutant that
-hangs is a mutant the budget eventually rejects, at a cost in wall
-clock the harness will not pay.
+oracle the mutants face. A timeout is the same kind of detection: a
+mutant that hangs is a mutant the budget eventually rejects, at a
+cost in wall clock the harness will not pay, so it too is counted
+apart from the kills.
 
 ## Survivor classes
 
-A survivor lands in exactly one class. The first five are accepted
-without a vector, each for a stated reason. The sixth is the finding
-the harness exists for.
+Each survivor is triaged into one class. The first five are
+accepted without a vector, each for a stated reason. The sixth is
+the finding the harness exists for.
 
 | class | meaning | accepted because |
 | --- | --- | --- |
@@ -57,48 +63,55 @@ pinned by `--tests`.
 ## Pass of 2026-08-23
 
 Run against `main` at PR 60 (`7eee46f`) with `--tests`, the corpus
-at 1,151 cases after this pass's nineteen vectors.
+at 1,149 cases after this pass's seventeen vectors.
 
-| module | mutants | killed | survived | timeout |
-| --- | --- | --- | --- | --- |
-| conditions | 481 | 442 | 39 | 0 |
-| costs | 114 | 114 | 0 | 0 |
-| errors | 3 | 2 | 1 | 0 |
-| machine | 80 | 75 | 5 | 0 |
-| operators | 379 | 361 | 17 | 1 |
-| secp256k1 | 153 | 137 | 15 | 1 |
-| serialize | 160 | 125 | 34 | 1 |
-| sexp | 37 | 37 | 0 | 0 |
-| tx | 165 | 104 | 61 | 0 |
-| validation | 161 | 154 | 7 | 0 |
-| total | 1,733 | 1,551 | 179 | 3 |
+| module | mutants | killed | crashed | survived | timeout |
+| --- | --- | --- | --- | --- | --- |
+| conditions | 426 | 330 | 57 | 39 | 0 |
+| costs | 114 | 114 | 0 | 0 | 0 |
+| errors | 2 | 0 | 1 | 1 | 0 |
+| machine | 79 | 58 | 16 | 5 | 0 |
+| operators | 369 | 300 | 51 | 17 | 1 |
+| secp256k1 | 148 | 104 | 27 | 15 | 2 |
+| serialize | 166 | 101 | 29 | 34 | 2 |
+| sexp | 35 | 26 | 9 | 0 | 0 |
+| tx | 168 | 92 | 15 | 61 | 0 |
+| validation | 144 | 116 | 20 | 8 | 0 |
+| total | 1,651 | 1,241 | 225 | 180 | 5 |
 
-The numbers are the state after the nineteen vectors below landed.
-The first pass, on the tree before PR 60 merged, had 195 survivors
-out of 1,720 mutants. Of the 179 remaining, the
-pytest suite kills 55: 29 of the 61 model preconditions in `tx.py`,
+The numbers are the state after the vectors below landed and after
+the review fold-ins reshaped the inventory: crashes and timeouts
+told apart from kills, the doubled negations deduplicated, the
+augmented-assignment, expression-test, and while sites added, and
+`__init__` excluded. The first pass, on the tree before PR 60
+merged, had 195 survivors out of 1,720 mutants under the old
+counting. The 225 crashes are dominated by deleted raises and
+shifted indices that Python detects before any verdict, and the
+corpus takes no kill credit for them. Of the 180 survivors, the
+pytest suite kills 52: 29 of the 61 model preconditions in `tx.py`,
 ten of the fifteen in `secp256k1.py` (the group order moved by one,
 the width guards, the point-at-infinity branch), nine in
-`serialize.py` (the length-form boundary at 2^20, the `bytes`-only
-type check, two truncation checks), the error-code guard,
-`condition_cost`, and a few `[0]` indices and flags elsewhere. The
-other 124 survive both, the five in `machine.py` and all seven in
-`validation.py` among them. All 179 fall into the accepted classes
-below. The
-three timeouts are mutants that loop until the budget rejects them:
-`if` returning its else branch in both cases, a scalar multiplication
-that never shifts its scalar, a deserializer that never advances.
+`serialize.py` (length-form table constants, the floor at 2^20
+among them, the `bytes`-only type check, the truncated-atom check),
+the `name` table index and the reserved branch of `condition_cost`
+in `conditions.py`, and one of `substr`'s negative-index checks.
+The other 128 survive both, the five in `machine.py` and all eight
+in `validation.py` among them. All 180 fall into the accepted
+classes below. The five timeouts are mutants that loop until the
+budget rejects them: the `if` operator returning one branch in both
+cases, the scalar multiplication shifting its scalar the wrong way
+or by zero, and the deserializer stepping backward or not at all.
 
 ### Gaps found, vectors added
 
-Nineteen cases, each a behavior the spec states that no vector
+Seventeen cases, each a behavior the spec states that no vector
 exercised. All pass the reference, the two vm path cases were
-cross-checked against the consensus oracle, and the three seal cases
+cross-checked against the consensus oracle, and the seal case
 against the vendored Bitcoin Core framework.
 
 | site | mutant that survived | vector | spec |
 | --- | --- | --- | --- |
-| path cost, leading zero bytes | `break` to `continue` in the leading-zero count: an interior zero byte was counted as leading | `vm/paths.json` `path_interior_zero_byte`, `path_leading_and_interior_zero_bytes` | VM.md section 3.1 |
+| path cost, leading zero bytes | `break` to `continue` in the leading-zero count: a zero byte after a nonzero byte was counted as leading | `vm/paths.json` `path_trailing_zero_byte`, `path_leading_and_trailing_zero_bytes` | VM.md section 3.1 |
 | one-byte atom in the long form | `<= 0x7F` to `< 0x7F` and `0x7F` to `0x7E`: `0x81 0x7F` accepted as canonical | `vm/serialize.json` `nonminimal_one_byte_atom_7f` | VM.md section 2 (D5) |
 | invalid prefix byte | `>= 0xFC` to `> 0xFC`: a lone `0xFC` fell through every length form | `vm/serialize.json` `lone_prefix_fc` | VM.md section 2 (D5) |
 | three-byte length form floor | floor `0x2000` to `0x1FFF`: a length of 8,191 in the three-byte form accepted as minimal | `vm/serialize.json` `nonminimal_length_e0_at_8191` | VM.md section 2 (D5) |
@@ -106,10 +119,10 @@ against the vendored Bitcoin Core framework.
 | reserved declared cost | `cost < 0` to `cost < -1`: a declared cost of exactly -1 reported as `reserved_cost_too_low` instead of `bad_condition_arg` | `conditions/encoding.json` `reserved_cost_minus_one` | CONDITIONS.md section 1, VALIDATION.md rule 6 |
 | ASSERT_MY_SCRIPTPUBKEY and ASSERT_MY_AMOUNT arity | the arity raise deleted: two operands accepted, the second ignored | `conditions/self-asserts.json` `scriptpubkey_arity_zero`, `scriptpubkey_arity_two`, `amount_arity_zero`, `amount_arity_two` | CONDITIONS.md self asserts |
 | specifier field shape | the atom check on a non-amount specifier field deleted: a pair carried into the ledger | `conditions/messages.json` `assure_script_specifier_pair` | CONDITIONS.md message family |
-| ASSERT_ANNOUNCEMENT arity | the arity raise deleted: an empty list crashed instead of reporting `bad_condition_arity` | `conditions/messages.json` `assert_announcement_arity_zero` | CONDITIONS.md message family |
+| ASSERT_ANNOUNCEMENT arity | the arity raise deleted: an empty list crashed instead of reporting `bad_condition_arity`. The vector pins the error code, and the harness reports the mutant crashed rather than killed, since Python detects it before any verdict | `conditions/messages.json` `assert_announcement_arity_zero` | CONDITIONS.md message family |
 | composed specifier operand order | `continue` to `break` after an amount field: the identity fields after it never parsed | `conditions/messages.json` `assure_amount_tapleaf_specifier_parses` | CONDITIONS.md message family |
-| specifier amount domain | `0 <= value` to `0 < value`: a zero-amount prevout unaddressable by amount | `validation/messages.json` `amount_specifier_over_zero_amount_input_balances` | VALIDATION.md rule 3 (C9) |
-| compact-size boundary in the txid and outputs hash | `n < 0xFD` to `n < 0xFC`: a 252-byte script or count encoded in the three-byte form | `validation/seals.json` `seal_outputs_script_252_bytes_one_byte_length`, `seal_outputs_script_253_bytes_three_byte_length`, `seal_txid_253_outputs_three_byte_count` | CONDITIONS.md seals |
+| specifier amount domain | `0 <= value` to `0 < value`: a zero-amount prevout unaddressable by amount | `validation/messages.json` `amount_specifier_over_zero_amount_input_balances` | VALIDATION.md rule 3, divergence C9 in the condition record |
+| compact-size boundary in the txid and outputs hash | `n < 0xFD` to `n < 0xFC`: a 252-byte script encoded in the three-byte form | `validation/seals.json` `seal_outputs_script_252_bytes_one_byte_length`. The 253 side was already pinned by the existing boundary case and the seal unit suite, and two review-added 253 cases were removed as pinning nothing | VALIDATION.md transaction view (the txid and outputs-hash serializations) |
 
 ### Survivors accepted
 
@@ -146,7 +159,9 @@ checks shadowed by width checks in the condition parsers (a pair has
 length two), the first arity check of the two variadic message
 parsers (the mode-derived count check reports the same code), the
 `(empty)` fallbacks in error messages, and the `name` property's
-table index, which only names a condition in a message.
+table index and the taproot-versus-scriptpubkey choice in the
+unsatisfied-scriptpubkey message, each of which only names a
+condition in a message.
 
 **Model precondition.** Every constructor check in `tx.py`: field
 ranges, byte types, the non-empty input and output tuples, distinct
