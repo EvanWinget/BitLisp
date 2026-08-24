@@ -70,13 +70,17 @@ artifact. The uncurry direction is deliberately stricter, in line
 with preferring to reject valid-looking input, and a test pins the
 divergence against the wheel.
 
-One structural collision is worth knowing. A compiled program that
-declares functions has exactly this shape, the main expression
-applied over the quoted function tree, so uncurry reports it as a
-curry of one value, and that value is the function tree. Uncurry
-proves shape, not history: it cannot tell a program somebody
-curried from a program that merely compiles to the same tree, and
-a zero exit status is never evidence that currying happened.
+Two structural collisions are worth knowing. A compiled program
+that declares functions has exactly this shape, the main
+expression applied over the quoted function tree, so uncurry
+reports it as a curry of one value, and that value is the
+function tree. A top-level `let` binding only literals, in a
+program with no function tree, emits the shape as well, the
+quoted body applied over the quoted values, which uncurry reports
+as curried values. Uncurry proves shape, not history: it cannot
+tell a program somebody curried from a program that merely
+compiles to the same tree, and a zero exit status is never
+evidence that currying happened.
 
 ## Tree hash as identity
 
