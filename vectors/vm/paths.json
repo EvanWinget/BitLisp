@@ -154,6 +154,24 @@
     "result": "80",
     "cost": 44
    }
+  },
+  {
+   "name": "path_interior_zero_byte",
+   "program": "820100",
+   "env": "ffffffffffffffff0a8080808080808080",
+   "expect": {
+    "result": "0a",
+    "cost": 76
+   }
+  },
+  {
+   "name": "path_leading_and_interior_zero_bytes",
+   "program": "83000100",
+   "env": "ffffffffffffffff0a8080808080808080",
+   "expect": {
+    "result": "0a",
+    "cost": 80
+   }
   }
  ]
 }

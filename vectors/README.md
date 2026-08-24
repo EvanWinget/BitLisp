@@ -133,3 +133,13 @@ duplicate-CREATE_OUTPUT theft case as vector #1 in
 
 Run the corpus with `python3 tools/run_vectors.py`. A vector file whose
 suite has no runner yet fails loudly rather than being skipped.
+
+## Mutation coverage
+
+`tools/mutate.py` asks the converse question of every vector file:
+does the corpus fail when the reference is wrong? It generates small
+semantic mutants of `python/bitlisp/` and runs the corpus against
+each. A surviving mutant is a behavior no vector pins, or a mutant
+equivalent to the original. Each pass is triaged in
+`docs/mutation-triage.md`, and every gap it finds becomes a vector
+here with its spec citation, the same day, like any other behavior.
