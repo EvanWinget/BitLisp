@@ -11,7 +11,8 @@ name is exactly a token the raw reader rejects as an unknown symbol,
 so strings, hex, operator names, and decimals keep their raw
 spelling rules, and the language occupies only text that previously
 errored. The reserved words are `program`, `defun`, `defun-inline`,
-`defconstant`, `include`, `if`, `list`, `assert`, `and`, and `or`.
+`defconstant`, `include`, `if`, `let`, `list`, `list*`, `assert`,
+`and`, and `or`.
 
 ## The program form
 
@@ -200,6 +201,20 @@ Builds a proper list of its evaluated arguments, folding into `c`
 calls: `(list A B)` compiles as `(c A (c B ()))`, and `(list)` is
 nil. Condition output is written with it.
 
+## list*
+
+```
+(list* <expr>* <tail>)
+```
+
+Builds a list of its evaluated arguments consed onto the last one,
+which becomes the tail: `(list* A B T)` compiles as
+`(c A (c B T))`. Where `list` always ends in nil, `list*` is how a
+condition list extends a tail the program inherited. With a single
+operand there is nothing to cons and the tail compiles bare.
+`(list*)` is rejected at compile time: "list* takes items and a
+final tail".
+
 ## assert
 
 ```
@@ -248,6 +263,41 @@ evaluate, and nil when every operand is falsy. `(or)` is nil.
 `(and X)` and `(or X)` compile to the same tree, both meaning X as
 a boolean.
 
+## let
+
+```
+(let ((<name> <expr>)*) <body>)
+```
+
+Binds names to evaluated expressions for one body expression.
+Bindings are parallel: every expression evaluates in the enclosing
+scope, and the bound names are visible only in the body, so a
+binding referencing a sibling is an unknown name. Sequential
+naming is nested `let`, each layer seeing the ones above. A
+binding names one value, with no destructuring shape. Bound names
+follow the parameter rules: duplicates in one binding list are
+rejected, a name may not be a reserved word or a condition
+constant, and inside the body a bound name shadows parameters,
+functions, and constants, exactly as a parameter does. Every name
+the `let` does not bind stays visible in the body.
+
+`let` compiles as the naming helpers it replaces are written by
+hand, a function taking the bound names as parameters and called
+once, except that the body is applied in place instead of entering
+the function tree:
+
+```
+(a (q . <body>) (c 2 (c <expr> ... 3)))
+```
+
+The body's environment is the enclosing one with the bound values
+consed in front of the arguments, so the function tree stays at
+path 2, calls and recursion inside the body work unchanged, and
+the cost is one apply plus one cons per binding, the price of the
+hand-written helper call. In a program with no function tree the
+rebuild drops the tree cons. `(let () <body>)` binds nothing and
+its body compiles bare.
+
 ## Expressions and quoting
 
 An expression is an atom, a name, or a form.
@@ -288,7 +338,9 @@ as a proper list:
 
 Every function therefore sees the same environment shape, its own
 parameters rooted at path 3, which is why recursion and mutual
-recursion fall out of the layout. The whole program is emitted as
+recursion fall out of the layout. A `let` rebuilds the layout the
+same way, its bound values consed in front of the arguments, so a
+body under `let` still sees the tree at path 2. The whole program is emitted as
 
 ```
 (a (q . <main>) (c (q . <function tree>) 1))
@@ -345,7 +397,9 @@ and shows the source name and the live arguments by parameter name
 instead of raw bytecode. A function whose compiled body is a single
 atom stays out of the table, because an atom's hash cannot be told
 apart from ordinary data. Inline functions stay out too: spliced
-code has no one compiled body to hash. `main_params` records the
+code has no one compiled body to hash. A `let` body stays out as
+well: it is part of the expression that contains it, not a
+function of its own. `main_params` records the
 program's own parameter names for the reader.
 
 ## Deviations from Chialisp
@@ -368,9 +422,14 @@ nothing forces a change. The deliberate differences:
   compile time rather than at run time.
 - `if`, `list`, `assert`, `and`, and `or` are compiler forms, not
   macros, with the semantics Chialisp's stage-2 and utility_macros
-  macros give the same spellings. Nothing can shadow them: where
-  Chialisp's newest macro silently wins, the one-namespace rule
-  makes redefinition an error.
+  macros give the same spellings, and `let` is a compiler form
+  with the modern dialect's parallel binding semantics. Nothing
+  can shadow any of them: where Chialisp's newest macro silently
+  wins, the one-namespace rule makes redefinition an error.
+- `list*` is an addition with no Chialisp counterpart: no dialect
+  has a form that builds a list onto a tail, so condition lists
+  extending an inherited tail are consed by hand there. The
+  expansion is one `c` per item, purely syntactic.
 - There is no macro system. Chialisp's `defmacro`, `qq`, and
   `unquote` are omitted, a removal decided on production evidence:
   across Chia's deployed puzzle corpus and its largest application
