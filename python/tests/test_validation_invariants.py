@@ -26,6 +26,7 @@ from bitlisp import (
     validate_transaction,
 )
 from bitlisp.secp256k1 import G, point_mul, taproot_output_key
+from conftest import filler_identity
 from hypothesis import given
 from hypothesis import strategies as st
 
@@ -93,9 +94,7 @@ def build_tx(input_claims, outputs):
                 amount=out_total if n == 0 else 0,
                 sequence=0xFFFFFFFF,
                 conditions=conditions,
-                tapleaf=b"\x0a" * 32,
-                merkle_root=b"\x0b" * 32,
-                internal_key=b"\x0c" * 32,
+                **filler_identity(),
             )
         )
     return Transaction(

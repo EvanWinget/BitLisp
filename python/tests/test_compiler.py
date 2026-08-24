@@ -35,6 +35,7 @@ from bitlisp_tools.compiler import (  # noqa: E402
     tree_hash,
 )
 from bitlisp_tools.runner import DEFAULT_MAX_COST, load_context, run_spend  # noqa: E402
+from conftest import filler_identity_json  # noqa: E402
 
 BUDGET = 11_000_000_000
 
@@ -329,9 +330,7 @@ def test_spend_pipeline_accepts_compiled_conditions():
                     "index": 0,
                     "script_pubkey": "5120" + "aa" * 32,
                     "amount": 1000,
-                    "tapleaf": "0a" * 32,
-                    "merkle_root": "0b" * 32,
-                    "internal_key": "0c" * 32,
+                    **filler_identity_json(),
                 }
             ],
             "outputs": [{"script_pubkey": "0014" + "99" * 20, "amount": 600}],

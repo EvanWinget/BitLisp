@@ -16,6 +16,7 @@ import sys
 from dataclasses import replace
 from pathlib import Path
 
+from conftest import filler_identity
 from hypothesis import assume, given, settings
 from hypothesis import strategies as st
 
@@ -112,9 +113,7 @@ def build_tx(version, locktime, inputs, outputs, conds, txid_prefix=b"\x01"):
             sequence=sequence,
             conditions=tuple(conds) if n == 0 else None,
             script_sig=script_sig,
-            tapleaf=b"\x0a" * 32,
-            merkle_root=b"\x0b" * 32,
-            internal_key=b"\x0c" * 32,
+            **filler_identity(),
         )
         for n, (txid, script_sig, sequence) in enumerate(inputs)
     )

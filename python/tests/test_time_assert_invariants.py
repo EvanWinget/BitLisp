@@ -27,6 +27,7 @@ from bitlisp.conditions import (
     LOCKTIME_THRESHOLD,
     SEQUENCE_VALUE_MAX,
 )
+from conftest import filler_identity
 from hypothesis import given
 from hypothesis import strategies as st
 
@@ -73,9 +74,7 @@ def build_tx(version, locktime, spec):
             amount=40_000 if n == 0 else 0,
             sequence=sequence,
             conditions=tuple(asserts),
-            tapleaf=b"\x0a" * 32,
-            merkle_root=b"\x0b" * 32,
-            internal_key=b"\x0c" * 32,
+            **filler_identity(),
         )
         for n, (sequence, asserts) in enumerate(spec)
     )

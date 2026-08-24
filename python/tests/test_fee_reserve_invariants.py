@@ -19,6 +19,7 @@ from bitlisp import (
     validate_transaction,
 )
 from bitlisp.conditions import ReserveFee
+from conftest import filler_identity
 from hypothesis import assume, given
 from hypothesis import strategies as st
 
@@ -47,9 +48,7 @@ def build_tx(reserve_lists_per_input, fee, extra_input=False):
             INPUT_AMOUNT,
             0xFFFFFFFF,
             tuple(ReserveFee(r) for r in reserves),
-            tapleaf=b"\x0a" * 32,
-            merkle_root=b"\x0b" * 32,
-            internal_key=b"\x0c" * 32,
+            **filler_identity(),
         )
         for txid, reserves in zip(
             (TXID_A, TXID_B), reserve_lists_per_input, strict=True
@@ -192,9 +191,7 @@ def test_merge_of_covered_reserves_is_covered(reserves_a, reserves_b, fee_1, fee
                 INPUT_AMOUNT,
                 0xFFFFFFFF,
                 tuple(ReserveFee(r) for r in reserves_b),
-                tapleaf=b"\x0a" * 32,
-                merkle_root=b"\x0b" * 32,
-                internal_key=b"\x0c" * 32,
+                **filler_identity(),
             ),
         ),
         (TxOutput(SPK_OUT, INPUT_AMOUNT - fee_2),),

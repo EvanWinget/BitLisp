@@ -16,6 +16,7 @@ import sys
 from functools import cache
 from pathlib import Path
 
+from conftest import filler_identity
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
@@ -132,9 +133,7 @@ def build_tx(coin, conds, env):
             amount=amount,
             sequence=sequence,
             conditions=tuple(conds),
-            tapleaf=b"\x0a" * 32,
-            merkle_root=b"\x0b" * 32,
-            internal_key=b"\x0c" * 32,
+            **filler_identity(),
         )
     ]
     if extra_position != "none":

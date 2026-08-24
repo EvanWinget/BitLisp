@@ -47,6 +47,7 @@ from bitlisp.conditions import (
     AssertMyTxid,
 )
 from bitlisp.secp256k1 import taproot_output_key
+from conftest import filler_identity
 from hypothesis import given
 from hypothesis import strategies as st
 
@@ -152,9 +153,7 @@ def build_tx(version, locktime, cond_lists, seq_pair, output_contents):
             amount=out_total if txid == TXID_A else 0,
             sequence=sequence,
             conditions=tuple(conditions),
-            tapleaf=b"\x0a" * 32,
-            merkle_root=b"\x0b" * 32,
-            internal_key=b"\x0c" * 32,
+            **filler_identity(),
         )
         for txid, script, sequence, conditions in (
             (TXID_A, SCRIPT_A, seq_pair[0], cond_lists[0]),

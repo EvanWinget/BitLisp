@@ -28,6 +28,11 @@ from bitlisp.conditions import (
     AssertMyTxid,
 )
 from bitlisp.secp256k1 import taproot_output_key
+from conftest import (
+    FILLER_INTERNAL_KEY,
+    FILLER_MERKLE_ROOT,
+    FILLER_TAPLEAF,
+)
 from hypothesis import given
 from hypothesis import strategies as st
 
@@ -38,8 +43,8 @@ NUMS = bytes.fromhex("50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace
 ROOT = b"\x77" * 32
 ROOT_B = b"\x78" * 32
 # The execution identity every transaction carries unless a property
-# draws one: filler no assert in the pools names.
-FILLER_IDENTITY = (b"\x0c" * 32, b"\x0b" * 32)
+# draws one: the shared corpus filler no assert in the pools names.
+FILLER_IDENTITY = (FILLER_INTERNAL_KEY, FILLER_MERKLE_ROOT)
 
 SPK_IK_ROOT = b"\x51\x20" + taproot_output_key(IK, ROOT)
 SPK_IK_PLAIN = b"\x51\x20" + taproot_output_key(IK, b"")
@@ -105,7 +110,7 @@ def build_tx(txid, index, script, amount, conds, env, identity=FILLER_IDENTITY):
             amount=amount,
             sequence=sequence,
             conditions=tuple(conds),
-            tapleaf=b"\x0a" * 32,
+            tapleaf=FILLER_TAPLEAF,
             merkle_root=merkle_root,
             internal_key=internal_key,
         )
