@@ -149,6 +149,14 @@ essay states them first.
   composition whose upstream record O35 calls thin, and Bitcoin's
   positional identity (O25) qualifies it further. The essay must not
   lean on it harder than 4.4 allows.
+- Every spend of a NUMS-keyed construction is a script-path
+  execution whose authorizations sign BitLisp's outpoint-bound
+  condition digests, not a BIP341 sighash. Shipping hardware
+  signers refuse to sign arbitrary 32-byte digests, so a
+  hardware-backed wallet cannot sign these spends until device
+  firmware understands the digest scheme, even though an
+  xpub-only watcher can assemble everything else. Phase 4 owes
+  the integration note.
 - The four design obligations were set by the same author who
   designs against them (the correlated-blind-spot item on the plan's
   risk watch-list). External implementers arrive only after Phase 5,
