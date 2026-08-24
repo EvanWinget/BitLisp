@@ -66,7 +66,6 @@ from .conditions import (
     AssertMyAmount,
     AssertMyOutpoint,
     AssertMyScriptPubKey,
-    AssertMyTaproot,
     AssertMyTaptree,
     AssertMyTxid,
     AssertSequenceHeight,
@@ -211,16 +210,11 @@ def check_self_asserts(tx):
                         f"ASSERT_MY_TXID demands {cond.txid.hex()}, "
                         f"the creating txid is {tx_input.txid.hex()}",
                     )
-            elif isinstance(cond, (AssertMyScriptPubKey, AssertMyTaproot)):
+            elif isinstance(cond, AssertMyScriptPubKey):
                 if cond.script_pubkey != tx_input.script_pubkey:
-                    name = (
-                        "ASSERT_MY_TAPROOT"
-                        if isinstance(cond, AssertMyTaproot)
-                        else "ASSERT_MY_SCRIPTPUBKEY"
-                    )
                     raise BitLispError(
                         "unsatisfied_scriptpubkey_assert",
-                        f"{name} demands "
+                        "ASSERT_MY_SCRIPTPUBKEY demands "
                         f"{cond.script_pubkey.hex() or '(empty)'}, the spent "
                         f"scriptPubKey is "
                         f"{tx_input.script_pubkey.hex() or '(empty)'}",

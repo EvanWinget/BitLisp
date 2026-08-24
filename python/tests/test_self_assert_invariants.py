@@ -4,10 +4,10 @@ Each self assert is an equality against its own input's prevout
 data, so the family's defining property is environment independence:
 the outcome is a pure function of (conditions, own prevout data) and
 nothing else in the transaction can change it. The other properties
-pin the txid-outpoint subset relation, the taproot assert's
-equivalence to a plain script assert over the derived scriptPubKey,
-and the taptree assert's indifference to the scriptPubKey plus its
-agreement with the taproot assert on an honest input. Field values
+pin the txid-outpoint subset relation and the taptree assert's
+indifference to the scriptPubKey plus its agreement, on an honest
+input, with a plain script assert over the scriptPubKey its
+operands derive. Field values
 and operands are drawn from small colliding pools so satisfied and
 unsatisfied asserts are both dense.
 """
@@ -23,7 +23,6 @@ from bitlisp.conditions import (
     AssertMyAmount,
     AssertMyOutpoint,
     AssertMyScriptPubKey,
-    AssertMyTaproot,
     AssertMyTaptree,
     AssertMyTxid,
 )
@@ -46,9 +45,15 @@ ROOT_B = b"\x78" * 32
 # draws one: the shared corpus filler no assert in the pools names.
 FILLER_IDENTITY = (FILLER_INTERNAL_KEY, FILLER_MERKLE_ROOT)
 
-SPK_IK_ROOT = b"\x51\x20" + taproot_output_key(IK, ROOT)
+# (internal key, merkle root) pairs, drawn both as the input's own
+# identity and as taptree operands, so the two collide often.
+IDENTITIES = ((IK, ROOT), (IK, ROOT_B), (NUMS, ROOT))
+# Derived once: the tweak is the one expensive step in this module,
+# and the pools are fixed, so nothing recomputes it per example.
+HONEST_SPKS = {pair: b"\x51\x20" + taproot_output_key(*pair) for pair in IDENTITIES}
+SPK_IK_ROOT = HONEST_SPKS[(IK, ROOT)]
 SPK_IK_PLAIN = b"\x51\x20" + taproot_output_key(IK, b"")
-SPK_NUMS_ROOT = b"\x51\x20" + taproot_output_key(NUMS, ROOT)
+SPK_NUMS_ROOT = HONEST_SPKS[(NUMS, ROOT)]
 SPK_P2WSH_TWIN = b"\x00\x20" + SPK_IK_ROOT[2:]
 
 txids = st.sampled_from((TXID_A, TXID_B))
@@ -57,9 +62,6 @@ scripts = st.sampled_from(
     (b"", b"\x51", SPK_IK_ROOT, SPK_IK_PLAIN, SPK_NUMS_ROOT, SPK_P2WSH_TWIN)
 )
 amounts = st.sampled_from((0, 1, 50_000, 50_000 + 2**32, 2_100_000_000_000_000))
-# (internal key, merkle root) pairs, drawn both as the input's own
-# identity and as taptree operands, so the two collide often.
-IDENTITIES = ((IK, ROOT), (IK, ROOT_B), (NUMS, ROOT))
 identities = st.sampled_from(IDENTITIES)
 
 
@@ -67,21 +69,11 @@ def _outpoint(txid, index):
     return txid + index.to_bytes(4, "little")
 
 
-def _taproot(internal_key, merkle_root):
-    spk = b"\x51\x20" + taproot_output_key(internal_key, merkle_root)
-    return AssertMyTaproot(internal_key, merkle_root, spk)
-
-
-# Derived once: the tweak is the one expensive step in this module,
-# and the pools are fixed, so no property recomputes it per example.
-TAPROOT_ASSERTS = {pair: _taproot(*pair) for pair in (*IDENTITIES, (IK, b""))}
-
 self_asserts = st.one_of(
     st.tuples(txids, indexes).map(lambda t: AssertMyOutpoint(_outpoint(*t))),
     txids.map(AssertMyTxid),
     scripts.map(AssertMyScriptPubKey),
     amounts.map(AssertMyAmount),
-    st.sampled_from(tuple(TAPROOT_ASSERTS.values())),
     identities.map(lambda t: AssertMyTaptree(*t)),
 )
 cond_lists = st.lists(self_asserts, max_size=4)
@@ -180,7 +172,7 @@ def test_single_assert_outcome_matches_field_equality(
     elif isinstance(cond, AssertMyTxid):
         satisfied = cond.txid == txid
         error = "unsatisfied_outpoint_assert"
-    elif isinstance(cond, (AssertMyScriptPubKey, AssertMyTaproot)):
+    elif isinstance(cond, AssertMyScriptPubKey):
         satisfied = cond.script_pubkey == script
         error = "unsatisfied_scriptpubkey_assert"
     elif isinstance(cond, AssertMyTaptree):
@@ -208,43 +200,22 @@ def test_taptree_assert_ignores_scriptpubkey(
 
 
 @given(txids, indexes, amounts, identities, identities, environments)
-def test_taptree_assert_agrees_with_taproot_assert_on_honest_input(
+def test_taptree_assert_agrees_with_derived_script_assert_on_honest_input(
     txid, index, amount, identity, operands, env
 ):
     """On an input whose scriptPubKey is the taproot output of its
     own identity, the shape every input base consensus admits has,
-    ASSERT_MY_TAPTREE and ASSERT_MY_TAPROOT over equal operands are
-    satisfied together and fail together. The pools hold no two
-    pairs deriving one output key, so the collision exemption never
-    fires here."""
-    honest = TAPROOT_ASSERTS[identity].script_pubkey
+    ASSERT_MY_TAPTREE over an operand pair and ASSERT_MY_SCRIPTPUBKEY
+    over the scriptPubKey that pair derives are satisfied together:
+    the BIP341 tweak derivation is the taptree assert's oracle. The
+    pools hold no two pairs deriving one output key, so the
+    collision exemption never fires here."""
+    honest = HONEST_SPKS[identity]
     taptree = AssertMyTaptree(*operands)
-    taproot = TAPROOT_ASSERTS[operands]
+    plain = AssertMyScriptPubKey(HONEST_SPKS[operands])
     got_taptree = outcome(
         build_tx(txid, index, honest, amount, [taptree], env, identity)
     )
-    got_taproot = outcome(
-        build_tx(txid, index, honest, amount, [taproot], env, identity)
-    )
-    assert (got_taptree is None) == (got_taproot is None)
+    got_plain = outcome(build_tx(txid, index, honest, amount, [plain], env, identity))
+    assert (got_taptree is None) == (got_plain is None)
     assert (got_taptree is None) == (operands == identity)
-
-
-@given(
-    txids,
-    indexes,
-    scripts,
-    amounts,
-    st.sampled_from(((IK, ROOT), (IK, b""), (NUMS, ROOT))),
-    environments,
-)
-def test_taproot_assert_equals_script_assert_on_derived_spk(
-    txid, index, script, amount, components, env
-):
-    """ASSERT_MY_TAPROOT behaves exactly like ASSERT_MY_SCRIPTPUBKEY
-    over the scriptPubKey its components derive."""
-    taproot = _taproot(*components)
-    plain = AssertMyScriptPubKey(taproot.script_pubkey)
-    got_taproot = outcome(build_tx(txid, index, script, amount, [taproot], env))
-    got_plain = outcome(build_tx(txid, index, script, amount, [plain], env))
-    assert got_taproot == got_plain

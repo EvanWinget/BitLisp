@@ -578,7 +578,8 @@ million for the taptree assert, the signature assert, the seal,
 and the two output claims. Through the single-spend runner the
 first spend totals 4,167,737, a later generation 4,245,698, and
 the ending spend 4,262,797, each exactly 1,300,000 below the same
-spend under ASSERT_MY_TAPROOT: the taptree assert reads the
+spend under ASSERT_MY_TAPROOT, the derivation assert decision
+29 has since removed: the taptree assert reads the
 identity base consensus authenticated from the control block
 instead of re-deriving the coin's scriptPubKey.
 

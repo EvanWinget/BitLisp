@@ -145,7 +145,6 @@ def _condition_json(cond):
         AssertMyAmount,
         AssertMyOutpoint,
         AssertMyScriptPubKey,
-        AssertMyTaproot,
         AssertMyTaptree,
         AssertMyTxid,
         AssertSequenceHeight,
@@ -198,13 +197,6 @@ def _condition_json(cond):
         return {"opcode": cond.opcode, "script_pubkey": cond.script_pubkey.hex()}
     if isinstance(cond, AssertMyAmount):
         return {"opcode": cond.opcode, "amount": cond.amount}
-    if isinstance(cond, AssertMyTaproot):
-        return {
-            "opcode": cond.opcode,
-            "internal_key": cond.internal_key.hex(),
-            "merkle_root": cond.merkle_root.hex(),
-            "script_pubkey": cond.script_pubkey.hex(),
-        }
     if isinstance(cond, AssertMyTaptree):
         return {
             "opcode": cond.opcode,
@@ -281,10 +273,7 @@ def run_conditions_case(case):
 
     The self asserts pin {"opcode"} plus their operand under its
     entry's name ("outpoint", "txid", "script_pubkey", "amount"),
-    amounts as integers, bytes as hex. ASSERT_MY_TAPROOT pins
-    {"opcode", "internal_key", "merkle_root", "script_pubkey"} with
-    script_pubkey the derived taproot script, exactly as
-    CREATE_OUTPUT_TAPROOT pins it. ASSERT_MY_TAPTREE pins
+    amounts as integers, bytes as hex. ASSERT_MY_TAPTREE pins
     {"opcode", "internal_key", "merkle_root"}, its two operands and
     nothing derived.
 

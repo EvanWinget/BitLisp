@@ -79,7 +79,6 @@ CONDITION_TABLE_ROWS = [
     (0x31, "ASSERT_MY_TXID"),
     (0x32, "ASSERT_MY_SCRIPTPUBKEY"),
     (0x33, "ASSERT_MY_AMOUNT"),
-    (0x37, "ASSERT_MY_TAPROOT"),
     (0x38, "ASSERT_MY_TAPTREE"),
     (0x40, "ANNOUNCE"),
     (0x41, "ASSERT_ANNOUNCEMENT"),
@@ -92,7 +91,7 @@ CONDITION_TABLE_ROWS = [
 
 
 def test_condition_constants_match_spec_table():
-    assert len(CONDITION_TABLE_ROWS) == 27
+    assert len(CONDITION_TABLE_ROWS) == 26
     assert CONDITION_CONSTANTS == {
         name: int_to_atom(opcode) for opcode, name in CONDITION_TABLE_ROWS
     }

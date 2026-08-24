@@ -177,104 +177,6 @@
    }
   },
   {
-   "name": "taproot_parses_empty_root",
-   "conditions": "ffff37ffa0d6889cb081036e0faefa3a35157ad71086b123b2b144b649798b494c300a961dff808080",
-   "expect": {
-    "parsed": [
-     {
-      "opcode": 55,
-      "internal_key": "d6889cb081036e0faefa3a35157ad71086b123b2b144b649798b494c300a961d",
-      "merkle_root": "",
-      "script_pubkey": "512053a1f6e454df1aa2776a2814a721372d6258050de330b3c6d10ee8f4e0dda343"
-     }
-    ]
-   }
-  },
-  {
-   "name": "taproot_parses_with_root",
-   "conditions": "ffff37ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b218080",
-   "expect": {
-    "parsed": [
-     {
-      "opcode": 55,
-      "internal_key": "187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27",
-      "merkle_root": "5b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b21",
-      "script_pubkey": "5120147c9c57132f6e7ecddba9800bb0c4449251c92a1e60371ee77557b6620f3ea3"
-     }
-    ]
-   }
-  },
-  {
-   "name": "taproot_internal_key_not_on_curve",
-   "conditions": "ffff37ffa00000000000000000000000000000000000000000000000000000000000000000ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b218080",
-   "expect": {
-    "error": "bad_condition_arg"
-   }
-  },
-  {
-   "name": "taproot_internal_key_31_bytes",
-   "conditions": "ffff37ff9f187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cfffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b218080",
-   "expect": {
-    "error": "bad_condition_arg"
-   }
-  },
-  {
-   "name": "taproot_root_31_bytes",
-   "conditions": "ffff37ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ff9f5b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b8080",
-   "expect": {
-    "error": "bad_condition_arg"
-   }
-  },
-  {
-   "name": "taproot_arity_one",
-   "conditions": "ffff37ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf278080",
-   "expect": {
-    "error": "bad_condition_arity"
-   }
-  },
-  {
-   "name": "taproot_arity_three",
-   "conditions": "ffff37ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b21ff018080",
-   "expect": {
-    "error": "bad_condition_arity"
-   }
-  },
-  {
-   "name": "taproot_internal_key_33_bytes",
-   "conditions": "ffff37ffa1187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf2700ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b218080",
-   "expect": {
-    "error": "bad_condition_arg"
-   }
-  },
-  {
-   "name": "taproot_internal_key_not_canonical",
-   "conditions": "ffff37ffa0fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2fffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b218080",
-   "expect": {
-    "error": "bad_condition_arg"
-   }
-  },
-  {
-   "name": "taproot_root_1_byte",
-   "conditions": "ffff37ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ff018080",
-   "expect": {
-    "error": "bad_condition_arg"
-   }
-  },
-  {
-   "name": "taproot_internal_key_is_pair",
-   "conditions": "ffff37ffffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf2780ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b218080",
-   "expect": {
-    "error": "bad_condition_arg"
-   }
-  },
-  {
-   "name": "taproot_root_is_pair",
-   "conditions": "ffff37ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b21808080",
-   "expect": {
-    "error": "bad_condition_arg"
-   }
-  },
-  {
    "name": "taptree_parses",
    "conditions": "ffff38ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b218080",
    "expect": {
@@ -401,6 +303,13 @@
   {
    "name": "gap_0x36_invalid",
    "conditions": "ffff36ffa011111111111111111111111111111111111111111111111111111111111111118080",
+   "expect": {
+    "error": "bad_condition_opcode"
+   }
+  },
+  {
+   "name": "gap_0x37_invalid",
+   "conditions": "ffff37ffa011111111111111111111111111111111111111111111111111111111111111118080",
    "expect": {
     "error": "bad_condition_opcode"
    }

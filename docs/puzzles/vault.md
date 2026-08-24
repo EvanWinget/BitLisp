@@ -353,7 +353,8 @@ spend with no revault costs 4,054,131 and one with a revault
 claim 6,704,696, a keyless recovery 1,407,940, a matured
 withdrawal 49,468, a consolidation leader with two followers
 1,418,898, and a follower 57,496. Each is exactly 1,300,000 below
-the same spend under ASSERT_MY_TAPROOT, the point multiplication
+the same spend under ASSERT_MY_TAPROOT, the derivation assert decision 29
+has since removed, the point multiplication
 the taptree assert does not run because base consensus already
 authenticated the identity it reads. The condition charge itself
 is 200 against 1,300,200, and a minimal spend emitting one
