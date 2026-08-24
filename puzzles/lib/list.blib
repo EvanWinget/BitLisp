@@ -11,4 +11,26 @@
   ; The element at INDEX, raising past the end of the list.
   (defun nth (ITEMS INDEX)
     (if INDEX (nth (r ITEMS) (- INDEX 1)) (f ITEMS)))
+
+  ; LEFT's items in order, then RIGHT as the tail as given, so an
+  ; improper tail survives.
+  (defun append (LEFT RIGHT)
+    (if LEFT (c (f LEFT) (append (r LEFT) RIGHT)) RIGHT))
+
+  ; The accumulator helper owns its generic name under the
+  ; one-namespace rule, as every name in this file does.
+  (defun reverse-onto (ITEMS ONTO)
+    (if ITEMS (reverse-onto (r ITEMS) (c (f ITEMS) ONTO)) ONTO))
+
+  (defun reverse (ITEMS)
+    (reverse-onto ITEMS ()))
+
+  ; The integer sum of the items, 0 for the empty list.
+  (defun sum (ITEMS)
+    (if ITEMS (+ (f ITEMS) (sum (r ITEMS))) 0))
+
+  ; The final item, raising on the empty list as nth raises past
+  ; the end.
+  (defun last (ITEMS)
+    (if (r ITEMS) (last (r ITEMS)) (f ITEMS)))
 )
