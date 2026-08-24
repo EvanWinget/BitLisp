@@ -592,202 +592,6 @@
    }
   },
   {
-   "name": "taproot_satisfied_bip341_tree",
-   "tx": {
-    "version": 2,
-    "locktime": 0,
-    "inputs": [
-     {
-      "txid": "1111111111111111111111111111111111111111111111111111111111111111",
-      "index": 1,
-      "script_pubkey": "5120147c9c57132f6e7ecddba9800bb0c4449251c92a1e60371ee77557b6620f3ea3",
-      "amount": 50000,
-      "conditions": "ffff37ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b218080",
-      "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
-      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
-      "internal_key": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c"
-     }
-    ],
-    "outputs": [
-     {
-      "script_pubkey": "0014bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "amount": 40000
-     }
-    ]
-   },
-   "expect": {
-    "valid": true
-   }
-  },
-  {
-   "name": "taproot_satisfied_bip341_no_tree",
-   "tx": {
-    "version": 2,
-    "locktime": 0,
-    "inputs": [
-     {
-      "txid": "1111111111111111111111111111111111111111111111111111111111111111",
-      "index": 1,
-      "script_pubkey": "512053a1f6e454df1aa2776a2814a721372d6258050de330b3c6d10ee8f4e0dda343",
-      "amount": 50000,
-      "conditions": "ffff37ffa0d6889cb081036e0faefa3a35157ad71086b123b2b144b649798b494c300a961dff808080",
-      "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
-      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
-      "internal_key": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c"
-     }
-    ],
-    "outputs": [
-     {
-      "script_pubkey": "0014bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "amount": 40000
-     }
-    ]
-   },
-   "expect": {
-    "valid": true
-   }
-  },
-  {
-   "name": "taproot_wrong_root",
-   "tx": {
-    "version": 2,
-    "locktime": 0,
-    "inputs": [
-     {
-      "txid": "1111111111111111111111111111111111111111111111111111111111111111",
-      "index": 1,
-      "script_pubkey": "5120147c9c57132f6e7ecddba9800bb0c4449251c92a1e60371ee77557b6620f3ea3",
-      "amount": 50000,
-      "conditions": "ffff37ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa099999999999999999999999999999999999999999999999999999999999999998080",
-      "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
-      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
-      "internal_key": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c"
-     }
-    ],
-    "outputs": [
-     {
-      "script_pubkey": "0014bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "amount": 40000
-     }
-    ]
-   },
-   "expect": {
-    "error": "unsatisfied_scriptpubkey_assert"
-   }
-  },
-  {
-   "name": "taproot_vs_non_taproot_prevout",
-   "tx": {
-    "version": 2,
-    "locktime": 0,
-    "inputs": [
-     {
-      "txid": "1111111111111111111111111111111111111111111111111111111111111111",
-      "index": 1,
-      "script_pubkey": "0014bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "amount": 50000,
-      "conditions": "ffff37ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b218080",
-      "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
-      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
-      "internal_key": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c"
-     }
-    ],
-    "outputs": [
-     {
-      "script_pubkey": "0014bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "amount": 40000
-     }
-    ]
-   },
-   "expect": {
-    "error": "unsatisfied_scriptpubkey_assert"
-   }
-  },
-  {
-   "name": "taproot_prefix_vs_p2wsh_sharing_key",
-   "tx": {
-    "version": 2,
-    "locktime": 0,
-    "inputs": [
-     {
-      "txid": "1111111111111111111111111111111111111111111111111111111111111111",
-      "index": 1,
-      "script_pubkey": "0020147c9c57132f6e7ecddba9800bb0c4449251c92a1e60371ee77557b6620f3ea3",
-      "amount": 50000,
-      "conditions": "ffff37ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b218080",
-      "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
-      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
-      "internal_key": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c"
-     }
-    ],
-    "outputs": [
-     {
-      "script_pubkey": "0014bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "amount": 40000
-     }
-    ]
-   },
-   "expect": {
-    "error": "unsatisfied_scriptpubkey_assert"
-   }
-  },
-  {
-   "name": "taproot_vs_bare_key_prevout",
-   "tx": {
-    "version": 2,
-    "locktime": 0,
-    "inputs": [
-     {
-      "txid": "1111111111111111111111111111111111111111111111111111111111111111",
-      "index": 1,
-      "script_pubkey": "147c9c57132f6e7ecddba9800bb0c4449251c92a1e60371ee77557b6620f3ea3",
-      "amount": 50000,
-      "conditions": "ffff37ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b218080",
-      "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
-      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
-      "internal_key": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c"
-     }
-    ],
-    "outputs": [
-     {
-      "script_pubkey": "0014bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "amount": 40000
-     }
-    ]
-   },
-   "expect": {
-    "error": "unsatisfied_scriptpubkey_assert"
-   }
-  },
-  {
-   "name": "taproot_nums_internal_key_satisfied",
-   "tx": {
-    "version": 2,
-    "locktime": 0,
-    "inputs": [
-     {
-      "txid": "1111111111111111111111111111111111111111111111111111111111111111",
-      "index": 1,
-      "script_pubkey": "5120e7f7a8924eaeafddb971a1d05801ce9b0ec566963a21e04f7d52bef66ee593ec",
-      "amount": 50000,
-      "conditions": "ffff37ffa050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b218080",
-      "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
-      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
-      "internal_key": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c"
-     }
-    ],
-    "outputs": [
-     {
-      "script_pubkey": "0014bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "amount": 40000
-     }
-    ]
-   },
-   "expect": {
-    "valid": true
-   }
-  },
-  {
    "name": "taptree_satisfied",
    "tx": {
     "version": 2,
@@ -911,34 +715,6 @@
       "script_pubkey": "0014bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
       "amount": 50000,
       "conditions": "ffff38ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b218080",
-      "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
-      "merkle_root": "5b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b21",
-      "internal_key": "187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27"
-     }
-    ],
-    "outputs": [
-     {
-      "script_pubkey": "0014bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "amount": 40000
-     }
-    ]
-   },
-   "expect": {
-    "valid": true
-   }
-  },
-  {
-   "name": "taptree_agrees_with_taproot_on_honest_spk",
-   "tx": {
-    "version": 2,
-    "locktime": 0,
-    "inputs": [
-     {
-      "txid": "1111111111111111111111111111111111111111111111111111111111111111",
-      "index": 1,
-      "script_pubkey": "5120147c9c57132f6e7ecddba9800bb0c4449251c92a1e60371ee77557b6620f3ea3",
-      "amount": 50000,
-      "conditions": "ffff38ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b2180ffff37ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b218080",
       "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
       "merkle_root": "5b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b21",
       "internal_key": "187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27"
@@ -1088,7 +864,7 @@
    }
   },
   {
-   "name": "covenant_verify_then_recreate",
+   "name": "taptree_covenant_recreation_missing",
    "tx": {
     "version": 2,
     "locktime": 0,
@@ -1098,38 +874,10 @@
       "index": 1,
       "script_pubkey": "5120147c9c57132f6e7ecddba9800bb0c4449251c92a1e60371ee77557b6620f3ea3",
       "amount": 50000,
-      "conditions": "ffff37ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b2180ffff02ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b21ff83009c408080",
+      "conditions": "ffff38ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b2180ffff02ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b21ff83009c408080",
       "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
-      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
-      "internal_key": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c"
-     }
-    ],
-    "outputs": [
-     {
-      "script_pubkey": "5120147c9c57132f6e7ecddba9800bb0c4449251c92a1e60371ee77557b6620f3ea3",
-      "amount": 40000
-     }
-    ]
-   },
-   "expect": {
-    "valid": true
-   }
-  },
-  {
-   "name": "covenant_recreation_missing",
-   "tx": {
-    "version": 2,
-    "locktime": 0,
-    "inputs": [
-     {
-      "txid": "1111111111111111111111111111111111111111111111111111111111111111",
-      "index": 1,
-      "script_pubkey": "5120147c9c57132f6e7ecddba9800bb0c4449251c92a1e60371ee77557b6620f3ea3",
-      "amount": 50000,
-      "conditions": "ffff37ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b2180ffff02ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b21ff83009c408080",
-      "tapleaf": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
-      "merkle_root": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
-      "internal_key": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c"
+      "merkle_root": "5b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b21",
+      "internal_key": "187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27"
      }
     ],
     "outputs": [
