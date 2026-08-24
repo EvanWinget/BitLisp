@@ -45,9 +45,15 @@ ROOT_B = b"\x78" * 32
 # draws one: the shared corpus filler no assert in the pools names.
 FILLER_IDENTITY = (FILLER_INTERNAL_KEY, FILLER_MERKLE_ROOT)
 
-SPK_IK_ROOT = b"\x51\x20" + taproot_output_key(IK, ROOT)
+# (internal key, merkle root) pairs, drawn both as the input's own
+# identity and as taptree operands, so the two collide often.
+IDENTITIES = ((IK, ROOT), (IK, ROOT_B), (NUMS, ROOT))
+# Derived once: the tweak is the one expensive step in this module,
+# and the pools are fixed, so nothing recomputes it per example.
+HONEST_SPKS = {pair: b"\x51\x20" + taproot_output_key(*pair) for pair in IDENTITIES}
+SPK_IK_ROOT = HONEST_SPKS[(IK, ROOT)]
 SPK_IK_PLAIN = b"\x51\x20" + taproot_output_key(IK, b"")
-SPK_NUMS_ROOT = b"\x51\x20" + taproot_output_key(NUMS, ROOT)
+SPK_NUMS_ROOT = HONEST_SPKS[(NUMS, ROOT)]
 SPK_P2WSH_TWIN = b"\x00\x20" + SPK_IK_ROOT[2:]
 
 txids = st.sampled_from((TXID_A, TXID_B))
@@ -56,19 +62,12 @@ scripts = st.sampled_from(
     (b"", b"\x51", SPK_IK_ROOT, SPK_IK_PLAIN, SPK_NUMS_ROOT, SPK_P2WSH_TWIN)
 )
 amounts = st.sampled_from((0, 1, 50_000, 50_000 + 2**32, 2_100_000_000_000_000))
-# (internal key, merkle root) pairs, drawn both as the input's own
-# identity and as taptree operands, so the two collide often.
-IDENTITIES = ((IK, ROOT), (IK, ROOT_B), (NUMS, ROOT))
 identities = st.sampled_from(IDENTITIES)
 
 
 def _outpoint(txid, index):
     return txid + index.to_bytes(4, "little")
 
-
-# Derived once: the tweak is the one expensive step in this module,
-# and the pools are fixed, so no property recomputes it per example.
-HONEST_SPKS = {pair: b"\x51\x20" + taproot_output_key(*pair) for pair in IDENTITIES}
 
 self_asserts = st.one_of(
     st.tuples(txids, indexes).map(lambda t: AssertMyOutpoint(_outpoint(*t))),

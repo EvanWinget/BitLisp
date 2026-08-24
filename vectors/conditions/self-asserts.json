@@ -177,13 +177,6 @@
    }
   },
   {
-   "name": "gap_0x37_invalid",
-   "conditions": "ffff37ffa011111111111111111111111111111111111111111111111111111111111111118080",
-   "expect": {
-    "error": "bad_condition_opcode"
-   }
-  },
-  {
    "name": "taptree_parses",
    "conditions": "ffff38ffa0187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27ffa05b75adecf53548f3ec6ad7d78383bf84cc57b55a3127c72b9a2481752dd88b218080",
    "expect": {
@@ -310,6 +303,13 @@
   {
    "name": "gap_0x36_invalid",
    "conditions": "ffff36ffa011111111111111111111111111111111111111111111111111111111111111118080",
+   "expect": {
+    "error": "bad_condition_opcode"
+   }
+  },
+  {
+   "name": "gap_0x37_invalid",
+   "conditions": "ffff37ffa011111111111111111111111111111111111111111111111111111111111111118080",
    "expect": {
     "error": "bad_condition_opcode"
    }

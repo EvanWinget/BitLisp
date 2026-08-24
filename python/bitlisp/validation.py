@@ -214,7 +214,7 @@ def check_self_asserts(tx):
                 if cond.script_pubkey != tx_input.script_pubkey:
                     raise BitLispError(
                         "unsatisfied_scriptpubkey_assert",
-                        f"ASSERT_MY_SCRIPTPUBKEY demands "
+                        "ASSERT_MY_SCRIPTPUBKEY demands "
                         f"{cond.script_pubkey.hex() or '(empty)'}, the spent "
                         f"scriptPubKey is "
                         f"{tx_input.script_pubkey.hex() or '(empty)'}",

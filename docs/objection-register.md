@@ -119,6 +119,9 @@ Phase 4:
 - O20, the measured cost schedule and the weight mapping.
 - O21, derived versus committed budget.
 - O28, the witness-byte cost of computed-over-context claims.
+- The hardware-signer digest scheme (section 5): whether and how a
+  signing device learns the outpoint-bound condition digests, the
+  integration note.
 
 Phase 5:
 - O6, the covenant vocabulary and the per-construct termination

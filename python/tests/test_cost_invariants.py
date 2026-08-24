@@ -41,8 +41,9 @@ def cond(opcode, *args):
     return clist(bytes([opcode]), *args)
 
 
-# One well-formed condition per cost tier, plus a second generic
-# and a reserved declaration off the floor.
+# One well-formed condition per cost tier, the generic tier drawn
+# three times (an amount assert, a time assert, and the identity
+# assert), and a reserved declaration off the floor.
 MENU = (
     cond(0x33, int_to_atom(1000)),
     cond(0x20, int_to_atom(800_000)),

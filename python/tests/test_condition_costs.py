@@ -32,10 +32,6 @@ from bitlisp.sexp import NIL, int_to_atom  # noqa: E402
 # An x above the field prime lifts to no curve point, so this key
 # passes every width check and fails the derivation.
 BAD_INTERNAL_KEY = b"\xff" * 32
-# A generator-point x, always liftable.
-GOOD_INTERNAL_KEY = bytes.fromhex(
-    "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
-)
 
 
 def clist(*items):

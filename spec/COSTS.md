@@ -333,7 +333,7 @@ Condition costs accrue on the same per-input budget as evaluation
 cost, under the accounting and charge order of VALIDATION.md rule
 5: for each condition in list order, every encoding check first,
 then the condition's whole cost as one checked charge, then, for
-the two derivation entries, the point derivation. The budget is
+the derivation entry, the point derivation. The budget is
 inclusive and bursting it raises `cost_exceeded`, the VM budget
 semantics unchanged.
 
