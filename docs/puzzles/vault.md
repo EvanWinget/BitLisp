@@ -349,14 +349,16 @@ $ bitlisp-compile puzzles/vault/vault.bl -I puzzles/lib -I puzzles/vault \
 
 Measured through the single-spend runner at the provisional
 constants, evaluation and condition charges together: a trigger
-spend costs 4,054,131, a keyless recovery 1,407,940, a matured
+spend with no revault costs 4,054,131 and one with a revault
+claim 6,704,696, a keyless recovery 1,407,940, a matured
 withdrawal 49,468, a consolidation leader with two followers
 1,418,898, and a follower 57,496. Each is exactly 1,300,000 below
 the same spend under ASSERT_MY_TAPROOT, the point multiplication
 the taptree assert does not run because base consensus already
-authenticated the identity it reads. A condition list carrying
-one identity assert and nothing else parses at 220 against
-1,300,220.
+authenticated the identity it reads. The condition charge itself
+is 200 against 1,300,200, and a minimal spend emitting one
+identity assert and nothing else runs at 220 against 1,300,220
+through evaluation and parsing together.
 
 The compiled representatives, one per spend path with the
 in-program guard failures and the malformed instances, are pinned
