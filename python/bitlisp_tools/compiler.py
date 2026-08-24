@@ -555,6 +555,15 @@ def _proper_list(*nodes):
     return result
 
 
+def _cons_onto(compiled, tail):
+    """The cons chain the two list forms share: each compiled item
+    in order, ending in tail, nil for a proper list."""
+    result = tail
+    for item in reversed(compiled):
+        result = _proper_list(_CONS, item, result)
+    return result
+
+
 def _lazy_if(condition, then_branch, else_branch):
     """The lazy branch idiom every branching form compiles through.
     The VM's i evaluates all three arguments, so the branches
@@ -710,10 +719,8 @@ class _Compilation:
 
     def _list(self, head, tail, bindings):
         items = _proper_items(tail, _LIST, head.offset)
-        result = NIL
-        for item in reversed(items):
-            result = _proper_list(_CONS, self.expression(item, bindings), result)
-        return result
+        compiled = [self.expression(item, bindings) for item in items]
+        return _cons_onto(compiled, NIL)
 
     def _list_star(self, head, tail, bindings):
         # The last argument is the tail the others cons onto, so
@@ -723,10 +730,7 @@ class _Compilation:
         if not items:
             raise CompileError("list* takes items and a final tail", head.offset)
         compiled = [self.expression(item, bindings) for item in items]
-        result = compiled[-1]
-        for item in reversed(compiled[:-1]):
-            result = _proper_list(_CONS, item, result)
-        return result
+        return _cons_onto(compiled[:-1], compiled[-1])
 
     def _assert(self, head, tail, bindings):
         items = _proper_items(tail, _ASSERT, head.offset)
@@ -769,17 +773,20 @@ class _Compilation:
         per binding, the hand-written naming helper's price.
 
         Every enclosing binding is re-rooted under the rebuilt
-        environment's tail. The rewrite leans on two invariants:
-        a compiled expression that is a non-nil atom is always an
+        environment's tail. The rewrite leans on two invariants,
+        the first enforced below: with a function tree every
+        binding path descends the argument side, path 3, because
+        parameters never bind into the tree at path 2, and a
+        compiled expression that is a non-nil atom is always an
         environment path, because value atoms quote themselves
-        into pairs, and with a function tree every binding path
-        descends the argument side, path 3, because parameters
-        never bind into the tree at path 2. A pair-valued binding,
-        an inline call-by-name substitution, is an arbitrary
-        expression meaningful only in the enclosing environment,
-        so each reference re-applies it against that environment
-        rebuilt from the tail, keeping the inline contract: used
-        twice evaluates twice, unused never evaluates."""
+        into pairs. A quote-headed binding evaluates the same
+        under any environment and passes through unchanged. Any
+        other pair-valued binding, an inline call-by-name
+        substitution, is an arbitrary expression meaningful only
+        in the enclosing environment, so each reference re-applies
+        it against that environment rebuilt from the tail, keeping
+        the inline contract: used twice evaluates twice, unused
+        never evaluates."""
         items = _proper_items(tail, _LET, head.offset)
         if len(items) != 2:
             raise CompileError("let takes bindings and a body", head.offset)
@@ -791,13 +798,16 @@ class _Compilation:
             # instead of complaining about the argument list.
             entry = _proper_items(node[0], "a let binding") if is_pair(node[0]) else []
             if len(entry) != 2 or not isinstance(entry[0], Symbol):
+                symbol = first_symbol(node[0])
                 raise CompileError(
-                    "a let binding takes a name and a value", head.offset
+                    "a let binding takes a name and a value",
+                    head.offset if symbol is None else symbol.offset,
                 )
             entries.append(entry)
             node = node[1]
         if node != NIL:
-            raise CompileError("let takes a binding list", head.offset)
+            offset = node.offset if isinstance(node, Symbol) else head.offset
+            raise CompileError("let takes a binding list", offset)
         if not entries:
             return self.expression(items[1], bindings)
         has_tree = bool(self.fn_paths)
@@ -805,15 +815,15 @@ class _Compilation:
         # environment and the bound names root at path 3 of the new
         # one. Bare, both are the whole environment, path 1.
         root = _RIGHT if has_tree else _TOP
-        seen = {}
+        bound_paths = {}
         values = []
         tail_path = root
         for symbol, value in entries:
             name = _check_name(symbol, "binding")
-            if name in seen:
+            if name in bound_paths:
                 raise CompileError(f"duplicate binding {name!r}", symbol.offset)
             values.append(self.expression(value, bindings))
-            seen[name] = int_to_atom(_compose(tail_path, _LEFT))
+            bound_paths[name] = int_to_atom(_compose(tail_path, _LEFT))
             tail_path = _compose(tail_path, _RIGHT)
         rebound = {}
         for name, bound in bindings.items():
@@ -822,10 +832,21 @@ class _Compilation:
             elif is_atom(bound):
                 path = atom_to_int(bound)
                 if has_tree:
+                    if path < _RIGHT or not path & 1:
+                        # The enforced invariant: a bare atom that
+                        # does not descend the argument side is not
+                        # a binding path, and rewriting it would
+                        # miscompile, so refuse loudly instead.
+                        raise AssertionError(
+                            f"binding path {path} is not under the arguments"
+                        )
                     # Drop the leading rest step: the path continues
                     # from the old arguments, which the tail reaches.
                     path >>= 1
                 rebound[name] = int_to_atom(_compose(tail_path, path))
+            elif is_atom(bound[0]) and bound[0] == _QUOTE:
+                # A quoted node is environment independent.
+                rebound[name] = bound
             else:
                 if has_tree:
                     environment = _proper_list(
@@ -834,7 +855,7 @@ class _Compilation:
                 else:
                     environment = int_to_atom(tail_path)
                 rebound[name] = _proper_list(_APPLY, _quote(bound), environment)
-        rebound.update(seen)
+        rebound.update(bound_paths)
         body = self.expression(items[1], rebound)
         rest = int_to_atom(root)
         for value in reversed(values):

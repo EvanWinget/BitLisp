@@ -362,6 +362,20 @@ def test_let_inside_an_inline_body_keeps_call_by_name():
     assert result == int_to_atom(7)
 
 
+def test_let_passes_quoted_inline_bindings_through():
+    # A quoted node evaluates the same under any environment, so a
+    # literal-valued inline substitution crosses a let unwrapped
+    # instead of paying a restore-apply per reference.
+    source = """(program (X)
+        (defun-inline plus (V) (let ((A 3)) (+ V A)))
+        (plus 5))"""
+    program, _, result = _run_program(source, "()")
+    assert result == int_to_atom(8)
+    text = disassemble(program)
+    assert "(q . 5)" in text
+    assert "(a (q 1 . 5)" not in text
+
+
 def test_let_inside_a_defconstant_value():
     source = """(program ()
         (defconstant K (let ((A (+ 20 1))) (* A 2)))
