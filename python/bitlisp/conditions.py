@@ -512,8 +512,9 @@ def _parse_create_output(args):
 def _fixed_width_atom(atom, what, size):
     """An atom operand of exactly size bytes, else bad_condition_arg.
     The one rule behind every 32-byte identity operand (txids, keys,
-    leaf hashes, roots, seal digests) and the 36-byte outpoint, so
-    the operands that share a domain share it in code."""
+    leaf hashes, roots, seal digests), the 36-byte outpoint, and the
+    64-byte signature, so the operands that share a domain share it
+    in code."""
     if not is_atom(atom):
         raise BitLispError("bad_condition_arg", f"{what} must be an atom")
     if len(atom) != size:
@@ -659,22 +660,9 @@ def _parse_assert_sig(opcode, args):
             "bad_condition_arity", f"{name} takes 3 arguments, got {len(args)}"
         )
     pubkey, message, signature = args
-    if not is_atom(pubkey):
-        raise BitLispError("bad_condition_arg", f"{name} pubkey must be an atom")
-    if len(pubkey) != SIG_PUBKEY_SIZE:
-        raise BitLispError(
-            "bad_condition_arg",
-            f"{name} pubkey must be {SIG_PUBKEY_SIZE} bytes, got {len(pubkey)}",
-        )
+    pubkey = _fixed_width_atom(pubkey, f"{name} pubkey", SIG_PUBKEY_SIZE)
     message = _parse_payload_atom(message, f"{name} message")
-    if not is_atom(signature):
-        raise BitLispError("bad_condition_arg", f"{name} signature must be an atom")
-    if len(signature) != SIG_SIGNATURE_SIZE:
-        raise BitLispError(
-            "bad_condition_arg",
-            f"{name} signature must be {SIG_SIGNATURE_SIZE} bytes, "
-            f"got {len(signature)}",
-        )
+    signature = _fixed_width_atom(signature, f"{name} signature", SIG_SIGNATURE_SIZE)
     return AssertSig(opcode, pubkey, message, signature)
 
 
@@ -709,15 +697,20 @@ def _parse_specifier(commitment, args, name):
         if kind in ("txid", "tapleaf", "merkle_root"):
             fields.append(_fixed_width_atom(atom, f"{name} {kind}", 32))
             continue
-        if not is_atom(atom):
-            raise BitLispError("bad_condition_arg", f"{name} {kind} must be an atom")
-        if len(atom) > MAX_SCRIPT_PUBKEY_SIZE:
-            raise BitLispError(
-                "bad_condition_arg",
-                f"{name} scriptPubKey must be at most "
-                f"{MAX_SCRIPT_PUBKEY_SIZE} bytes, got {len(atom)}",
-            )
-        fields.append(atom)
+        if kind == "script_pubkey":
+            if not is_atom(atom):
+                raise BitLispError(
+                    "bad_condition_arg", f"{name} {kind} must be an atom"
+                )
+            if len(atom) > MAX_SCRIPT_PUBKEY_SIZE:
+                raise BitLispError(
+                    "bad_condition_arg",
+                    f"{name} scriptPubKey must be at most "
+                    f"{MAX_SCRIPT_PUBKEY_SIZE} bytes, got {len(atom)}",
+                )
+            fields.append(atom)
+            continue
+        raise AssertionError(f"unhandled specifier operand kind: {kind}")
     return Specifier(commitment, tuple(fields))
 
 
