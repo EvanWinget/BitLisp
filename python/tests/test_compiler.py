@@ -35,7 +35,7 @@ from bitlisp_tools.compiler import (  # noqa: E402
     tree_hash,
 )
 from bitlisp_tools.runner import DEFAULT_MAX_COST, load_context, run_spend  # noqa: E402
-from conftest import filler_identity_json  # noqa: E402
+from support import filler_identity_json  # noqa: E402
 
 BUDGET = 11_000_000_000
 

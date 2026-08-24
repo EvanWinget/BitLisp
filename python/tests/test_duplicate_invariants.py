@@ -47,9 +47,14 @@ from bitlisp.conditions import (
     AssertMyTxid,
 )
 from bitlisp.secp256k1 import taproot_output_key
-from conftest import filler_identity
 from hypothesis import given
 from hypothesis import strategies as st
+from support import (
+    FILLER_INTERNAL_KEY,
+    FILLER_MERKLE_ROOT,
+    FILLER_TAPLEAF,
+    filler_identity,
+)
 
 IDEMPOTENT = (
     AssertLocktimeHeight,
@@ -108,8 +113,8 @@ def _pool(own_txid, own_script, other_txid, other_script):
         AssertMyAmount(0),
         AssertMyAmount(1),
         AssertMyTaproot(_TAPROOT_IK, b"", _TAPROOT_SPK),
-        AssertMyTaptree(b"\x0c" * 32, b"\x0b" * 32),
-        AssertMyTaptree(b"\x0c" * 32, b"\x0a" * 32),
+        AssertMyTaptree(FILLER_INTERNAL_KEY, FILLER_MERKLE_ROOT),
+        AssertMyTaptree(FILLER_INTERNAL_KEY, FILLER_TAPLEAF),
         AssertLocktimeHeight(600),
         AssertLocktimeHeight(700),
         AssertLocktimeTime(500_000_600),

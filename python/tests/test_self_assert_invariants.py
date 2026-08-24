@@ -28,18 +28,18 @@ from bitlisp.conditions import (
     AssertMyTxid,
 )
 from bitlisp.secp256k1 import taproot_output_key
-from conftest import (
+from hypothesis import given
+from hypothesis import strategies as st
+from support import (
     FILLER_INTERNAL_KEY,
     FILLER_MERKLE_ROOT,
     FILLER_TAPLEAF,
+    NUMS,
 )
-from hypothesis import given
-from hypothesis import strategies as st
 
 TXID_A = b"\xaa" * 32
 TXID_B = b"\xbb" * 32
 IK = bytes.fromhex("187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27")
-NUMS = bytes.fromhex("50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0")
 ROOT = b"\x77" * 32
 ROOT_B = b"\x78" * 32
 # The execution identity every transaction carries unless a property

@@ -27,9 +27,9 @@ from bitlisp.conditions import (
     LOCKTIME_THRESHOLD,
     SEQUENCE_VALUE_MAX,
 )
-from conftest import filler_identity
 from hypothesis import given
 from hypothesis import strategies as st
+from support import filler_identity
 
 _FINAL = 0xFFFFFFFF
 _DISABLE = 1 << 31

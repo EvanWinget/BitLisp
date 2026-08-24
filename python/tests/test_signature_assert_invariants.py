@@ -16,9 +16,9 @@ import sys
 from functools import cache
 from pathlib import Path
 
-from conftest import filler_identity
 from hypothesis import given, settings
 from hypothesis import strategies as st
+from support import filler_identity
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "python"))

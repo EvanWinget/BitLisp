@@ -53,7 +53,7 @@ from bitlisp_tools.runner import (  # noqa: E402
     render_condition,
     run_spend,
 )
-from conftest import filler_identity_json  # noqa: E402
+from support import filler_identity_json  # noqa: E402
 
 SPK_TAPROOT = "5120" + "aa" * 32
 SPK_P2WPKH = "0014" + "99" * 20

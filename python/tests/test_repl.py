@@ -14,7 +14,7 @@ sys.path.insert(0, str(REPO_ROOT / "python"))
 
 from bitlisp_tools import repl  # noqa: E402
 from bitlisp_tools.repl import BitLispShell  # noqa: E402
-from conftest import filler_identity_json  # noqa: E402
+from support import filler_identity_json  # noqa: E402
 
 BUDGET = 11_000_000_000
 

@@ -14,7 +14,6 @@ fixed aux bytes, so every derived value is deterministic.
 """
 
 import hashlib
-import json
 import sys
 from pathlib import Path
 
@@ -38,7 +37,12 @@ from bitlisp.sexp import NIL, int_to_atom, iter_proper_list  # noqa: E402
 from bitlisp_tools.compiler import compile_program, tree_hash  # noqa: E402
 from bitlisp_tools.curry import curry, uncurry  # noqa: E402
 from bitlisp_tools.runner import run_spend  # noqa: E402
-from conftest import assert_corpus_identities  # noqa: E402
+from support import (  # noqa: E402
+    NUMS,
+    assert_corpus_identities,
+    condition_inputs,
+    load_vector,
+)
 from test_framework.key import compute_xonly_pubkey, sign_schnorr  # noqa: E402
 
 PUZZLES = REPO_ROOT / "puzzles"
@@ -46,8 +50,6 @@ INCLUDES = (PUZZLES / "lib", PUZZLES / "singleton")
 BUDGET = 11_000_000_000
 SEQ_FINAL = 0xFFFFFFFF
 
-# The BIP341 nothing-up-my-sleeve point, fixed inside the wrapper.
-NUMS = bytes.fromhex("50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0")
 OWNER_SK = (0xC0 << 248 | 11).to_bytes(32, "big")
 OWNER_PK = compute_xonly_pubkey(OWNER_SK)[0]
 OWNER2_SK = (0xC1 << 248 | 12).to_bytes(32, "big")
@@ -646,11 +648,6 @@ def test_two_lineages_compose():
     assert conds[2].outpoint == outpoint(with_other.txid, 1)
 
 
-def load_vector(name):
-    path = REPO_ROOT / "vectors" / name
-    return {case["name"]: case for case in json.loads(path.read_text())["cases"]}
-
-
 def vm_cases():
     """Every pinned program and solution, by case name, built from
     the sources and the lifecycle above."""
@@ -812,11 +809,8 @@ def test_validation_vectors_match_source():
     # The complete closure: every conditions field in the validation
     # vector file is recomputed here from compiled source and the
     # documented signature flip, set-equal in both directions.
-    observed = set()
-    for case in load_vector("validation/singleton-lineage.json").values():
-        for entry in case["tx"]["inputs"]:
-            if "conditions" in entry:
-                observed.add(entry["conditions"])
+    files = [load_vector("validation/singleton-lineage.json")]
+    observed = {entry["conditions"] for _, entry in condition_inputs(files)}
     assert observed == validation_conditions()
 
 

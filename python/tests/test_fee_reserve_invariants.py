@@ -19,9 +19,9 @@ from bitlisp import (
     validate_transaction,
 )
 from bitlisp.conditions import ReserveFee
-from conftest import filler_identity
 from hypothesis import assume, given
 from hypothesis import strategies as st
+from support import filler_identity
 
 TXID_A = b"\xaa" * 32
 TXID_B = b"\xbb" * 32

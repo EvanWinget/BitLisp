@@ -12,7 +12,6 @@ fixed aux bytes, so every derived value is deterministic.
 """
 
 import hashlib
-import json
 import sys
 from pathlib import Path
 
@@ -37,7 +36,12 @@ from bitlisp_tools import assemble  # noqa: E402
 from bitlisp_tools.compiler import compile_program, tree_hash  # noqa: E402
 from bitlisp_tools.curry import curry, uncurry  # noqa: E402
 from bitlisp_tools.runner import run_spend  # noqa: E402
-from conftest import assert_corpus_identities  # noqa: E402
+from support import (  # noqa: E402
+    NUMS,
+    assert_corpus_identities,
+    condition_inputs,
+    load_vector,
+)
 from test_framework.key import compute_xonly_pubkey, sign_schnorr  # noqa: E402
 
 PUZZLES = REPO_ROOT / "puzzles"
@@ -45,8 +49,6 @@ INCLUDES = (PUZZLES / "lib", PUZZLES / "vault")
 BUDGET = 11_000_000_000
 SEQ_FINAL = 0xFFFFFFFF
 
-# The BIP341 nothing-up-my-sleeve point: no key-path spend exists.
-NUMS = bytes.fromhex("50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0")
 AUTH_SK = (0xA0 << 248 | 7).to_bytes(32, "big")
 AUTH_PK = compute_xonly_pubkey(AUTH_SK)[0]
 RKEY_SK = (0xB0 << 248 | 9).to_bytes(32, "big")
@@ -600,11 +602,6 @@ def test_unknown_path_raises():
     assert info.value.code == "user_raise"
 
 
-def load_vector(name):
-    path = REPO_ROOT / "vectors" / name
-    return {case["name"]: case for case in json.loads(path.read_text())["cases"]}
-
-
 def test_vm_vectors_match_source():
     # Every pinned program is byte-identical to a fresh compile and
     # curry of the sources, so the corpus cannot drift from them.
@@ -725,12 +722,11 @@ def test_validation_vectors_match_source():
         ).hex(),
         serialize(assemble(f"((0x42 98 () 0x{VSPK.hex()}))")).hex(),
     }
-    observed = set()
-    for name in ("validation/vault-core.json", "validation/vault-consolidation.json"):
-        for case in load_vector(name).values():
-            for entry in case["tx"]["inputs"]:
-                if "conditions" in entry:
-                    observed.add(entry["conditions"])
+    files = [
+        load_vector("validation/vault-core.json"),
+        load_vector("validation/vault-consolidation.json"),
+    ]
+    observed = {entry["conditions"] for _, entry in condition_inputs(files)}
     assert observed == expected
 
 
