@@ -28,6 +28,7 @@ from bitlisp import (
 from bitlisp.secp256k1 import G, point_mul, taproot_output_key
 from hypothesis import given
 from hypothesis import strategies as st
+from support import filler_identity
 
 SCRIPTS = (b"\x51", b"\x52", b"\x53")
 AMOUNTS = (0, 1, 2, 3)
@@ -93,9 +94,7 @@ def build_tx(input_claims, outputs):
                 amount=out_total if n == 0 else 0,
                 sequence=0xFFFFFFFF,
                 conditions=conditions,
-                tapleaf=b"\x0a" * 32,
-                merkle_root=b"\x0b" * 32,
-                internal_key=b"\x0c" * 32,
+                **filler_identity(),
             )
         )
     return Transaction(
@@ -357,11 +356,7 @@ def test_model_requires_identity_with_conditions():
     # A condition-carrying input is a BitLisp input, and a BitLisp
     # input always executes a leaf of some tree, so the model refuses
     # the impossible shape.
-    identity = {
-        "tapleaf": b"\x0a" * 32,
-        "merkle_root": b"\x0b" * 32,
-        "internal_key": b"\x0c" * 32,
-    }
+    identity = filler_identity()
     with pytest.raises(ValueError, match="tapleaf, merkle_root, and internal_key"):
         TxInput(b"\x01" * 32, 0, b"\x51", 1, 0, conditions=())
     for missing in identity:

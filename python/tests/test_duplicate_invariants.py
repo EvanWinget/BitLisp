@@ -49,6 +49,12 @@ from bitlisp.conditions import (
 from bitlisp.secp256k1 import taproot_output_key
 from hypothesis import given
 from hypothesis import strategies as st
+from support import (
+    FILLER_INTERNAL_KEY,
+    FILLER_MERKLE_ROOT,
+    FILLER_TAPLEAF,
+    filler_identity,
+)
 
 IDEMPOTENT = (
     AssertLocktimeHeight,
@@ -107,8 +113,8 @@ def _pool(own_txid, own_script, other_txid, other_script):
         AssertMyAmount(0),
         AssertMyAmount(1),
         AssertMyTaproot(_TAPROOT_IK, b"", _TAPROOT_SPK),
-        AssertMyTaptree(b"\x0c" * 32, b"\x0b" * 32),
-        AssertMyTaptree(b"\x0c" * 32, b"\x0a" * 32),
+        AssertMyTaptree(FILLER_INTERNAL_KEY, FILLER_MERKLE_ROOT),
+        AssertMyTaptree(FILLER_INTERNAL_KEY, FILLER_TAPLEAF),
         AssertLocktimeHeight(600),
         AssertLocktimeHeight(700),
         AssertLocktimeTime(500_000_600),
@@ -152,9 +158,7 @@ def build_tx(version, locktime, cond_lists, seq_pair, output_contents):
             amount=out_total if txid == TXID_A else 0,
             sequence=sequence,
             conditions=tuple(conditions),
-            tapleaf=b"\x0a" * 32,
-            merkle_root=b"\x0b" * 32,
-            internal_key=b"\x0c" * 32,
+            **filler_identity(),
         )
         for txid, script, sequence, conditions in (
             (TXID_A, SCRIPT_A, seq_pair[0], cond_lists[0]),

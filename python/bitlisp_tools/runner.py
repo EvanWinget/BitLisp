@@ -58,6 +58,10 @@ class ContextError(Exception):
     spend verdict, which is BitLispError's job."""
 
 
+def _optional_hex(entry, key):
+    return bytes.fromhex(entry[key]) if key in entry else None
+
+
 def _int_field(value, what):
     # bool is an int subclass, so a JSON true would otherwise pass
     # as 1 through every integer range check downstream.
@@ -147,19 +151,9 @@ def load_context(obj):
                     sequence=_int_field(entry.get("sequence", 0xFFFFFFFF), "sequence"),
                     conditions=conditions,
                     script_sig=bytes.fromhex(entry.get("script_sig", "")),
-                    tapleaf=(
-                        bytes.fromhex(entry["tapleaf"]) if "tapleaf" in entry else None
-                    ),
-                    merkle_root=(
-                        bytes.fromhex(entry["merkle_root"])
-                        if "merkle_root" in entry
-                        else None
-                    ),
-                    internal_key=(
-                        bytes.fromhex(entry["internal_key"])
-                        if "internal_key" in entry
-                        else None
-                    ),
+                    tapleaf=_optional_hex(entry, "tapleaf"),
+                    merkle_root=_optional_hex(entry, "merkle_root"),
+                    internal_key=_optional_hex(entry, "internal_key"),
                 )
                 for entry, conditions in decoded_inputs
             ),

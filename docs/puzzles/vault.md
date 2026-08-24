@@ -22,8 +22,8 @@ bitlisp-compile puzzles/vault/triggered.bl -I puzzles/lib -I puzzles/vault
 A vault instance is the vault program curried with its seven fixed
 values. Its coin's scriptPubKey is the taproot output of a fixed
 internal key tweaked with the curried program's tree hash as the
-merkle root, the derivation CREATE_OUTPUT_TAPROOT and
-ASSERT_MY_TAPROOT perform in the validator. The internal key is the
+merkle root, the derivation CREATE_OUTPUT_TAPROOT performs in
+the validator. The internal key is the
 BIP341 nothing-up-my-sleeve point, so no key-path spend exists and
 the program is the whole spending policy.
 
@@ -34,7 +34,9 @@ its own curried tree hash: the curried shape
 the uncurried program's tree hash and the tree hashes of the fixed
 values. The helpers in `puzzles/lib/curry-hash.blib` compute
 exactly the digest `bitlisp-curry -T` prints. Every path emits
-`ASSERT_MY_TAPROOT` over the reconstructed root, binding the
+`ASSERT_MY_TAPTREE` over the fixed internal key and the
+reconstructed root, the execution identity base consensus
+authenticated from the control block, binding the
 program run to the coin it claims to govern: one instance's
 program can never spend another instance's coin, and a program
 installed against a coin at any other scriptPubKey fails its own
@@ -120,7 +122,7 @@ guards hold even against a misbehaving signer: no signed solution
 can mint an oversized triggered coin through a negative revault or
 a worthless zero-value one. Emitted conditions:
 
-1. `ASSERT_MY_TAPROOT INTERNAL_KEY <vault root>`
+1. `ASSERT_MY_TAPTREE INTERNAL_KEY <vault root>`
 2. `ASSERT_MY_AMOUNT MY_AMT`
 3. `ASSERT_SIG_MY_OUTPOINT AUTH_KEY <digest message> SIG` where the
    message is the tree hash of `(1 TARGET TRIG_AMT REVAULT_AMT)`,
@@ -154,7 +156,7 @@ griefing. The keyed posture closes the griefing and costs key
 management. The choice is per instance.
 
 **Path 3, consolidation follower.** ARGS is `(MY_SPK)`. Emitted
-conditions: the taproot assert, `ASSERT_MY_SCRIPTPUBKEY MY_SPK`,
+conditions: the taptree assert, `ASSERT_MY_SCRIPTPUBKEY MY_SPK`,
 and `ASSURE 98 () MY_SPK`. The scriptPubKey arrives in the
 solution because no operator derives it, and the assert proves it
 is the coin's own. Mode 98 puts the assurer half at commitment 3,
@@ -165,7 +167,7 @@ commitment 2, addressing the shared scriptPubKey.
 **Path 4, consolidation leader.** ARGS is
 `(MY_SPK MY_AMT OUT_AMT FOLLOWER_AMOUNTS)`. The program rejects an
 empty follower list and `MY_AMT + sum(FOLLOWER_AMOUNTS) > OUT_AMT`.
-Emitted conditions: the taproot assert,
+Emitted conditions: the taptree assert,
 `ASSERT_MY_SCRIPTPUBKEY MY_SPK`, `ASSERT_MY_AMOUNT MY_AMT`, one
 `REQUIRE 98 () MY_SPK <amount>` per listed follower
 amount, and `CREATE_OUTPUT MY_SPK OUT_AMT`.
@@ -175,7 +177,7 @@ An unknown path raises.
 ## Triggered paths
 
 **Path 1, withdrawal.** ARGS is `()`. Emitted conditions: the
-taproot assert over the triggered root,
+taptree assert over the triggered root,
 `ASSERT_SEQUENCE_HEIGHT DELAY`, and `SEAL_OUTPUTS TARGET_HASH`.
 The sequence assert makes the coin `DELAY` blocks old before it
 moves. The seal fixes every output slot of the spending
@@ -190,7 +192,7 @@ value burns to fees, the recorded divergence below, so a wallet
 never reuses a target.
 
 **Path 2, recovery.** Identical to the vault's recovery path with
-the triggered root in the taproot assert, available at any time
+the triggered root in the taptree assert, available at any time
 before a withdrawal confirms, before or after the delay matures.
 
 ## BIP-345 correspondence
@@ -330,9 +332,9 @@ The mod hashes, pinned in `python/tests/test_vault_puzzles.py`:
 
 ```
 $ bitlisp-compile -T puzzles/vault/vault.bl -I puzzles/lib -I puzzles/vault
-2fc2096c3167018bc0210e061d4add87f081360a77ec352bcfb1456243ca34a2
+802e8fda9a74a0fdf0170b2e974ae3d9b91805c4f7640997f05b1b0d0268dc13
 $ bitlisp-compile -T puzzles/vault/triggered.bl -I puzzles/lib -I puzzles/vault
-214b0347c7df10d8d7c95769dd4cc3e0fdcee183b281b3d96ebda71bb739ec1b
+8c7afe4710a59fc8dfa7534f0fef404b45acb8dc494b681e17f1b08f4609b461
 ```
 
 An instance's merkle root is the curried tree hash, printable
@@ -344,6 +346,19 @@ $ bitlisp-compile puzzles/vault/vault.bl -I puzzles/lib -I puzzles/vault \
       -a 0x<auth key> -a 0x<internal key> -a 0x<recovery spk> \
       -a 0x -a 144 -T
 ```
+
+Measured through the single-spend runner at the provisional
+constants, evaluation and condition charges together: a trigger
+spend with no revault costs 4,054,131 and one with a revault
+claim 6,704,696, a keyless recovery 1,407,940, a matured
+withdrawal 49,468, a consolidation leader with two followers
+1,418,898, and a follower 57,496. Each is exactly 1,300,000 below
+the same spend under ASSERT_MY_TAPROOT, the point multiplication
+the taptree assert does not run because base consensus already
+authenticated the identity it reads. The condition charge itself
+is 200 against 1,300,200, and a minimal spend emitting one
+identity assert and nothing else runs at 220 against 1,300,220
+through evaluation and parsing together.
 
 The compiled representatives, one per spend path with the
 in-program guard failures and the malformed instances, are pinned

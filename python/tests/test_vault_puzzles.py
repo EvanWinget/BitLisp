@@ -12,7 +12,6 @@ fixed aux bytes, so every derived value is deterministic.
 """
 
 import hashlib
-import json
 import sys
 from pathlib import Path
 
@@ -37,6 +36,12 @@ from bitlisp_tools import assemble  # noqa: E402
 from bitlisp_tools.compiler import compile_program, tree_hash  # noqa: E402
 from bitlisp_tools.curry import curry, uncurry  # noqa: E402
 from bitlisp_tools.runner import run_spend  # noqa: E402
+from support import (  # noqa: E402
+    NUMS,
+    assert_corpus_identities,
+    condition_inputs,
+    load_vector,
+)
 from test_framework.key import compute_xonly_pubkey, sign_schnorr  # noqa: E402
 
 PUZZLES = REPO_ROOT / "puzzles"
@@ -44,8 +49,6 @@ INCLUDES = (PUZZLES / "lib", PUZZLES / "vault")
 BUDGET = 11_000_000_000
 SEQ_FINAL = 0xFFFFFFFF
 
-# The BIP341 nothing-up-my-sleeve point: no key-path spend exists.
-NUMS = bytes.fromhex("50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0")
 AUTH_SK = (0xA0 << 248 | 7).to_bytes(32, "big")
 AUTH_PK = compute_xonly_pubkey(AUTH_SK)[0]
 RKEY_SK = (0xB0 << 248 | 9).to_bytes(32, "big")
@@ -59,10 +62,10 @@ AUX = b"\x00" * 32
 # so any source change is a deliberate re-pin of both literals and
 # the vector files.
 VAULT_MOD_HASH = bytes.fromhex(
-    "2fc2096c3167018bc0210e061d4add87f081360a77ec352bcfb1456243ca34a2"
+    "802e8fda9a74a0fdf0170b2e974ae3d9b91805c4f7640997f05b1b0d0268dc13"
 )
 TRIG_MOD_HASH = bytes.fromhex(
-    "214b0347c7df10d8d7c95769dd4cc3e0fdcee183b281b3d96ebda71bb739ec1b"
+    "8c7afe4710a59fc8dfa7534f0fef404b45acb8dc494b681e17f1b08f4609b461"
 )
 
 VAULT_NODE, _ = compile_program((PUZZLES / "vault" / "vault.bl").read_text(), INCLUDES)
@@ -188,7 +191,7 @@ def test_curried_identity_matches_tooling():
     # Three independent computations of each instance's identity
     # must agree: the tooling's tree_hash over the curried node, the
     # spec-rule reimplementation above, and the program's own
-    # reconstruction read off the taproot assert it emits. uncurry
+    # reconstruction read off the taptree assert it emits. uncurry
     # must also read back the inner program and the fixed values.
     for node, inst, root, values in (
         (VAULT_NODE, VAULT, VROOT, vault_values(b"")),
@@ -200,8 +203,8 @@ def test_curried_identity_matches_tooling():
         assert inner == node
         assert read_back == values
     conds = conditions_of(VAULT, f"(3 0x{VSPK.hex()})")
+    assert conds[0].internal_key == NUMS
     assert conds[0].merkle_root == VROOT
-    assert conds[0].script_pubkey == VSPK
 
 
 def test_trigger_spend_with_revault():
@@ -599,11 +602,6 @@ def test_unknown_path_raises():
     assert info.value.code == "user_raise"
 
 
-def load_vector(name):
-    path = REPO_ROOT / "vectors" / name
-    return {case["name"]: case for case in json.loads(path.read_text())["cases"]}
-
-
 def test_vm_vectors_match_source():
     # Every pinned program is byte-identical to a fresh compile and
     # curry of the sources, so the corpus cannot drift from them.
@@ -724,41 +722,24 @@ def test_validation_vectors_match_source():
         ).hex(),
         serialize(assemble(f"((0x42 98 () 0x{VSPK.hex()}))")).hex(),
     }
-    observed = set()
-    for name in ("validation/vault-core.json", "validation/vault-consolidation.json"):
-        for case in load_vector(name).values():
-            for entry in case["tx"]["inputs"]:
-                if "conditions" in entry:
-                    observed.add(entry["conditions"])
+    files = [
+        load_vector("validation/vault-core.json"),
+        load_vector("validation/vault-consolidation.json"),
+    ]
+    observed = {entry["conditions"] for _, entry in condition_inputs(files)}
     assert observed == expected
 
 
 def test_validation_vector_identities_derive_their_scripts():
     # The corpus carries each instance input's execution identity as
     # data the model takes on trust, so this is where the trust is
-    # checked: every instance input's scriptPubKey must be the tweak
-    # of its internal key by its merkle root, with the single-leaf
-    # tree's root equal to its leaf hash. The hostile foreign-script
-    # inputs carry the corpus filler triple, counted so the exemption
-    # cannot widen unnoticed.
-    filler = ("0a" * 32, "0b" * 32, "0c" * 32)
-    filler_seen = 0
-    for name in ("validation/vault-core.json", "validation/vault-consolidation.json"):
-        for case in load_vector(name).values():
-            for entry in case["tx"]["inputs"]:
-                if "conditions" not in entry:
-                    continue
-                identity = (
-                    entry["tapleaf"],
-                    entry["merkle_root"],
-                    entry["internal_key"],
-                )
-                if identity == filler:
-                    filler_seen += 1
-                    continue
-                root = bytes.fromhex(entry["merkle_root"])
-                assert entry["tapleaf"] == entry["merkle_root"]
-                assert entry["internal_key"] == NUMS.hex()
-                expected = b"\x51\x20" + secp256k1.taproot_output_key(NUMS, root)
-                assert entry["script_pubkey"] == expected.hex(), case["name"]
-    assert filler_seen == 2
+    # checked, by the shared audit. The two hostile foreign-script
+    # inputs carry the corpus filler triple.
+    assert_corpus_identities(
+        [
+            load_vector("validation/vault-core.json"),
+            load_vector("validation/vault-consolidation.json"),
+        ],
+        NUMS,
+        filler_expected=2,
+    )

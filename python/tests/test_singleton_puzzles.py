@@ -14,7 +14,6 @@ fixed aux bytes, so every derived value is deterministic.
 """
 
 import hashlib
-import json
 import sys
 from pathlib import Path
 
@@ -38,6 +37,12 @@ from bitlisp.sexp import NIL, int_to_atom, iter_proper_list  # noqa: E402
 from bitlisp_tools.compiler import compile_program, tree_hash  # noqa: E402
 from bitlisp_tools.curry import curry, uncurry  # noqa: E402
 from bitlisp_tools.runner import run_spend  # noqa: E402
+from support import (  # noqa: E402
+    NUMS,
+    assert_corpus_identities,
+    condition_inputs,
+    load_vector,
+)
 from test_framework.key import compute_xonly_pubkey, sign_schnorr  # noqa: E402
 
 PUZZLES = REPO_ROOT / "puzzles"
@@ -45,8 +50,6 @@ INCLUDES = (PUZZLES / "lib", PUZZLES / "singleton")
 BUDGET = 11_000_000_000
 SEQ_FINAL = 0xFFFFFFFF
 
-# The BIP341 nothing-up-my-sleeve point, fixed inside the wrapper.
-NUMS = bytes.fromhex("50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0")
 OWNER_SK = (0xC0 << 248 | 11).to_bytes(32, "big")
 OWNER_PK = compute_xonly_pubkey(OWNER_SK)[0]
 OWNER2_SK = (0xC1 << 248 | 12).to_bytes(32, "big")
@@ -61,7 +64,7 @@ END_PAYLOAD = b"\x00" * 32
 # so any source change is a deliberate re-pin of both literals and
 # the vector files.
 SINGLETON_MOD_HASH = bytes.fromhex(
-    "1d8a1a3714577ac5cee67abe6ae1a6972d29ba24ea0c599205f2f0069e943f83"
+    "15d44b7d58dfa717679dfdeb583bb42a749bf9188dc5d7661171fdf89e8c3714"
 )
 OWNER_INNER_MOD_HASH = bytes.fromhex(
     "40977e84db61eef5f52c9ac9b46dd2e2fbd6439674f50dd7a00ced5daf523bf0"
@@ -386,7 +389,7 @@ def test_mod_hashes_pinned():
 
 
 def test_curried_identity_matches_tooling():
-    # The program's own root reconstruction, read off the taproot
+    # The program's own root reconstruction, read off the taptree
     # assert it emits, must agree with the tooling's tree hash over
     # the curried node, and uncurry must read the values back.
     inner, values = uncurry(SINGLETON)
@@ -395,7 +398,6 @@ def test_curried_identity_matches_tooling():
     conds = conditions_of(SINGLETON, SOL1)
     assert conds[0].internal_key == NUMS
     assert conds[0].merkle_root == ROOT
-    assert conds[0].script_pubkey == SPK
 
 
 def test_wire_serialization_matches_model():
@@ -646,11 +648,6 @@ def test_two_lineages_compose():
     assert conds[2].outpoint == outpoint(with_other.txid, 1)
 
 
-def load_vector(name):
-    path = REPO_ROOT / "vectors" / name
-    return {case["name"]: case for case in json.loads(path.read_text())["cases"]}
-
-
 def vm_cases():
     """Every pinned program and solution, by case name, built from
     the sources and the lifecycle above."""
@@ -812,27 +809,18 @@ def test_validation_vectors_match_source():
     # The complete closure: every conditions field in the validation
     # vector file is recomputed here from compiled source and the
     # documented signature flip, set-equal in both directions.
-    observed = set()
-    for case in load_vector("validation/singleton-lineage.json").values():
-        for entry in case["tx"]["inputs"]:
-            if "conditions" in entry:
-                observed.add(entry["conditions"])
+    files = [load_vector("validation/singleton-lineage.json")]
+    observed = {entry["conditions"] for _, entry in condition_inputs(files)}
     assert observed == validation_conditions()
 
 
 def test_validation_vector_identities_derive_their_scripts():
     # The corpus carries each lineage input's execution identity as
     # data the model takes on trust, so this is where the trust is
-    # checked: every condition-carrying input's scriptPubKey must be
-    # the tweak of its internal key by its merkle root, with the
-    # single-leaf tree's root equal to its leaf hash. No input in
-    # this file carries filler.
-    for case in load_vector("validation/singleton-lineage.json").values():
-        for entry in case["tx"]["inputs"]:
-            if "conditions" not in entry:
-                continue
-            root = bytes.fromhex(entry["merkle_root"])
-            assert entry["tapleaf"] == entry["merkle_root"]
-            assert entry["internal_key"] == NUMS.hex()
-            expected = b"\x51\x20" + secp256k1.taproot_output_key(NUMS, root)
-            assert entry["script_pubkey"] == expected.hex(), case["name"]
+    # checked, by the shared audit. No input in this file carries
+    # filler.
+    assert_corpus_identities(
+        [load_vector("validation/singleton-lineage.json")],
+        NUMS,
+        filler_expected=0,
+    )

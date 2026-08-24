@@ -18,6 +18,7 @@ from pathlib import Path
 
 from hypothesis import given, settings
 from hypothesis import strategies as st
+from support import filler_identity
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "python"))
@@ -132,9 +133,7 @@ def build_tx(coin, conds, env):
             amount=amount,
             sequence=sequence,
             conditions=tuple(conds),
-            tapleaf=b"\x0a" * 32,
-            merkle_root=b"\x0b" * 32,
-            internal_key=b"\x0c" * 32,
+            **filler_identity(),
         )
     ]
     if extra_position != "none":

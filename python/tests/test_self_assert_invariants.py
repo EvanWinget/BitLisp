@@ -30,16 +30,21 @@ from bitlisp.conditions import (
 from bitlisp.secp256k1 import taproot_output_key
 from hypothesis import given
 from hypothesis import strategies as st
+from support import (
+    FILLER_INTERNAL_KEY,
+    FILLER_MERKLE_ROOT,
+    FILLER_TAPLEAF,
+    NUMS,
+)
 
 TXID_A = b"\xaa" * 32
 TXID_B = b"\xbb" * 32
 IK = bytes.fromhex("187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27")
-NUMS = bytes.fromhex("50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0")
 ROOT = b"\x77" * 32
 ROOT_B = b"\x78" * 32
 # The execution identity every transaction carries unless a property
-# draws one: filler no assert in the pools names.
-FILLER_IDENTITY = (b"\x0c" * 32, b"\x0b" * 32)
+# draws one: the shared corpus filler no assert in the pools names.
+FILLER_IDENTITY = (FILLER_INTERNAL_KEY, FILLER_MERKLE_ROOT)
 
 SPK_IK_ROOT = b"\x51\x20" + taproot_output_key(IK, ROOT)
 SPK_IK_PLAIN = b"\x51\x20" + taproot_output_key(IK, b"")
@@ -70,7 +75,6 @@ def _taproot(internal_key, merkle_root):
 # Derived once: the tweak is the one expensive step in this module,
 # and the pools are fixed, so no property recomputes it per example.
 TAPROOT_ASSERTS = {pair: _taproot(*pair) for pair in (*IDENTITIES, (IK, b""))}
-HONEST_SPKS = {pair: TAPROOT_ASSERTS[pair].script_pubkey for pair in IDENTITIES}
 
 self_asserts = st.one_of(
     st.tuples(txids, indexes).map(lambda t: AssertMyOutpoint(_outpoint(*t))),
@@ -105,7 +109,7 @@ def build_tx(txid, index, script, amount, conds, env, identity=FILLER_IDENTITY):
             amount=amount,
             sequence=sequence,
             conditions=tuple(conds),
-            tapleaf=b"\x0a" * 32,
+            tapleaf=FILLER_TAPLEAF,
             merkle_root=merkle_root,
             internal_key=internal_key,
         )
@@ -213,7 +217,7 @@ def test_taptree_assert_agrees_with_taproot_assert_on_honest_input(
     satisfied together and fail together. The pools hold no two
     pairs deriving one output key, so the collision exemption never
     fires here."""
-    honest = HONEST_SPKS[identity]
+    honest = TAPROOT_ASSERTS[identity].script_pubkey
     taptree = AssertMyTaptree(*operands)
     taproot = TAPROOT_ASSERTS[operands]
     got_taptree = outcome(

@@ -14,6 +14,7 @@ sys.path.insert(0, str(REPO_ROOT / "python"))
 
 from bitlisp_tools import repl  # noqa: E402
 from bitlisp_tools.repl import BitLispShell  # noqa: E402
+from support import filler_identity_json  # noqa: E402
 
 BUDGET = 11_000_000_000
 
@@ -38,9 +39,7 @@ def ctx_file(tmp_path):
                 "index": 0,
                 "script_pubkey": SPK_TAPROOT,
                 "amount": 1000,
-                "tapleaf": "0a" * 32,
-                "merkle_root": "0b" * 32,
-                "internal_key": "0c" * 32,
+                **filler_identity_json(),
             }
         ],
         "outputs": [{"script_pubkey": SPK_P2WPKH, "amount": 600}],
@@ -200,18 +199,14 @@ def test_input_selection_reaches_spend(shell, tmp_path, capsys):
                 "index": 0,
                 "script_pubkey": SPK_TAPROOT,
                 "amount": 1000,
-                "tapleaf": "0a" * 32,
-                "merkle_root": "0b" * 32,
-                "internal_key": "0c" * 32,
+                **filler_identity_json(),
             },
             {
                 "txid": "22" * 32,
                 "index": 0,
                 "script_pubkey": SPK_TAPROOT,
                 "amount": 700,
-                "tapleaf": "0a" * 32,
-                "merkle_root": "0b" * 32,
-                "internal_key": "0c" * 32,
+                **filler_identity_json(),
             },
         ],
         "outputs": [{"script_pubkey": SPK_P2WPKH, "amount": 600}],
@@ -490,9 +485,7 @@ def test_main_input_out_of_range_exits_two(tmp_path, capsys):
                 "index": 0,
                 "script_pubkey": SPK_TAPROOT,
                 "amount": 1000,
-                "tapleaf": "0a" * 32,
-                "merkle_root": "0b" * 32,
-                "internal_key": "0c" * 32,
+                **filler_identity_json(),
             }
         ],
         "outputs": [{"script_pubkey": SPK_P2WPKH, "amount": 600}],

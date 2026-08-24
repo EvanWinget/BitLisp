@@ -135,10 +135,11 @@ hash is a tree hash. Here the parent's scriptPubKey is a taproot
 output key, the internal key tweaked by the merkle root, and no VM
 operator performs that tweak. `secp_verify` is BIP340 Schnorr only,
 and a Schnorr verification cannot be bent into a point addition the
-way an ECDSA verification could. The validator derives the tweak
-for the spending input's own scriptPubKey through ASSERT_MY_TAPROOT
-and for claimed outputs through CREATE_OUTPUT_TAPROOT, and for
-nothing else. A program can therefore recognize exactly one
+way an ECDSA verification could. The validator performs the tweak
+for claimed outputs through CREATE_OUTPUT_TAPROOT and for nothing
+else, and ASSERT_MY_TAPTREE reads back the spending input's own
+internal key and merkle root, the tweak preimage base consensus
+authenticated. A program can therefore recognize exactly one
 scriptPubKey as a member of its own family: its own.
 
 That constraint decides the construction. Every coin of a lineage
@@ -166,8 +167,9 @@ value, not a free one. Both sides of the shape question, for the
 record:
 
 - For the constant scriptPubKey: it needs nothing the v0 vocabulary
-  lacks, it costs no point multiplication beyond the one
-  ASSERT_MY_TAPROOT already charges, a wallet watches one address
+  lacks, it costs no point multiplication at all now that
+  ASSERT_MY_TAPTREE reads the identity base consensus
+  authenticated, a wallet watches one address
   for the whole lineage, a counterparty paying to the singleton
   addresses it by that one scriptPubKey rather than by a hash that
   moves with the state, and the Chia census above found no
@@ -214,8 +216,9 @@ scriptPubKey computable, before the first singleton coin exists.
 Base consensus spends the launcher once, and that is the whole
 launch mechanism: no launcher program, no launch announcement.
 
-Every spend asserts ASSERT_MY_TAPROOT over the recomputed root,
-which proves the coin commits to this program and nothing else, and
+Every spend asserts ASSERT_MY_TAPTREE over the fixed internal key
+and the recomputed root, which proves the coin commits to this
+program and nothing else, and
 ASSERT_MY_OUTPOINT over the txid of the supplied creating
 transaction, which makes that transaction's output at the coin's
 index the coin's own scriptPubKey. The binding is program-to-coin
@@ -328,7 +331,7 @@ solution, that data being
 `(LAUNCHER_OUTPOINT MY_OUTPOINT MY_SPK MY_AMOUNT INNER_HASH)`, and
 rewrites the conditions it yields. Emitted conditions:
 
-1. `ASSERT_MY_TAPROOT <NUMS point> <lineage root>`
+1. `ASSERT_MY_TAPTREE <NUMS point> <lineage root>`
 2. `ASSERT_MY_AMOUNT MY_AMOUNT`
 3. `ASSERT_MY_OUTPOINT <creating txid || MY_INDEX>`
 4. The inner program's conditions, morphed.
@@ -553,7 +556,7 @@ The mod hashes, pinned in `python/tests/test_singleton_puzzles.py`:
 
 ```
 $ bitlisp-compile -T puzzles/singleton/singleton.bl -I puzzles/lib -I puzzles/singleton
-1d8a1a3714577ac5cee67abe6ae1a6972d29ba24ea0c599205f2f0069e943f83
+15d44b7d58dfa717679dfdeb583bb42a749bf9188dc5d7661171fdf89e8c3714
 $ bitlisp-compile -T puzzles/singleton/owner-inner.bl -I puzzles/lib -I puzzles/singleton
 40977e84db61eef5f52c9ac9b46dd2e2fbd6439674f50dd7a00ced5daf523bf0
 ```
@@ -570,9 +573,14 @@ Measured on the test lifecycle: the curried wrapper serializes to
 3620 bytes, the first spend's solution to 551 bytes and a later
 generation's to 832, the two serialized transactions being most of
 it. Evaluation costs 166937 for the first spend and 244898 for a
-later generation before the conditions charge, which add about 5.3
-million for the taproot assert, the signature assert, the seal, and
-the two output claims.
+later generation before the conditions charge, which add about 4.0
+million for the taptree assert, the signature assert, the seal,
+and the two output claims. Through the single-spend runner the
+first spend totals 4,167,737, a later generation 4,245,698, and
+the ending spend 4,262,797, each exactly 1,300,000 below the same
+spend under ASSERT_MY_TAPROOT: the taptree assert reads the
+identity base consensus authenticated from the control block
+instead of re-deriving the coin's scriptPubKey.
 
 The compiled representatives, one per lifecycle step with the
 in-program failures, are pinned in
