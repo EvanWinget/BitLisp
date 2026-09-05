@@ -20,6 +20,9 @@
   the public record to a Lisp VM for Bitcoin or to the conditions
   architecture, with BitLisp's answer, its status, and where it
   lives. The skeleton of the Phase 5 essay.
+- [mutation-triage.md](mutation-triage.md): what the mutation
+  harness found when run against the vector corpus, the survivor
+  classes accepted and why, and the vectors each pass added.
 - [condition-comparison.md](condition-comparison.md): informative
   side-by-side of Chia's deployed condition vocabulary and BitLisp's
   v0 vocabulary, plus the validation-layer architecture comparison.

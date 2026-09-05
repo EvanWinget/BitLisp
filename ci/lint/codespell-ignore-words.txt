@@ -2,3 +2,5 @@
 # above it.
 # The set-theory property (pairwise disjoint), not "disjointedness".
 disjointness
+# The ast.NotIn comparison operator class, not "not in" misspelled.
+NotIn

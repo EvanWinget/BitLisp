@@ -309,6 +309,13 @@
    "expect": {
     "error": "bad_condition_arg"
    }
+  },
+  {
+   "name": "reserved_cost_minus_one",
+   "conditions": "ffff8180ff81ff8080",
+   "expect": {
+    "error": "bad_condition_arg"
+   }
   }
  ]
 }

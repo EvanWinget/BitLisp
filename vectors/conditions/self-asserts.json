@@ -320,6 +320,34 @@
    "expect": {
     "error": "bad_condition_opcode"
    }
+  },
+  {
+   "name": "scriptpubkey_arity_zero",
+   "conditions": "ffff328080",
+   "expect": {
+    "error": "bad_condition_arity"
+   }
+  },
+  {
+   "name": "scriptpubkey_arity_two",
+   "conditions": "ffff32ffa25120aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaffa25120aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa8080",
+   "expect": {
+    "error": "bad_condition_arity"
+   }
+  },
+  {
+   "name": "amount_arity_zero",
+   "conditions": "ffff338080",
+   "expect": {
+    "error": "bad_condition_arity"
+   }
+  },
+  {
+   "name": "amount_arity_two",
+   "conditions": "ffff33ff8203e8ff8203e88080",
+   "expect": {
+    "error": "bad_condition_arity"
+   }
   }
  ]
 }

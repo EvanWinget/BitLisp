@@ -588,6 +588,40 @@
    "expect": {
     "error": "bad_condition_arg"
    }
+  },
+  {
+   "name": "assure_script_specifier_pair",
+   "conditions": "ffff42ff8200e2ff826869ffff01028080",
+   "expect": {
+    "error": "bad_condition_arg"
+   }
+  },
+  {
+   "name": "assert_announcement_arity_zero",
+   "conditions": "ffff418080",
+   "expect": {
+    "error": "bad_condition_arity"
+   }
+  },
+  {
+   "name": "assure_amount_tapleaf_specifier_parses",
+   "conditions": "ffff42ff09ff826869ff8203e8ffa02b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b8080",
+   "expect": {
+    "parsed": [
+     {
+      "opcode": 66,
+      "assurer_commitment": 0,
+      "requirer": {
+       "commitment": 9,
+       "fields": [
+        1000,
+        "2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b"
+       ]
+      },
+      "message": "6869"
+     }
+    ]
+   }
   }
  ]
 }

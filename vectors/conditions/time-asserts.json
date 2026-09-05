@@ -199,6 +199,25 @@
    "expect": {
     "error": "bad_condition_arg"
    }
+  },
+  {
+   "name": "seqheight_zero",
+   "conditions": "ffff22ff808080",
+   "expect": {
+    "parsed": [
+     {
+      "opcode": 34,
+      "blocks": 0
+     }
+    ]
+   }
+  },
+  {
+   "name": "seqheight_negative",
+   "conditions": "ffff22ff81ff8080",
+   "expect": {
+    "error": "bad_condition_arg"
+   }
   }
  ]
 }
