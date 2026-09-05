@@ -24,6 +24,7 @@ Exit status: 0 when every case in every suite passes, 1 otherwise.
 
 import json
 import sys
+import traceback
 from dataclasses import fields
 from pathlib import Path
 
@@ -43,7 +44,9 @@ class MalformedCase(VectorError):
     """A case raised outside the error taxonomy: a malformed vector,
     or an implementation raising something no vector can expect.
     Distinct so tooling that judges implementations by vector verdict
-    (the mutation harness) can tell the two apart."""
+    (the mutation harness) can tell the two apart. A suite raises it
+    only after every other case in the file has run, so a case that
+    reaches a verdict is never hidden behind one that escaped."""
 
 
 def validate_envelope(obj, path="<memory>"):
@@ -316,6 +319,7 @@ def run_validation_case(case):
 def _make_suite_runner(case_runner):
     def run_suite(envelope, path):
         names = set()
+        escaped = None
         for index, case in enumerate(envelope["cases"]):
             name = case.get("name", f"case {index}")
             if name in names:
@@ -325,10 +329,14 @@ def _make_suite_runner(case_runner):
                 case_runner(case)
             except VectorError as exc:
                 raise VectorError(f"{path}: {name}: {exc}") from None
-            except (KeyError, ValueError) as exc:
-                raise MalformedCase(
-                    f"{path}: {name}: malformed case: {exc!r}"
-                ) from None
+            except Exception as exc:
+                # The remaining cases still run: a verdict on any of
+                # them outranks an exception that escaped this one.
+                if escaped is None:
+                    escaped = (name, exc)
+        if escaped is not None:
+            name, exc = escaped
+            raise MalformedCase(f"{path}: {name}: malformed case: {exc!r}") from exc
 
     return run_suite
 
@@ -370,6 +378,8 @@ def main():
             total_cases += run_file(path)
         except VectorError as exc:
             print(f"FAIL {exc}", file=sys.stderr)
+            if isinstance(exc, MalformedCase):
+                traceback.print_exception(exc.__cause__, file=sys.stderr)
             failures += 1
     print(
         f"run_vectors: {len(files)} file(s), {total_cases} case(s), "
