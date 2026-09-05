@@ -3,6 +3,7 @@ judges them through the real corpus runner."""
 
 import ast
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -11,12 +12,12 @@ sys.path.insert(0, str(REPO_ROOT / "tools"))
 
 import mutate  # noqa: E402
 
-MODULES = sorted(p.stem for p in mutate.PACKAGE.glob("*.py") if p.stem != "__init__")
-
 
 def test_every_module_yields_parseable_distinct_mutants():
     mutants = mutate.inventory(set())
-    assert {m.module for m in mutants} == set(MODULES)
+    # The package's __init__ only re-exports names, so it alone has
+    # no mutation site.
+    assert {m.module for m in mutants} == set(mutate.module_names()) - {"__init__"}
     ids = [m.id for m in mutants]
     assert len(ids) == len(set(ids))
     for mutant in mutants:
@@ -69,9 +70,24 @@ def test_mirror_shares_data_and_copies_code():
         assert (root / "puzzles").is_symlink()
         assert not (root / "python" / "bitlisp").is_symlink()
         assert (root / "tools" / "run_vectors.py").is_file()
-        assert (root / "python" / "tests" / "conftest.py").is_file()
     finally:
         shutil.rmtree(root)
+
+
+def test_unknown_module_is_refused_before_anything_runs():
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(REPO_ROOT / "tools" / "mutate.py"),
+            "--list",
+            "--module",
+            "condition",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert proc.returncode == 2
+    assert "no module ['condition']" in proc.stderr
 
 
 def test_verdict_separates_the_oracle_from_an_escaping_exception():
@@ -102,13 +118,11 @@ def test_corpus_judges_a_wrong_cost_and_a_poisoned_error_table_apart():
     poisoned = next(
         m for m in mutate.inventory({"errors"}) if m.description == "NotIn -> In"
     )
-    assert mutate.evaluate(costs, timeout=120, tests=False)[:3] == (
-        costs.id,
-        "killed",
-        None,
-    )
-    assert mutate.evaluate(poisoned, timeout=120, tests=False)[:3] == (
-        poisoned.id,
+    killed = mutate.evaluate(costs, timeout=120, tests=False)
+    assert (killed.mutant, killed.corpus, killed.tests) == (costs, "killed", None)
+    crashed = mutate.evaluate(poisoned, timeout=120, tests=False)
+    assert (crashed.mutant, crashed.corpus, crashed.tests) == (
+        poisoned,
         "crashed",
         None,
     )
