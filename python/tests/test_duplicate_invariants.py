@@ -42,13 +42,17 @@ from bitlisp.conditions import (
     AssertMyAmount,
     AssertMyOutpoint,
     AssertMyScriptPubKey,
-    AssertMyTaproot,
     AssertMyTaptree,
     AssertMyTxid,
 )
-from bitlisp.secp256k1 import taproot_output_key
 from hypothesis import given
 from hypothesis import strategies as st
+from support import (
+    FILLER_INTERNAL_KEY,
+    FILLER_MERKLE_ROOT,
+    FILLER_TAPLEAF,
+    filler_identity,
+)
 
 IDEMPOTENT = (
     AssertLocktimeHeight,
@@ -59,7 +63,6 @@ IDEMPOTENT = (
     AssertMyTxid,
     AssertMyScriptPubKey,
     AssertMyAmount,
-    AssertMyTaproot,
     AssertMyTaptree,
     Announce,
     AssertAnnouncement,
@@ -77,12 +80,6 @@ def _outpoint(txid):
     return txid + (0).to_bytes(4, "little")
 
 
-_TAPROOT_IK = bytes.fromhex(
-    "187791b6f712a8ea41c8ecdd0ee77fab3e85263b37e1ec18a3651926b3a6cf27"
-)
-_TAPROOT_SPK = b"\x51\x20" + taproot_output_key(_TAPROOT_IK, b"")
-
-
 def _pool(own_txid, own_script, other_txid, other_script):
     """Condition candidates for one input. Announcer specifiers,
     requirer specifiers, and payloads collide across the pools of
@@ -90,11 +87,9 @@ def _pool(own_txid, own_script, other_txid, other_script):
     every landed rule, and the never-announced payload keeps the
     announcement error path exercised. The self asserts pair each
     input's own values with the other input's, so satisfied and
-    failing asserts are both dense, the taproot assert always
-    fails here (neither input script is a taproot script), keeping
-    a failing assert's idempotence exercised, and the taptree
-    asserts pair the identity build_tx installs with a wrong
-    root."""
+    failing asserts are both dense, and the taptree asserts pair
+    the identity build_tx installs with a wrong root, so a failing
+    assert's idempotence stays exercised."""
     return (
         CreateOutput(SCRIPT_A, 1),
         CreateOutput(SCRIPT_B, 1),
@@ -106,9 +101,8 @@ def _pool(own_txid, own_script, other_txid, other_script):
         AssertMyScriptPubKey(other_script),
         AssertMyAmount(0),
         AssertMyAmount(1),
-        AssertMyTaproot(_TAPROOT_IK, b"", _TAPROOT_SPK),
-        AssertMyTaptree(b"\x0c" * 32, b"\x0b" * 32),
-        AssertMyTaptree(b"\x0c" * 32, b"\x0a" * 32),
+        AssertMyTaptree(FILLER_INTERNAL_KEY, FILLER_MERKLE_ROOT),
+        AssertMyTaptree(FILLER_INTERNAL_KEY, FILLER_TAPLEAF),
         AssertLocktimeHeight(600),
         AssertLocktimeHeight(700),
         AssertLocktimeTime(500_000_600),
@@ -152,9 +146,7 @@ def build_tx(version, locktime, cond_lists, seq_pair, output_contents):
             amount=out_total if txid == TXID_A else 0,
             sequence=sequence,
             conditions=tuple(conditions),
-            tapleaf=b"\x0a" * 32,
-            merkle_root=b"\x0b" * 32,
-            internal_key=b"\x0c" * 32,
+            **filler_identity(),
         )
         for txid, script, sequence, conditions in (
             (TXID_A, SCRIPT_A, seq_pair[0], cond_lists[0]),

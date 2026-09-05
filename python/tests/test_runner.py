@@ -29,7 +29,6 @@ from bitlisp.conditions import (  # noqa: E402
     AssertMyAmount,
     AssertMyOutpoint,
     AssertMyScriptPubKey,
-    AssertMyTaproot,
     AssertMyTaptree,
     AssertMyTxid,
     AssertSequenceHeight,
@@ -53,6 +52,7 @@ from bitlisp_tools.runner import (  # noqa: E402
     render_condition,
     run_spend,
 )
+from support import filler_identity_json  # noqa: E402
 
 SPK_TAPROOT = "5120" + "aa" * 32
 SPK_P2WPKH = "0014" + "99" * 20
@@ -68,9 +68,7 @@ def _context(**overrides):
                 "index": 0,
                 "script_pubkey": SPK_TAPROOT,
                 "amount": 1000,
-                "tapleaf": "0a" * 32,
-                "merkle_root": "0b" * 32,
-                "internal_key": "0c" * 32,
+                **filler_identity_json(),
             }
         ],
         "outputs": [{"script_pubkey": SPK_P2WPKH, "amount": 600}],
@@ -113,15 +111,6 @@ RENDER_CASES = [
     (AssertMyTxid(b"\x22" * 32), "ASSERT_MY_TXID txid=0x" + "22" * 32),
     (AssertMyScriptPubKey(b""), "ASSERT_MY_SCRIPTPUBKEY script_pubkey=0x"),
     (AssertMyAmount(0), "ASSERT_MY_AMOUNT amount=0"),
-    (
-        AssertMyTaproot(b"\x02" * 32, b"\x04" * 32, bytes.fromhex(SPK_TAPROOT)),
-        "ASSERT_MY_TAPROOT internal_key=0x"
-        + "02" * 32
-        + " merkle_root=0x"
-        + "04" * 32
-        + " script_pubkey=0x"
-        + SPK_TAPROOT,
-    ),
     (
         AssertMyTaptree(b"\x02" * 32, b"\x04" * 32),
         "ASSERT_MY_TAPTREE internal_key=0x" + "02" * 32 + " merkle_root=0x" + "04" * 32,

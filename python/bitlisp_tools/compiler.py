@@ -6,8 +6,9 @@ operator names, and decimals keep exactly their raw meaning and the
 language occupies only text that previously errored. Atoms quote
 themselves, names resolve to environment paths or inline constant
 values, and the special forms are program, defun, defun-inline,
-defconstant, include, if, list, assert, and, and or. Everything
-else a source expression can say is an operator application.
+defconstant, include, if, let, list, list*, assert, and, and or.
+Everything else a source expression can say is an operator
+application.
 
 A compiled program's environment is the pair (function tree . args).
 The function tree holds every reachable function body, balanced in
@@ -45,7 +46,7 @@ from bitlisp import conditions
 from bitlisp.errors import BitLispError
 from bitlisp.machine import run
 from bitlisp.operators import OPERATORS
-from bitlisp.sexp import NIL, int_to_atom, is_atom, is_pair
+from bitlisp.sexp import NIL, atom_to_int, int_to_atom, is_atom, is_pair
 
 from .keywords import ATOM_TO_NAME
 from .printer import _atom_text
@@ -70,7 +71,9 @@ _TOP, _LEFT, _RIGHT = 1, 2, 3
     _DEFCONSTANT,
     _INCLUDE,
     _IF,
+    _LET,
     _LIST,
+    _LIST_STAR,
     _ASSERT,
     _AND,
     _OR,
@@ -81,7 +84,9 @@ _TOP, _LEFT, _RIGHT = 1, 2, 3
     "defconstant",
     "include",
     "if",
+    "let",
     "list",
+    "list*",
     "assert",
     "and",
     "or",
@@ -94,7 +99,9 @@ RESERVED_WORDS = frozenset(
         _DEFCONSTANT,
         _INCLUDE,
         _IF,
+        _LET,
         _LIST,
+        _LIST_STAR,
         _ASSERT,
         _AND,
         _OR,
@@ -141,7 +148,6 @@ CONDITION_NAMES = (
     "ASSERT_MY_TXID",
     "ASSERT_MY_SCRIPTPUBKEY",
     "ASSERT_MY_AMOUNT",
-    "ASSERT_MY_TAPROOT",
     "ASSERT_MY_TAPTREE",
     "ANNOUNCE",
     "ASSERT_ANNOUNCEMENT",
@@ -330,36 +336,46 @@ class Definitions:
         self.inlines = {}
         self.constants = {}
 
+    def __contains__(self, name):
+        return name in self.functions or name in self.inlines or name in self.constants
+
     def _claim(self, symbol, taken):
         name = _check_name(symbol, "definition")
-        if (
-            name in self.functions
-            or name in self.inlines
-            or name in self.constants
-            or name in taken
-        ):
+        if name in self or name in taken:
             raise CompileError(f"{name!r} is already defined", symbol.offset)
+        return name
+
+    def add(self, form, taken=frozenset()):
+        """Adds one declaration form, dispatched on its keyword. An
+        include form is not a declaration: the caller splices its
+        file's declarations and adds each of those."""
+        keyword = declaration_keyword(form)
+        if keyword == _DEFUN:
+            return self.add_defun(form, taken)
+        if keyword == _DEFUN_INLINE:
+            return self.add_defun_inline(form, taken)
+        if keyword == _DEFCONSTANT:
+            return self.add_defconstant(form, taken)
+        raise CompileError("expected defun, defun-inline, defconstant, or include")
+
+    def _add_function(self, form, keyword, space, taken):
+        items = _form_items(form, keyword, 4)
+        name = self._claim(items[1], taken)
+        arity = _check_params(items[2])
+        space[name] = (items[2], items[3], arity)
         return name
 
     def add_defun(self, form, taken=frozenset()):
         """Adds one (defun name params body) source form. The body
         is stored as written and compiles when a program reaches it,
         so definitions may reference names that arrive later."""
-        items = _form_items(form, _DEFUN, 4)
-        name = self._claim(items[1], taken)
-        arity = _check_params(items[2])
-        self.functions[name] = (items[2], items[3], arity)
-        return name
+        return self._add_function(form, _DEFUN, self.functions, taken)
 
     def add_defun_inline(self, form, taken=frozenset()):
         """Adds one (defun-inline name params body) source form.
         The body is stored as written and splices at each call site
         a program reaches, never entering the function tree."""
-        items = _form_items(form, _DEFUN_INLINE, 4)
-        name = self._claim(items[1], taken)
-        arity = _check_params(items[2])
-        self.inlines[name] = (items[2], items[3], arity)
-        return name
+        return self._add_function(form, _DEFUN_INLINE, self.inlines, taken)
 
     def add_defconstant(self, form, taken=frozenset()):
         """Adds one (defconstant name value) source form. The value
@@ -451,10 +467,7 @@ def _bind_inline_params(params, arguments):
         index += 1
         spine = spine[1]
     if isinstance(spine, Symbol):
-        rest = NIL
-        for argument in reversed(arguments[index:]):
-            rest = _proper_list(_CONS, argument, rest)
-        bindings[spine.name] = rest
+        bindings[spine.name] = _cons_onto(arguments[index:], NIL)
     while stack:
         tree, node = stack.pop()
         if isinstance(tree, Symbol):
@@ -531,10 +544,9 @@ def _proper_items(node, what, offset_hint=None):
     while is_pair(node):
         items.append(node[0])
         node = node[1]
-    if node != NIL and not isinstance(node, Symbol):
-        raise CompileError(f"{what} takes a proper argument list", offset_hint)
-    if isinstance(node, Symbol):
-        raise CompileError(f"{what} takes a proper argument list", node.offset)
+    if node != NIL:
+        offset = node.offset if isinstance(node, Symbol) else offset_hint
+        raise CompileError(f"{what} takes a proper argument list", offset)
     return items
 
 
@@ -546,6 +558,15 @@ def _proper_list(*nodes):
     result = NIL
     for node in reversed(nodes):
         result = (node, result)
+    return result
+
+
+def _cons_onto(compiled, tail):
+    """The cons chain the two list forms share: each compiled item
+    in order, ending in tail, nil for a proper list."""
+    result = tail
+    for item in reversed(compiled):
+        result = _proper_list(_CONS, item, result)
     return result
 
 
@@ -669,8 +690,12 @@ class _Compilation:
         name = head.name
         if name == _IF:
             return self._if(head, tail, bindings)
+        if name == _LET:
+            return self._let(head, tail, bindings)
         if name == _LIST:
             return self._list(head, tail, bindings)
+        if name == _LIST_STAR:
+            return self._list_star(head, tail, bindings)
         if name == _ASSERT:
             return self._assert(head, tail, bindings)
         if name == _AND:
@@ -700,10 +725,18 @@ class _Compilation:
 
     def _list(self, head, tail, bindings):
         items = _proper_items(tail, _LIST, head.offset)
-        result = NIL
-        for item in reversed(items):
-            result = _proper_list(_CONS, self.expression(item, bindings), result)
-        return result
+        compiled = [self.expression(item, bindings) for item in items]
+        return _cons_onto(compiled, NIL)
+
+    def _list_star(self, head, tail, bindings):
+        # The last argument is the tail the others cons onto, so
+        # the built list ends in it instead of nil, and a lone
+        # tail compiles bare.
+        items = _proper_items(tail, _LIST_STAR, head.offset)
+        if not items:
+            raise CompileError("list* takes items and a final tail", head.offset)
+        compiled = [self.expression(item, bindings) for item in items]
+        return _cons_onto(compiled[:-1], compiled[-1])
 
     def _assert(self, head, tail, bindings):
         items = _proper_items(tail, _ASSERT, head.offset)
@@ -736,6 +769,104 @@ class _Compilation:
         for condition in reversed(compiled):
             result = _lazy_if(condition, _TRUE, result)
         return result
+
+    def _let(self, head, tail, bindings):
+        """The bound names become parameters of the body, applied
+        once in place: the environment is rebuilt as the enclosing
+        one with the bound values consed in front of the arguments,
+        so the function tree keeps its path and calls inside the
+        body work unchanged. The cost is one apply plus one cons
+        per binding, the hand-written naming helper's price.
+
+        Every enclosing binding is re-rooted under the rebuilt
+        environment's tail. The rewrite leans on two invariants,
+        the first enforced below: with a function tree every
+        binding path descends the argument side, path 3, because
+        parameters never bind into the tree at path 2, and a
+        compiled expression that is a non-nil atom is always an
+        environment path, because value atoms quote themselves
+        into pairs. A quote-headed binding evaluates the same
+        under any environment and passes through unchanged. Any
+        other pair-valued binding, an inline call-by-name
+        substitution, is an arbitrary expression meaningful only
+        in the enclosing environment, so each reference re-applies
+        it against that environment rebuilt from the tail, keeping
+        the inline contract: used twice evaluates twice, unused
+        never evaluates."""
+        items = _proper_items(tail, _LET, head.offset)
+        if len(items) != 2:
+            raise CompileError("let takes bindings and a body", head.offset)
+        entries = []
+        node = items[0]
+        while is_pair(node):
+            # A bare name in entry position is the classic unnested
+            # spelling (let (A 1) ...), so the error names the shape
+            # instead of complaining about the argument list.
+            entry = _proper_items(node[0], "a let binding") if is_pair(node[0]) else []
+            if len(entry) != 2 or not isinstance(entry[0], Symbol):
+                symbol = first_symbol(node[0])
+                raise CompileError(
+                    "a let binding takes a name and a value",
+                    head.offset if symbol is None else symbol.offset,
+                )
+            entries.append(entry)
+            node = node[1]
+        if node != NIL:
+            offset = node.offset if isinstance(node, Symbol) else head.offset
+            raise CompileError("let takes a binding list", offset)
+        if not entries:
+            return self.expression(items[1], bindings)
+        has_tree = bool(self.fn_paths)
+        # With a tree the old arguments sit at path 3 of the old
+        # environment and the bound names root at path 3 of the new
+        # one. Bare, both are the whole environment, path 1.
+        root = _RIGHT if has_tree else _TOP
+        bound_paths = {}
+        values = []
+        tail_path = root
+        for symbol, value in entries:
+            name = _check_name(symbol, "binding")
+            if name in bound_paths:
+                raise CompileError(f"duplicate binding {name!r}", symbol.offset)
+            values.append(self.expression(value, bindings))
+            bound_paths[name] = int_to_atom(_compose(tail_path, _LEFT))
+            tail_path = _compose(tail_path, _RIGHT)
+        rebound = {}
+        for name, bound in bindings.items():
+            if bound == NIL:
+                rebound[name] = bound
+            elif is_atom(bound):
+                path = atom_to_int(bound)
+                if has_tree:
+                    if path < _RIGHT or not path & 1:
+                        # The enforced invariant: a bare atom that
+                        # does not descend the argument side is not
+                        # a binding path, and rewriting it would
+                        # miscompile, so refuse loudly instead.
+                        raise AssertionError(
+                            f"binding path {path} is not under the arguments"
+                        )
+                    # Drop the leading rest step: the path continues
+                    # from the old arguments, which the tail reaches.
+                    path >>= 1
+                rebound[name] = int_to_atom(_compose(tail_path, path))
+            elif is_atom(bound[0]) and bound[0] == _QUOTE:
+                # A quoted node is environment independent.
+                rebound[name] = bound
+            else:
+                if has_tree:
+                    environment = _proper_list(
+                        _CONS, int_to_atom(_LEFT), int_to_atom(tail_path)
+                    )
+                else:
+                    environment = int_to_atom(tail_path)
+                rebound[name] = _proper_list(_APPLY, _quote(bound), environment)
+        rebound.update(bound_paths)
+        body = self.expression(items[1], rebound)
+        rest = _cons_onto(values, int_to_atom(root))
+        if has_tree:
+            rest = _proper_list(_CONS, int_to_atom(_LEFT), rest)
+        return _proper_list(_APPLY, _quote(body), rest)
 
     def _inline_call(self, head, tail, bindings):
         """The body compiled at the call site, parameter references
@@ -785,12 +916,8 @@ class _Compilation:
         # The callee sees the caller's layout rebuilt: the function
         # tree it received at path 2, consed onto the evaluated
         # arguments as a proper list.
-        argument_list = NIL
-        for argument in reversed(arguments):
-            argument_list = _proper_list(
-                _CONS, self.expression(argument, bindings), argument_list
-            )
-        environment = _proper_list(_CONS, int_to_atom(_LEFT), argument_list)
+        compiled = [self.expression(argument, bindings) for argument in arguments]
+        environment = _proper_list(_CONS, int_to_atom(_LEFT), _cons_onto(compiled, NIL))
         return _proper_list(_APPLY, int_to_atom(self.fn_paths[name]), environment)
 
     def _operator(self, op, tail, bindings):
@@ -1035,18 +1162,8 @@ def compile_program(source, include_paths=()):
     _check_params(params)
     defs = Definitions()
     for declaration, origin in _spliced(items[1:-1], include_paths):
-        keyword = declaration_keyword(declaration)
         try:
-            if keyword == _DEFUN:
-                defs.add_defun(declaration)
-            elif keyword == _DEFUN_INLINE:
-                defs.add_defun_inline(declaration)
-            elif keyword == _DEFCONSTANT:
-                defs.add_defconstant(declaration)
-            else:
-                raise CompileError(
-                    "expected defun, defun-inline, defconstant, or include"
-                )
+            defs.add(declaration)
         except CompileError as exc:
             # An included declaration's offsets index its own file's
             # text, so the error names the file, as a function body's

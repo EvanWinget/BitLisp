@@ -35,6 +35,7 @@ from bitlisp_tools.compiler import (  # noqa: E402
     tree_hash,
 )
 from bitlisp_tools.runner import DEFAULT_MAX_COST, load_context, run_spend  # noqa: E402
+from support import filler_identity_json  # noqa: E402
 
 BUDGET = 11_000_000_000
 
@@ -78,7 +79,6 @@ CONDITION_TABLE_ROWS = [
     (0x31, "ASSERT_MY_TXID"),
     (0x32, "ASSERT_MY_SCRIPTPUBKEY"),
     (0x33, "ASSERT_MY_AMOUNT"),
-    (0x37, "ASSERT_MY_TAPROOT"),
     (0x38, "ASSERT_MY_TAPTREE"),
     (0x40, "ANNOUNCE"),
     (0x41, "ASSERT_ANNOUNCEMENT"),
@@ -91,7 +91,7 @@ CONDITION_TABLE_ROWS = [
 
 
 def test_condition_constants_match_spec_table():
-    assert len(CONDITION_TABLE_ROWS) == 27
+    assert len(CONDITION_TABLE_ROWS) == 26
     assert CONDITION_CONSTANTS == {
         name: int_to_atom(opcode) for opcode, name in CONDITION_TABLE_ROWS
     }
@@ -147,6 +147,49 @@ def test_pin_list_and_nil():
     program, _, result = _run_program("(program () (list 1 () (list)))")
     assert disassemble(program) == "(c (q . 1) (c () (c () ())))"
     assert result == assemble("(1 () ())")
+
+
+def test_pin_list_star_shapes():
+    # A lone tail has nothing to cons and compiles bare, and each
+    # further item adds one cons, the built list ending in the tail
+    # instead of nil.
+    program, _, _ = _run_program("(program (T) (list* T))", "((5 6))")
+    assert disassemble(program) == "2"
+    program, _, result = _run_program("(program (A B T) (list* A B T))", "(1 2 (5 6))")
+    assert disassemble(program) == "(c 2 (c 5 11))"
+    assert result == assemble("(1 2 5 6)")
+
+
+def test_pin_let_shapes():
+    # Bare: the body is quoted and applied onto the bound value
+    # consed in front of the old environment, so A reads path 2 and
+    # the tail is the whole old environment, path 1. With a
+    # function tree the rebuild keeps the tree at path 2 and X,
+    # path 5 outside the let, reads path 11 through the tail.
+    # Empty bindings compile the body bare.
+    program, _, result = _run_program(
+        "(program (X) (let ((A (+ X 1))) (* A A)))", "(4)"
+    )
+    assert disassemble(program) == "(a (q 18 2 2) (c (+ 2 (q . 1)) 1))"
+    assert result == int_to_atom(25)
+    program, _, result = _run_program(
+        "(program (X) (defun double (N) (* 2 N)) (let ((A (double X))) (+ A A X)))",
+        "(5)",
+    )
+    assert disassemble(program) == (
+        "(a (q 2 (q 16 5 5 11) (c 2 (c (a 2 (c 2 (c 5 ()))) 3))) "
+        "(c (q 18 (q . 2) 5) 1))"
+    )
+    assert result == int_to_atom(25)
+    program, _, _ = _run_program("(program (X) (let () (+ X 1)))", "(9)")
+    assert disassemble(program) == "(+ 2 (q . 1))"
+    # Two bindings: the second name reads one rest step deeper, and
+    # the old environment lands behind both consed values.
+    program, _, result = _run_program(
+        "(program (X Y) (let ((A X) (B Y)) (c A B)))", "(7 9)"
+    )
+    assert disassemble(program) == "(a (q 4 2 5) (c 2 (c 5 1)))"
+    assert result == (int_to_atom(7), int_to_atom(9))
 
 
 def test_pin_constant_inlines():
@@ -250,6 +293,115 @@ def test_and_or_are_boolean_and_lazy():
     assert result == int_to_atom(1)
 
 
+def test_list_star_extends_an_inherited_tail():
+    # The shape condition lists take when a program conses its own
+    # conditions onto a tail it was handed.
+    source = """(program (SCRIPT AMT TAIL)
+        (list* (list CREATE_OUTPUT SCRIPT AMT) TAIL))"""
+    _, _, result = _run_program(source, "(0xaa 700 ((81 1)))")
+    assert result == assemble("((1 0xaa 700) (81 1))")
+
+
+def test_let_binds_in_parallel_and_nests():
+    # Parallel: every value evaluates against the enclosing scope,
+    # so a swap through a let works, and sequential naming is the
+    # nested-let idiom.
+    _, _, result = _run_program(
+        "(program (X Y) (let ((X Y) (Y X)) (list X Y)))", "(1 2)"
+    )
+    assert result == assemble("(2 1)")
+    source = """(program (X)
+        (let ((A (+ X 1)))
+            (let ((B (* A 2))) (list A B X))))"""
+    _, _, result = _run_program(source, "(10)")
+    assert result == assemble("(11 22 10)")
+
+
+def test_let_shadows_and_keeps_the_rest_of_scope():
+    # A bound name shadows a parameter, a function, or a constant
+    # exactly as a parameter does, and every unshadowed name stays
+    # visible through the rebuilt environment, dotted parameters
+    # included.
+    _, _, result = _run_program("(program (X) (let ((X (* X X))) (+ X 1)))", "(6)")
+    assert result == int_to_atom(37)
+    source = """(program (X Y)
+        (defconstant K 100)
+        (defun bump (N) (+ N 1))
+        (let ((bump (bump X)) (K (+ K Y))) (list bump K)))"""
+    _, _, result = _run_program(source, "(5 2)")
+    assert result == assemble("(6 102)")
+    _, _, result = _run_program(
+        "(program (H . T) (let ((A (f T))) (list A H)))", "(1 2 3)"
+    )
+    assert result == assemble("(2 1)")
+
+
+def test_let_body_calls_through_the_tree():
+    # The rebuilt environment keeps the function tree at path 2, so
+    # recursion inside a let body needs no special handling.
+    source = """(program (N)
+        (defun down (N) (if (= N 0) () (c N (down (- N 1)))))
+        (let ((K (+ N 1))) (down K)))"""
+    _, _, result = _run_program(source, "(3)")
+    assert result == assemble("(4 3 2 1)")
+
+
+def test_let_inside_an_inline_body_keeps_call_by_name():
+    # The inline argument stays call-by-name through the rebuilt
+    # environment: used twice it evaluates twice, and unused it
+    # never evaluates, so the raise never fires.
+    source = """(program (X)
+        (defun-inline twice (V) (let ((A 1)) (+ V V A)))
+        (twice (* X X)))"""
+    _, _, result = _run_program(source, "(3)")
+    assert result == int_to_atom(19)
+    source = """(program (X)
+        (defun-inline drop (V) (let ((A 7)) A))
+        (drop (x)))"""
+    _, _, result = _run_program(source, "(1)")
+    assert result == int_to_atom(7)
+
+
+def test_let_passes_quoted_inline_bindings_through():
+    # A quoted node evaluates the same under any environment, so a
+    # literal-valued inline substitution crosses a let unwrapped
+    # instead of paying a restore-apply per reference.
+    source = """(program (X)
+        (defun-inline plus (V) (let ((A 3)) (+ V A)))
+        (plus 5))"""
+    program, _, result = _run_program(source, "()")
+    assert result == int_to_atom(8)
+    text = disassemble(program)
+    assert "(q . 5)" in text
+    assert "(a (q 1 . 5)" not in text
+
+
+def test_let_inside_a_defconstant_value():
+    source = """(program ()
+        (defconstant K (let ((A (+ 20 1))) (* A 2)))
+        K)"""
+    _, _, result = _run_program(source)
+    assert result == int_to_atom(42)
+
+
+def test_let_names_an_expensive_value_once():
+    # Naming through let evaluates the value once where the inline
+    # substitution evaluates it per reference, so past a small
+    # value the apply plus cons overhead costs less than the
+    # second evaluation.
+    named = "(program (X) (let ((H (sha256tree X))) (list H H)))"
+    inlined = """(program (X)
+        (defun-inline pair (H) (list H H))
+        (pair (sha256tree X)))"""
+    solution = "((1 2 3 4 5 6 7 8))"
+    named_program, _, named_result = _run_program(named, solution)
+    inlined_program, _, inlined_result = _run_program(inlined, solution)
+    assert named_result == inlined_result
+    named_cost = run(named_program, assemble(solution), BUDGET)[0]
+    inlined_cost = run(inlined_program, assemble(solution), BUDGET)[0]
+    assert named_cost < inlined_cost
+
+
 def test_destructured_parameters():
     source = "(program ((A B) C) (+ A (* B C)))"
     program, _, _ = _run_program(source, "((2 3) 10)")
@@ -329,9 +481,7 @@ def test_spend_pipeline_accepts_compiled_conditions():
                     "index": 0,
                     "script_pubkey": "5120" + "aa" * 32,
                     "amount": 1000,
-                    "tapleaf": "0a" * 32,
-                    "merkle_root": "0b" * 32,
-                    "internal_key": "0c" * 32,
+                    **filler_identity_json(),
                 }
             ],
             "outputs": [{"script_pubkey": "0014" + "99" * 20, "amount": 600}],
@@ -423,7 +573,7 @@ def test_load_symbols_tracks_the_reserved_words():
     _, table = compile_program("(program (X) (defun fun (N) (* 2 N)) (fun X))")
     data = symbols_to_json(table)
     (key,) = data["functions"]
-    for name in ("assert", "and", "or", "include", "defun-inline"):
+    for name in ("assert", "and", "or", "include", "defun-inline", "let", "list*"):
         data["functions"][key]["name"] = name
         with pytest.raises(ValueError) as excinfo:
             load_symbols(data)
@@ -838,7 +988,29 @@ def test_included_body_error_names_function_and_file(tmp_path):
         ("(program (X) (defun f N) X)", "defun takes 3 parts"),
         ("(program (X) (defconstant K) X)", "defconstant takes 2 parts"),
         ("(program (X) (assert))", "assert takes conditions and a final value"),
+        ("(program (X) (list*))", "list* takes items and a final tail"),
+        ("(program (X) (list* 1 . 2))", "list* takes a proper argument list"),
         ("(program (assert) 1)", "'assert' is a reserved word"),
+        ("(program (list*) 1)", "'list*' is a reserved word"),
+        ("(program (X) (defun list* (N) N) X)", "'list*' is a reserved word"),
+        ("(program (X) (let))", "let takes bindings and a body"),
+        ("(program (X) (let ((A 1))))", "let takes bindings and a body"),
+        ("(program (X) (let ((A 1) . B) A))", "let takes a binding list"),
+        ("(program (X) (let ((A)) A))", "a let binding takes a name and a value"),
+        ("(program (X) (let (A 1) A))", "a let binding takes a name and a value"),
+        ("(program (X) (let ((A 1 2)) A))", "a let binding takes a name and a value"),
+        (
+            "(program (X) (let ((A 1 . 2)) A))",
+            "a let binding takes a proper argument list",
+        ),
+        ("(program (X) (let ((A 1) (A 2)) A))", "duplicate binding 'A'"),
+        ("(program (X) (let ((list 1)) 2))", "'list' is a reserved word"),
+        ("(program (X) (let ((SEAL 1)) 2))", "'SEAL' is a condition constant"),
+        ("(program (X) (let ((A X)) (A 1)))", "'A' is a parameter, not a function"),
+        ("(program (X) (let ((A B)) A))", "unknown name 'B'"),
+        ("(program (X) (let ((A 1) (B A)) B))", "unknown name 'A'"),
+        ("(program (let) 1)", "'let' is a reserved word"),
+        ("(program (X) (defun let (N) N) X)", "'let' is a reserved word"),
         ("(program (X) (defun and (N) N) X)", "'and' is a reserved word"),
         ("(program (X) (defconstant or 1) X)", "'or' is a reserved word"),
         ("(program (X) (defun include (N) N) X)", "'include' is a reserved word"),
@@ -927,7 +1099,9 @@ def test_reserved_words_are_pinned_and_all_dispatch():
             "defconstant",
             "include",
             "if",
+            "let",
             "list",
+            "list*",
             "assert",
             "and",
             "or",
@@ -964,6 +1138,43 @@ def test_list_builds_the_literal_list(values):
     for value in reversed(values):
         expected = (int_to_atom(value), expected)
     assert result == expected
+
+
+@given(
+    st.lists(st.integers(min_value=0, max_value=2**63 - 1), max_size=6),
+    st.lists(st.integers(min_value=0, max_value=2**63 - 1), max_size=4),
+)
+def test_list_star_conses_onto_its_tail(values, tail_values):
+    # Against Python's own cons fold: the built list is the items
+    # ended by the quoted tail rather than nil.
+    defs = Definitions()
+    tail = NIL
+    for value in reversed(tail_values):
+        tail = (int_to_atom(value), tail)
+    text = "(list* {} (q . {}))".format(
+        " ".join(str(value) for value in values), disassemble(tail)
+    )
+    program, _ = compile_expression(text, defs)
+    cost, result = run(program, NIL, BUDGET)
+    expected = tail
+    for value in reversed(values):
+        expected = (int_to_atom(value), expected)
+    assert result == expected
+
+
+@given(st.lists(st.integers(min_value=0, max_value=2**63 - 1), max_size=5))
+def test_let_sums_its_bound_names(values):
+    # Random integer bindings, the body summing every bound name,
+    # against Python's own sum.
+    defs = Definitions()
+    names = [f"V{i}" for i in range(len(values))]
+    bound = " ".join(
+        f"({name} {value})" for name, value in zip(names, values, strict=True)
+    )
+    text = "(let ({}) (+ {}))".format(bound, " ".join(names))
+    program, _ = compile_expression(text, defs)
+    cost, result = run(program, NIL, BUDGET)
+    assert result == int_to_atom(sum(values))
 
 
 @given(st.lists(st.integers(min_value=0, max_value=3), max_size=6))

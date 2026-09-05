@@ -24,6 +24,7 @@ Exit status: 0 when every case in every suite passes, 1 otherwise.
 
 import json
 import sys
+from dataclasses import fields
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -128,136 +129,45 @@ def run_vm_case(case):
         raise VectorError(f"expected {expect}, got {outcome}")
 
 
-def _specifier_json(specifier):
-    """The pinned JSON form of a participant specifier: the
-    commitment value and the fields in operand order, amounts as
-    integers, everything else as hex."""
+def _json_value(value):
+    """The pinned JSON form of one parsed operand: integers as
+    integers, bytes as hex, a participant specifier as its
+    commitment value and its fields in operand order."""
+    from bitlisp.conditions import Specifier
+
+    if isinstance(value, bool) or not isinstance(value, int | bytes | Specifier):
+        raise VectorError(f"no JSON form for operand {value!r}")
+    if isinstance(value, int):
+        return value
+    if isinstance(value, bytes):
+        return value.hex()
     return {
-        "commitment": specifier.commitment,
-        "fields": [
-            field if isinstance(field, int) else field.hex()
-            for field in specifier.fields
-        ],
+        "commitment": value.commitment,
+        "fields": [_json_value(field) for field in value.fields],
     }
 
 
 def _condition_json(cond):
-    """The pinned JSON form of one parsed condition."""
+    """The pinned JSON form of one parsed condition: its opcode, then
+    every operand under its model field name. A reserved condition's
+    raw argument nodes pin as serialized hex."""
     from bitlisp import serialize
-    from bitlisp.conditions import (
-        Announce,
-        AssertAnnouncement,
-        AssertLocktimeHeight,
-        AssertLocktimeTime,
-        AssertMyAmount,
-        AssertMyOutpoint,
-        AssertMyScriptPubKey,
-        AssertMyTaproot,
-        AssertMyTaptree,
-        AssertMyTxid,
-        AssertSequenceHeight,
-        AssertSequenceTime,
-        AssertSig,
-        Assure,
-        CreateOutput,
-        CreateOutputTaproot,
-        Require,
-        Reserved,
-        ReserveFee,
-        Seal,
-        SealOutputs,
-    )
+    from bitlisp.conditions import Reserved
 
-    if isinstance(cond, AssertLocktimeHeight):
-        return {"opcode": cond.opcode, "height": cond.height}
-    if isinstance(cond, AssertLocktimeTime):
-        return {"opcode": cond.opcode, "time": cond.time}
-    if isinstance(cond, AssertSequenceHeight):
-        return {"opcode": cond.opcode, "blocks": cond.blocks}
-    if isinstance(cond, AssertSequenceTime):
-        return {"opcode": cond.opcode, "units": cond.units}
-    if isinstance(cond, CreateOutput):
-        return {
-            "opcode": cond.opcode,
-            "script_pubkey": cond.script_pubkey.hex(),
-            "amount": cond.amount,
-        }
-    if isinstance(cond, CreateOutputTaproot):
-        return {
-            "opcode": cond.opcode,
-            "internal_key": cond.internal_key.hex(),
-            "merkle_root": cond.merkle_root.hex(),
-            "amount": cond.amount,
-            "script_pubkey": cond.script_pubkey.hex(),
-        }
-    if isinstance(cond, AssertSig):
-        return {
-            "opcode": cond.opcode,
-            "pubkey": cond.pubkey.hex(),
-            "message": cond.message.hex(),
-            "signature": cond.signature.hex(),
-        }
-    if isinstance(cond, AssertMyOutpoint):
-        return {"opcode": cond.opcode, "outpoint": cond.outpoint.hex()}
-    if isinstance(cond, AssertMyTxid):
-        return {"opcode": cond.opcode, "txid": cond.txid.hex()}
-    if isinstance(cond, AssertMyScriptPubKey):
-        return {"opcode": cond.opcode, "script_pubkey": cond.script_pubkey.hex()}
-    if isinstance(cond, AssertMyAmount):
-        return {"opcode": cond.opcode, "amount": cond.amount}
-    if isinstance(cond, AssertMyTaproot):
-        return {
-            "opcode": cond.opcode,
-            "internal_key": cond.internal_key.hex(),
-            "merkle_root": cond.merkle_root.hex(),
-            "script_pubkey": cond.script_pubkey.hex(),
-        }
-    if isinstance(cond, AssertMyTaptree):
-        return {
-            "opcode": cond.opcode,
-            "internal_key": cond.internal_key.hex(),
-            "merkle_root": cond.merkle_root.hex(),
-        }
-    if isinstance(cond, Announce):
-        return {
-            "opcode": cond.opcode,
-            "namespace": cond.namespace.hex(),
-            "payload": cond.payload.hex(),
-        }
-    if isinstance(cond, AssertAnnouncement):
-        return {
-            "opcode": cond.opcode,
-            "announcer": _specifier_json(cond.announcer),
-            "namespace": cond.namespace.hex(),
-            "payload": cond.payload.hex(),
-        }
-    if isinstance(cond, Assure):
-        return {
-            "opcode": cond.opcode,
-            "assurer_commitment": cond.assurer_commitment,
-            "requirer": _specifier_json(cond.requirer),
-            "message": cond.message.hex(),
-        }
-    if isinstance(cond, Require):
-        return {
-            "opcode": cond.opcode,
-            "assurer": _specifier_json(cond.assurer),
-            "requirer_commitment": cond.requirer_commitment,
-            "message": cond.message.hex(),
-        }
-    if isinstance(cond, ReserveFee):
-        return {"opcode": cond.opcode, "reserve": cond.reserve}
-    if isinstance(cond, Seal):
-        return {"opcode": cond.opcode, "txid": cond.txid.hex()}
-    if isinstance(cond, SealOutputs):
-        return {"opcode": cond.opcode, "outputs_hash": cond.outputs_hash.hex()}
     if isinstance(cond, Reserved):
         return {
             "opcode": cond.opcode,
             "cost": cond.cost,
             "args": [serialize(arg).hex() for arg in cond.args],
         }
-    raise VectorError(f"no JSON form for condition type {type(cond).__name__}")
+    return {
+        "opcode": cond.opcode,
+        **{
+            field.name: _json_value(getattr(cond, field.name))
+            for field in fields(cond)
+            if field.name != "opcode"
+        },
+    }
 
 
 def run_conditions_case(case):
@@ -288,10 +198,7 @@ def run_conditions_case(case):
 
     The self asserts pin {"opcode"} plus their operand under its
     entry's name ("outpoint", "txid", "script_pubkey", "amount"),
-    amounts as integers, bytes as hex. ASSERT_MY_TAPROOT pins
-    {"opcode", "internal_key", "merkle_root", "script_pubkey"} with
-    script_pubkey the derived taproot script, exactly as
-    CREATE_OUTPUT_TAPROOT pins it. ASSERT_MY_TAPTREE pins
+    amounts as integers, bytes as hex. ASSERT_MY_TAPTREE pins
     {"opcode", "internal_key", "merkle_root"}, its two operands and
     nothing derived.
 

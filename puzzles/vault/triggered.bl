@@ -28,7 +28,7 @@
   ; without invalidating it.
   (defun-inline withdraw-conditions (IK TROOT DELAY TARGET)
     (list
-      (list ASSERT_MY_TAPROOT IK TROOT)
+      (list ASSERT_MY_TAPTREE IK TROOT)
       (list ASSERT_SEQUENCE_HEIGHT DELAY)
       (list SEAL_OUTPUTS TARGET)))
 

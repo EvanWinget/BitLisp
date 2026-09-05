@@ -13,47 +13,48 @@ Signatures come from the vendored Bitcoin Core framework signer with
 fixed aux bytes, so every derived value is deterministic.
 """
 
-import hashlib
-import json
 import sys
 from pathlib import Path
 
-import pytest
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "python"))
-sys.path.insert(0, str(REPO_ROOT / "tools" / "oracle" / "bitcoincore"))
 
-from bitlisp import (  # noqa: E402
-    BitLispError,
-    Transaction,
-    TxInput,
-    TxOutput,
-    run,
-    secp256k1,
-    serialize,
-)
-from bitlisp.conditions import CreateOutput, parse_conditions  # noqa: E402
+from bitlisp import Transaction, TxInput, TxOutput, run  # noqa: E402
+from bitlisp.conditions import CreateOutput  # noqa: E402
 from bitlisp.sexp import NIL, int_to_atom, iter_proper_list  # noqa: E402
 from bitlisp_tools.compiler import compile_program, tree_hash  # noqa: E402
 from bitlisp_tools.curry import curry, uncurry  # noqa: E402
 from bitlisp_tools.runner import run_spend  # noqa: E402
-from test_framework.key import compute_xonly_pubkey, sign_schnorr  # noqa: E402
+from puzzle_support import (  # noqa: E402
+    BUDGET,
+    FEE_SPK,
+    SEQ_FINAL,
+    assert_conditions_closure,
+    assert_vm_vectors_match,
+    conditions_of,
+    emitted_hex,
+    fee_input,
+    instance,
+    outpoint,
+    proper_list,
+    run_error,
+    sig_my_outpoint,
+    spend_error,
+    taproot_input,
+    tx,
+    tx_fields,
+)
+from support import NUMS, assert_corpus_identities, load_vector  # noqa: E402
+from test_framework.key import compute_xonly_pubkey  # noqa: E402
 
 PUZZLES = REPO_ROOT / "puzzles"
 INCLUDES = (PUZZLES / "lib", PUZZLES / "singleton")
-BUDGET = 11_000_000_000
-SEQ_FINAL = 0xFFFFFFFF
 
-# The BIP341 nothing-up-my-sleeve point, fixed inside the wrapper.
-NUMS = bytes.fromhex("50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0")
 OWNER_SK = (0xC0 << 248 | 11).to_bytes(32, "big")
 OWNER_PK = compute_xonly_pubkey(OWNER_SK)[0]
 OWNER2_SK = (0xC1 << 248 | 12).to_bytes(32, "big")
 OWNER2_PK = compute_xonly_pubkey(OWNER2_SK)[0]
-FEE_SPK = bytes.fromhex("0014") + b"\x11" * 20
 PAY_SPK = bytes.fromhex("0014") + b"\x22" * 20
-AUX = b"\x00" * 32
 END_AMOUNT = -113
 END_PAYLOAD = b"\x00" * 32
 
@@ -61,7 +62,7 @@ END_PAYLOAD = b"\x00" * 32
 # so any source change is a deliberate re-pin of both literals and
 # the vector files.
 SINGLETON_MOD_HASH = bytes.fromhex(
-    "1d8a1a3714577ac5cee67abe6ae1a6972d29ba24ea0c599205f2f0069e943f83"
+    "15d44b7d58dfa717679dfdeb583bb42a749bf9188dc5d7661171fdf89e8c3714"
 )
 OWNER_INNER_MOD_HASH = bytes.fromhex(
     "40977e84db61eef5f52c9ac9b46dd2e2fbd6439674f50dd7a00ced5daf523bf0"
@@ -73,41 +74,6 @@ SINGLETON_NODE, _ = compile_program(
 INNER_NODE, _ = compile_program(
     (PUZZLES / "singleton" / "owner-inner.bl").read_text(), INCLUDES
 )
-
-
-def proper_list(*items):
-    node = NIL
-    for item in reversed(items):
-        node = (item, node)
-    return node
-
-
-def outpoint(txid, index):
-    return txid + index.to_bytes(4, "little")
-
-
-def tx_fields(tx):
-    """The transaction in the field shape tx-wire.blib serializes."""
-    return proper_list(
-        tx.version.to_bytes(4, "little"),
-        proper_list(
-            *[
-                proper_list(
-                    outpoint(i.txid, i.index),
-                    i.script_sig,
-                    i.sequence.to_bytes(4, "little"),
-                )
-                for i in tx.inputs
-            ]
-        ),
-        proper_list(
-            *[
-                proper_list(o.amount.to_bytes(8, "little"), o.script_pubkey)
-                for o in tx.outputs
-            ]
-        ),
-        tx.locktime.to_bytes(4, "little"),
-    )
 
 
 def state_payload(inner_hash, amount, index):
@@ -127,17 +93,7 @@ def state_output(launcher, inner_hash, amount, index):
 def lineage(launcher):
     """A lineage's curried wrapper, its merkle root, and its
     scriptPubKey."""
-    inst = curry(SINGLETON_NODE, [SINGLETON_MOD_HASH, launcher])
-    root = tree_hash(inst)
-    return inst, root, b"\x51\x20" + secp256k1.taproot_output_key(NUMS, root)
-
-
-def sig_my_outpoint(sk, txid, index, message_node):
-    tag = hashlib.sha256(b"BitLisp/sig/my_outpoint").digest()
-    digest = hashlib.sha256(
-        tag + tag + outpoint(txid, index) + tree_hash(message_node)
-    ).digest()
-    return sign_schnorr(sk, digest, AUX)
+    return instance(SINGLETON_NODE, [SINGLETON_MOD_HASH, launcher])
 
 
 def inner_solution(sk, txid, index, next_hash, next_amount, tx, extra=NIL, sig=None):
@@ -173,32 +129,6 @@ def solution(
     )
 
 
-def fee_input(txid=b"\xbb" * 32, amount=50_000, index=0):
-    return TxInput(txid, index, FEE_SPK, amount, sequence=SEQ_FINAL)
-
-
-def singleton_input(spk, root, txid, index, amount, conditions=None):
-    """A BitLisp input of a single-leaf taproot tree, where the
-    executing leaf's hash is also the spending path's merkle root."""
-    return TxInput(
-        txid,
-        index,
-        spk,
-        amount,
-        sequence=SEQ_FINAL,
-        conditions=conditions,
-        tapleaf=root,
-        merkle_root=root,
-        internal_key=NUMS,
-    )
-
-
-def tx(inputs, outputs):
-    return Transaction(
-        version=2, locktime=0, inputs=tuple(inputs), outputs=tuple(outputs)
-    )
-
-
 LAUNCHER_TXID = b"\xaa" * 32
 LAUNCHER = outpoint(LAUNCHER_TXID, 0)
 SINGLETON, ROOT, SPK = lineage(LAUNCHER)
@@ -223,7 +153,7 @@ LAUNCH = tx(
 # Generation 1: the first coin hands the lineage to the second owner,
 # child at output 0 again.
 TX1 = tx(
-    [singleton_input(SPK, ROOT, LAUNCH.txid, 0, AMOUNT), fee_input()],
+    [taproot_input(LAUNCH.txid, 0, SPK, AMOUNT, ROOT), fee_input(50_000)],
     [
         TxOutput(SPK, AMOUNT),
         state_output(LAUNCHER, H2, AMOUNT, 0),
@@ -238,7 +168,7 @@ SOL1 = solution(
 # Generation 2: the singleton sits at input 1 and its child at output
 # 1, and the second owner hands the lineage back.
 TX2 = tx(
-    [fee_input(b"\xcc" * 32), singleton_input(SPK, ROOT, TX1.txid, 0, AMOUNT)],
+    [fee_input(50_000, b"\xcc" * 32), taproot_input(TX1.txid, 0, SPK, AMOUNT, ROOT)],
     [
         TxOutput(FEE_SPK, 40_000),
         TxOutput(SPK, AMOUNT),
@@ -254,7 +184,7 @@ SOL2 = solution(
 # the ending state output.
 PAYOUT = proper_list(proper_list(b"\x01", PAY_SPK, int_to_atom(10_000)))
 TX3 = tx(
-    [singleton_input(SPK, ROOT, TX2.txid, 1, AMOUNT)],
+    [taproot_input(TX2.txid, 1, SPK, AMOUNT, ROOT)],
     [TxOutput(PAY_SPK, 10_000), TxOutput(state_script(LAUNCHER, END_PAYLOAD), 0)],
 )
 SOL3 = solution(
@@ -278,9 +208,9 @@ OTHER_LAUNCH = tx(
 # output set.
 COMPOSED = tx(
     [
-        singleton_input(SPK, ROOT, LAUNCH.txid, 0, AMOUNT),
-        singleton_input(OTHER_SPK, OTHER_ROOT, OTHER_LAUNCH.txid, 0, AMOUNT),
-        fee_input(),
+        taproot_input(LAUNCH.txid, 0, SPK, AMOUNT, ROOT),
+        taproot_input(OTHER_LAUNCH.txid, 0, OTHER_SPK, AMOUNT, OTHER_ROOT),
+        fee_input(50_000),
     ],
     [
         TxOutput(SPK, AMOUNT),
@@ -308,8 +238,8 @@ FUNDED = tx(
     [TxInput(b"\xee" * 32, 3, FEE_SPK, 100_000, sequence=SEQ_FINAL)],
     [TxOutput(SPK, AMOUNT), state_output(LAUNCHER, H1, AMOUNT, 0)],
 )
-UNRELATED = tx([fee_input(b"\xed" * 32, 400_000)], [TxOutput(FEE_SPK, 100_000)] * 4)
-GRANDPARENT_OF_FEE = tx([fee_input(b"\xdd" * 32, 60_000)], [TxOutput(FEE_SPK, 60_000)])
+UNRELATED = tx([fee_input(400_000, b"\xed" * 32)], [TxOutput(FEE_SPK, 100_000)] * 4)
+GRANDPARENT_OF_FEE = tx([fee_input(60_000, b"\xdd" * 32)], [TxOutput(FEE_SPK, 60_000)])
 CHAINED = tx(
     [TxInput(GRANDPARENT_OF_FEE.txid, 0, FEE_SPK, 60_000, sequence=SEQ_FINAL)],
     [TxOutput(SPK, AMOUNT), state_output(LAUNCHER, H1, AMOUNT, 0)],
@@ -321,7 +251,7 @@ TWO_STATES = tx(
 # coin of the observer's own at the committed index, the authorized
 # child moved to index 3.
 SUBSTITUTED = tx(
-    [singleton_input(SPK, ROOT, LAUNCH.txid, 0, AMOUNT), fee_input()],
+    [taproot_input(LAUNCH.txid, 0, SPK, AMOUNT, ROOT), fee_input(50_000)],
     [
         TxOutput(SPK, 1),
         state_output(LAUNCHER, H2, AMOUNT, 0),
@@ -332,7 +262,7 @@ SUBSTITUTED = tx(
 # The ending spend re-assembled with a refill: a 1-satoshi coin and a
 # second tagged output naming the observer's inner program.
 REFILLED = tx(
-    [singleton_input(SPK, ROOT, TX2.txid, 1, AMOUNT), fee_input()],
+    [taproot_input(TX2.txid, 1, SPK, AMOUNT, ROOT), fee_input(50_000)],
     TX3.outputs + (TxOutput(SPK, 1), state_output(LAUNCHER, H2, 1, 2)),
 )
 
@@ -362,31 +292,13 @@ def ending_spend_sealing(spending):
     )  # fmt: skip
 
 
-def spend_error(program, sol, spending, input_index=0):
-    with pytest.raises(BitLispError) as info:
-        run_spend(program, sol, spending, input_index)
-    return info.value.code
-
-
-def run_error(program, sol):
-    with pytest.raises(BitLispError) as info:
-        run(program, sol, BUDGET)
-    return info.value.code
-
-
-def conditions_of(program, sol):
-    _, result = run(program, sol, BUDGET)
-    _, conds = parse_conditions(result, None)
-    return conds
-
-
 def test_mod_hashes_pinned():
     assert tree_hash(SINGLETON_NODE) == SINGLETON_MOD_HASH
     assert tree_hash(INNER_NODE) == OWNER_INNER_MOD_HASH
 
 
 def test_curried_identity_matches_tooling():
-    # The program's own root reconstruction, read off the taproot
+    # The program's own root reconstruction, read off the taptree
     # assert it emits, must agree with the tooling's tree hash over
     # the curried node, and uncurry must read the values back.
     inner, values = uncurry(SINGLETON)
@@ -395,7 +307,6 @@ def test_curried_identity_matches_tooling():
     conds = conditions_of(SINGLETON, SOL1)
     assert conds[0].internal_key == NUMS
     assert conds[0].merkle_root == ROOT
-    assert conds[0].script_pubkey == SPK
 
 
 def test_wire_serialization_matches_model():
@@ -415,7 +326,7 @@ def test_wire_serialization_matches_model():
             Transaction(
                 version=1,
                 locktime=500_000,
-                inputs=(legacy, fee_input()),
+                inputs=(legacy, fee_input(50_000)),
                 outputs=(
                     TxOutput(b"\x6a" + b"\x55" * (width - 1), 0),
                     TxOutput(FEE_SPK, 59_000),
@@ -424,7 +335,7 @@ def test_wire_serialization_matches_model():
         )
     samples.append(
         tx(
-            [fee_input(bytes([i]) * 32, 1_000) for i in range(253)],
+            [fee_input(1_000, bytes([i]) * 32) for i in range(253)],
             [TxOutput(FEE_SPK, 1_000)],
         )
     )
@@ -461,7 +372,7 @@ def test_fee_input_prepended_keeps_spend_valid():
     # Placement is committed by the state output and the owner's
     # seal, never by the input index, so anyone may prepend a fee
     # input to the broadcast spend with the owner's witness unchanged.
-    bumped = tx([fee_input(b"\xc9" * 32)] + list(TX1.inputs), TX1.outputs)
+    bumped = tx([fee_input(50_000, b"\xc9" * 32)] + list(TX1.inputs), TX1.outputs)
     run_spend(SINGLETON, SOL1, bumped, 1)
 
 
@@ -533,7 +444,7 @@ def test_ended_lineage_cannot_be_refilled():
 
 def test_wrong_outpoint_fails_in_validator():
     wrong = tx(
-        [singleton_input(SPK, ROOT, TX1.txid, 2, AMOUNT), fee_input()], TX2.outputs
+        [taproot_input(TX1.txid, 2, SPK, AMOUNT, ROOT), fee_input(50_000)], TX2.outputs
     )
     assert spend_error(SINGLETON, SOL2, wrong) == "unsatisfied_outpoint_assert"
 
@@ -610,7 +521,7 @@ def test_owner_signature_binds_outpoint_and_message():
         (TX1.outputs[0], state_output(LAUNCHER, H1, AMOUNT, 0), TX1.outputs[2]),
     )
     later = tx(
-        [singleton_input(SPK, ROOT, committed.txid, 0, AMOUNT), fee_input()],
+        [taproot_input(committed.txid, 0, SPK, AMOUNT, ROOT), fee_input(50_000)],
         TX1.outputs,
     )
     replayed = solution(AMOUNT, 0, 0, committed, 0, 0, LAUNCH, INNER1, args1)
@@ -628,8 +539,13 @@ def test_two_lineages_compose():
     with_other = tx(
         [
             COMPOSED.inputs[0],
-            singleton_input(
-                OTHER_SPK, OTHER_ROOT, OTHER_LAUNCH.txid, 0, AMOUNT, other_conds
+            taproot_input(
+                OTHER_LAUNCH.txid,
+                0,
+                OTHER_SPK,
+                AMOUNT,
+                OTHER_ROOT,
+                conditions=other_conds,
             ),
             COMPOSED.inputs[2],
         ],
@@ -644,11 +560,6 @@ def test_two_lineages_compose():
     )  # fmt: skip
     conds = conditions_of(OTHER, next_sol)
     assert conds[2].outpoint == outpoint(with_other.txid, 1)
-
-
-def load_vector(name):
-    path = REPO_ROOT / "vectors" / name
-    return {case["name"]: case for case in json.loads(path.read_text())["cases"]}
 
 
 def vm_cases():
@@ -778,16 +689,7 @@ def test_vm_vectors_match_source():
     # Every pinned program and solution is byte-identical to a fresh
     # compile, curry, and lifecycle construction, so the corpus
     # cannot drift from the sources.
-    cases = load_vector("vm/singleton-programs.json")
-    expected = vm_cases()
-    assert set(cases) == set(expected)
-    for name, (program, sol) in expected.items():
-        assert cases[name]["program"] == serialize(program).hex(), name
-        assert cases[name]["env"] == serialize(sol).hex(), name
-
-
-def emitted_hex(program, sol):
-    return serialize(run(program, sol, BUDGET)[1]).hex()
+    assert_vm_vectors_match("vm/singleton-programs.json", vm_cases())
 
 
 def validation_conditions():
@@ -812,27 +714,18 @@ def test_validation_vectors_match_source():
     # The complete closure: every conditions field in the validation
     # vector file is recomputed here from compiled source and the
     # documented signature flip, set-equal in both directions.
-    observed = set()
-    for case in load_vector("validation/singleton-lineage.json").values():
-        for entry in case["tx"]["inputs"]:
-            if "conditions" in entry:
-                observed.add(entry["conditions"])
-    assert observed == validation_conditions()
+    assert_conditions_closure(
+        ("validation/singleton-lineage.json",), validation_conditions()
+    )
 
 
 def test_validation_vector_identities_derive_their_scripts():
     # The corpus carries each lineage input's execution identity as
     # data the model takes on trust, so this is where the trust is
-    # checked: every condition-carrying input's scriptPubKey must be
-    # the tweak of its internal key by its merkle root, with the
-    # single-leaf tree's root equal to its leaf hash. No input in
-    # this file carries filler.
-    for case in load_vector("validation/singleton-lineage.json").values():
-        for entry in case["tx"]["inputs"]:
-            if "conditions" not in entry:
-                continue
-            root = bytes.fromhex(entry["merkle_root"])
-            assert entry["tapleaf"] == entry["merkle_root"]
-            assert entry["internal_key"] == NUMS.hex()
-            expected = b"\x51\x20" + secp256k1.taproot_output_key(NUMS, root)
-            assert entry["script_pubkey"] == expected.hex(), case["name"]
+    # checked, by the shared audit. No input in this file carries
+    # filler.
+    assert_corpus_identities(
+        [load_vector("validation/singleton-lineage.json")],
+        NUMS,
+        filler_expected=0,
+    )

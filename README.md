@@ -44,7 +44,7 @@ ci/lint/lint.sh
 
 ## Using the tools
 
-The editable install adds five console scripts:
+The editable install adds seven console scripts:
 
 ```
 .venv/bin/bitlisp [tx.json]                            # REPL with stepping debugger
@@ -52,6 +52,8 @@ The editable install adds five console scripts:
 .venv/bin/bitlisp-asm [text]                           # text to serialized bytecode hex
 .venv/bin/bitlisp-disasm [hex]                         # serialized bytecode hex to text
 .venv/bin/bitlisp-compile [source]                     # v0 language source to bytecode hex
+.venv/bin/bitlisp-curry [hex] --arg <value>            # fix values into a program
+.venv/bin/bitlisp-uncurry [hex]                        # split a curried program back out
 ```
 
 `bitlisp-run` reports the verdict, the emitted conditions, and the

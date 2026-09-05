@@ -152,7 +152,7 @@
     (assert PARENT_PROVEN
             (state-proven STATES
               (state-script L (state-payload INNER_HASH MY_AMOUNT MY_INDEX)))
-      (c (list ASSERT_MY_TAPROOT INTERNAL_KEY ROOT)
+      (c (list ASSERT_MY_TAPTREE INTERNAL_KEY ROOT)
       (c (list ASSERT_MY_AMOUNT MY_AMOUNT)
       (c (list ASSERT_MY_OUTPOINT MY_OUTPOINT)
          (morph L MY_SPK CHILD_INDEX

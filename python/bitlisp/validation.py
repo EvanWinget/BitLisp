@@ -66,7 +66,6 @@ from .conditions import (
     AssertMyAmount,
     AssertMyOutpoint,
     AssertMyScriptPubKey,
-    AssertMyTaproot,
     AssertMyTaptree,
     AssertMyTxid,
     AssertSequenceHeight,
@@ -211,16 +210,11 @@ def check_self_asserts(tx):
                         f"ASSERT_MY_TXID demands {cond.txid.hex()}, "
                         f"the creating txid is {tx_input.txid.hex()}",
                     )
-            elif isinstance(cond, (AssertMyScriptPubKey, AssertMyTaproot)):
+            elif isinstance(cond, AssertMyScriptPubKey):
                 if cond.script_pubkey != tx_input.script_pubkey:
-                    name = (
-                        "ASSERT_MY_TAPROOT"
-                        if isinstance(cond, AssertMyTaproot)
-                        else "ASSERT_MY_SCRIPTPUBKEY"
-                    )
                     raise BitLispError(
                         "unsatisfied_scriptpubkey_assert",
-                        f"{name} demands "
+                        "ASSERT_MY_SCRIPTPUBKEY demands "
                         f"{cond.script_pubkey.hex() or '(empty)'}, the spent "
                         f"scriptPubKey is "
                         f"{tx_input.script_pubkey.hex() or '(empty)'}",
@@ -403,15 +397,12 @@ def check_fee_reserve(tx):
 def check_seals(tx):
     """The seal family: each condition is an equality against a
     quantity derived from the assembled transaction, SEAL against
-    its txid, SEAL_OUTPUTS against its outputs hash. Derived only
-    when a seal is present: most transactions carry none."""
-    txid = None
-    outputs_hash = None
+    its txid, SEAL_OUTPUTS against its outputs hash."""
+    txid = tx.txid
+    outputs_hash = tx.outputs_hash
     for tx_input in tx.inputs:
         for cond in tx_input.conditions or ():
             if isinstance(cond, Seal):
-                if txid is None:
-                    txid = tx.txid
                 if cond.txid != txid:
                     raise BitLispError(
                         "unsatisfied_seal_assert",
@@ -419,8 +410,6 @@ def check_seals(tx):
                         f"transaction's txid is {txid.hex()}",
                     )
             elif isinstance(cond, SealOutputs):
-                if outputs_hash is None:
-                    outputs_hash = tx.outputs_hash
                 if cond.outputs_hash != outputs_hash:
                     raise BitLispError(
                         "unsatisfied_seal_assert",

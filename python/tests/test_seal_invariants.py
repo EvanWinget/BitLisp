@@ -18,6 +18,7 @@ from pathlib import Path
 
 from hypothesis import assume, given, settings
 from hypothesis import strategies as st
+from support import filler_identity
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "python"))
@@ -112,9 +113,7 @@ def build_tx(version, locktime, inputs, outputs, conds, txid_prefix=b"\x01"):
             sequence=sequence,
             conditions=tuple(conds) if n == 0 else None,
             script_sig=script_sig,
-            tapleaf=b"\x0a" * 32,
-            merkle_root=b"\x0b" * 32,
-            internal_key=b"\x0c" * 32,
+            **filler_identity(),
         )
         for n, (txid, script_sig, sequence) in enumerate(inputs)
     )
