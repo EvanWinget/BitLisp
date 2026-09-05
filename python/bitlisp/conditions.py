@@ -470,23 +470,37 @@ def _parse_int(atom, what):
     return value
 
 
+def _parse_amount(atom, what):
+    """A satoshi amount: a minimally encoded integer in 0 to
+    MAX_MONEY, the one domain every amount operand shares."""
+    amount = _parse_int(atom, what)
+    if not 0 <= amount <= MAX_MONEY:
+        raise BitLispError("bad_condition_arg", f"{what} out of range: {amount}")
+    return amount
+
+
+def _script_pubkey_atom(atom, what, minimum):
+    """A scriptPubKey operand: an atom of at most MAX_SCRIPT_PUBKEY_SIZE
+    bytes. A claimed output's script must be non-empty, the
+    self-assert and specifier comparands may be empty."""
+    if not is_atom(atom):
+        raise BitLispError("bad_condition_arg", f"{what} must be an atom")
+    if not minimum <= len(atom) <= MAX_SCRIPT_PUBKEY_SIZE:
+        raise BitLispError(
+            "bad_condition_arg",
+            f"{what} must be {minimum} to {MAX_SCRIPT_PUBKEY_SIZE} bytes, "
+            f"got {len(atom)}",
+        )
+    return atom
+
+
 def _parse_create_output(args):
     if len(args) != 2:
         raise BitLispError(
             "bad_condition_arity", f"CREATE_OUTPUT takes 2 arguments, got {len(args)}"
         )
-    script_pubkey, amount_atom = args
-    if not is_atom(script_pubkey):
-        raise BitLispError("bad_condition_arg", "scriptPubKey must be an atom")
-    if not 1 <= len(script_pubkey) <= MAX_SCRIPT_PUBKEY_SIZE:
-        raise BitLispError(
-            "bad_condition_arg",
-            f"scriptPubKey must be 1 to {MAX_SCRIPT_PUBKEY_SIZE} bytes, "
-            f"got {len(script_pubkey)}",
-        )
-    amount = _parse_int(amount_atom, "CREATE_OUTPUT amount")
-    if not 0 <= amount <= MAX_MONEY:
-        raise BitLispError("bad_condition_arg", f"amount out of range: {amount}")
+    script_pubkey = _script_pubkey_atom(args[0], "scriptPubKey", 1)
+    amount = _parse_amount(args[1], "CREATE_OUTPUT amount")
     return CreateOutput(script_pubkey, amount)
 
 
@@ -541,9 +555,7 @@ def _parse_create_output_taproot(args, meter):
         )
     internal_key, merkle_root, amount_atom = args
     _check_taproot_components(internal_key, merkle_root)
-    amount = _parse_int(amount_atom, "CREATE_OUTPUT_TAPROOT amount")
-    if not 0 <= amount <= MAX_MONEY:
-        raise BitLispError("bad_condition_arg", f"amount out of range: {amount}")
+    amount = _parse_amount(amount_atom, "CREATE_OUTPUT_TAPROOT amount")
     meter.charge(CONDITION_COSTS[CREATE_OUTPUT_TAPROOT])
     script_pubkey = _derive_taproot_spk(internal_key, merkle_root)
     return CreateOutputTaproot(internal_key, merkle_root, amount, script_pubkey)
@@ -579,18 +591,9 @@ def _parse_assert_my_scriptpubkey(args):
             "bad_condition_arity",
             f"ASSERT_MY_SCRIPTPUBKEY takes 1 argument, got {len(args)}",
         )
-    atom = args[0]
-    if not is_atom(atom):
-        raise BitLispError(
-            "bad_condition_arg", "ASSERT_MY_SCRIPTPUBKEY operand must be an atom"
-        )
-    if len(atom) > MAX_SCRIPT_PUBKEY_SIZE:
-        raise BitLispError(
-            "bad_condition_arg",
-            f"ASSERT_MY_SCRIPTPUBKEY operand must be at most "
-            f"{MAX_SCRIPT_PUBKEY_SIZE} bytes, got {len(atom)}",
-        )
-    return AssertMyScriptPubKey(atom)
+    return AssertMyScriptPubKey(
+        _script_pubkey_atom(args[0], "ASSERT_MY_SCRIPTPUBKEY operand", 0)
+    )
 
 
 def _parse_assert_my_amount(args):
@@ -599,10 +602,7 @@ def _parse_assert_my_amount(args):
             "bad_condition_arity",
             f"ASSERT_MY_AMOUNT takes 1 argument, got {len(args)}",
         )
-    amount = _parse_int(args[0], "ASSERT_MY_AMOUNT operand")
-    if not 0 <= amount <= MAX_MONEY:
-        raise BitLispError("bad_condition_arg", f"amount out of range: {amount}")
-    return AssertMyAmount(amount)
+    return AssertMyAmount(_parse_amount(args[0], "ASSERT_MY_AMOUNT operand"))
 
 
 def _parse_assert_my_taptree(args):
@@ -652,12 +652,7 @@ def _parse_specifier(commitment, args, name):
     fields = []
     for kind, atom in zip(SPECIFIER_OPERANDS[commitment], args, strict=True):
         if kind == "amount":
-            value = _parse_int(atom, f"{name} specifier amount")
-            if not 0 <= value <= MAX_MONEY:
-                raise BitLispError(
-                    "bad_condition_arg", f"specifier amount out of range: {value}"
-                )
-            fields.append(value)
+            fields.append(_parse_amount(atom, f"{name} specifier amount"))
             continue
         if kind == "outpoint":
             fields.append(_fixed_width_atom(atom, f"{name} outpoint", OUTPOINT_SIZE))
@@ -666,17 +661,7 @@ def _parse_specifier(commitment, args, name):
             fields.append(_fixed_width_atom(atom, f"{name} {kind}", 32))
             continue
         if kind == "script_pubkey":
-            if not is_atom(atom):
-                raise BitLispError(
-                    "bad_condition_arg", f"{name} {kind} must be an atom"
-                )
-            if len(atom) > MAX_SCRIPT_PUBKEY_SIZE:
-                raise BitLispError(
-                    "bad_condition_arg",
-                    f"{name} scriptPubKey must be at most "
-                    f"{MAX_SCRIPT_PUBKEY_SIZE} bytes, got {len(atom)}",
-                )
-            fields.append(atom)
+            fields.append(_script_pubkey_atom(atom, f"{name} scriptPubKey", 0))
             continue
         raise AssertionError(f"unhandled specifier operand kind: {kind}")
     return Specifier(commitment, tuple(fields))
@@ -765,10 +750,7 @@ def _parse_reserve_fee(args):
             "bad_condition_arity",
             f"RESERVE_FEE takes 1 argument, got {len(args)}",
         )
-    reserve = _parse_int(args[0], "RESERVE_FEE operand")
-    if not 0 <= reserve <= MAX_MONEY:
-        raise BitLispError("bad_condition_arg", f"reserve out of range: {reserve}")
-    return ReserveFee(reserve)
+    return ReserveFee(_parse_amount(args[0], "RESERVE_FEE operand"))
 
 
 def _parse_reserved(opcode, args):

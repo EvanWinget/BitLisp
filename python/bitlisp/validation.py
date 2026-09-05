@@ -397,15 +397,12 @@ def check_fee_reserve(tx):
 def check_seals(tx):
     """The seal family: each condition is an equality against a
     quantity derived from the assembled transaction, SEAL against
-    its txid, SEAL_OUTPUTS against its outputs hash. Derived only
-    when a seal is present: most transactions carry none."""
-    txid = None
-    outputs_hash = None
+    its txid, SEAL_OUTPUTS against its outputs hash."""
+    txid = tx.txid
+    outputs_hash = tx.outputs_hash
     for tx_input in tx.inputs:
         for cond in tx_input.conditions or ():
             if isinstance(cond, Seal):
-                if txid is None:
-                    txid = tx.txid
                 if cond.txid != txid:
                     raise BitLispError(
                         "unsatisfied_seal_assert",
@@ -413,8 +410,6 @@ def check_seals(tx):
                         f"transaction's txid is {txid.hex()}",
                     )
             elif isinstance(cond, SealOutputs):
-                if outputs_hash is None:
-                    outputs_hash = tx.outputs_hash
                 if cond.outputs_hash != outputs_hash:
                     raise BitLispError(
                         "unsatisfied_seal_assert",
