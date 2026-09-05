@@ -21,11 +21,11 @@ negated, each `not` removed, each `raise` deleted, and `break` and
 `continue` exchanged. Each mutant runs the whole corpus in a private
 mirror of the tree. A mutant the corpus fails is killed. One the
 corpus passes survived and is triaged by hand into a class below.
-One that makes the reference raise outside its error taxonomy, so
-the runner stops on an escaping exception before any vector's
-verdict, crashed: detected by Python rather than by the corpus, and
-counted apart so the corpus's coverage is not overstated by kills it
-did not earn.
+One that makes the reference raise outside its error taxonomy on
+some case, while no case in any file reaches a verdict, crashed:
+detected by Python rather than by the corpus, and counted apart so
+the corpus's coverage is not overstated by kills it did not earn.
+Every case runs regardless, so a verdict anywhere outranks a crash.
 With `--tests`, every corpus survivor also runs the pytest suite
 (hypothesis invariants, oracle differentials, unit tests), which
 separates survivors nothing catches from survivors the tests catch
@@ -60,47 +60,51 @@ which the cost invariants use to check that the meter's total equals
 the per-condition sum) survive the corpus by construction and are
 pinned by `--tests`.
 
-## Pass of 2026-08-23
+## Passes of 2026-08-23 and 2026-09-05
 
-Run against `main` at PR 60 (`7eee46f`) with `--tests`, the corpus
-at 1,149 cases after this pass's seventeen vectors.
+The first pass ran against `main` at PR 60 (`7eee46f`) and found the
+seventeen gaps below. The second ran on 2026-09-05 against `main` at
+PR 66 (`95ae47d`) merged with this branch, the corpus at 1,126 cases,
+after the review reshaped the harness: crashes and timeouts told
+apart from kills, a case's verdict outranking an earlier case's
+escape, the doubled negations deduplicated, and the
+augmented-assignment, expression-test, and while sites added. The
+table is the second pass.
 
 | module | mutants | killed | crashed | survived | timeout |
 | --- | --- | --- | --- | --- | --- |
-| conditions | 426 | 330 | 57 | 39 | 0 |
+| conditions | 391 | 310 | 41 | 40 | 0 |
 | costs | 114 | 114 | 0 | 0 | 0 |
 | errors | 2 | 0 | 1 | 1 | 0 |
-| machine | 79 | 58 | 16 | 5 | 0 |
-| operators | 369 | 300 | 51 | 17 | 1 |
-| secp256k1 | 148 | 104 | 27 | 15 | 2 |
-| serialize | 166 | 101 | 29 | 34 | 2 |
-| sexp | 35 | 26 | 9 | 0 | 0 |
-| tx | 168 | 92 | 15 | 61 | 0 |
-| validation | 144 | 116 | 20 | 8 | 0 |
-| total | 1,651 | 1,241 | 225 | 180 | 5 |
+| machine | 79 | 61 | 13 | 5 | 0 |
+| operators | 369 | 307 | 44 | 17 | 1 |
+| secp256k1 | 148 | 105 | 26 | 15 | 2 |
+| serialize | 166 | 106 | 24 | 34 | 2 |
+| sexp | 35 | 27 | 8 | 0 | 0 |
+| tx | 168 | 93 | 14 | 61 | 0 |
+| validation | 141 | 120 | 14 | 7 | 0 |
+| total | 1,613 | 1,243 | 185 | 180 | 5 |
 
-The numbers are the state after the vectors below landed and after
-the review fold-ins reshaped the inventory: crashes and timeouts
-told apart from kills, the doubled negations deduplicated, the
-augmented-assignment, expression-test, and while sites added, and
-`__init__` excluded. The first pass, on the tree before PR 60
-merged, had 195 survivors out of 1,720 mutants under the old
-counting. The 225 crashes are dominated by deleted raises and
-shifted indices that Python detects before any verdict, and the
-corpus takes no kill credit for them. Of the 180 survivors, the
-pytest suite kills 52: 29 of the 61 model preconditions in `tx.py`,
-ten of the fifteen in `secp256k1.py` (the group order moved by one,
-the width guards, the point-at-infinity branch), nine in
+The first pass, on the tree before PR 60 merged, had 195 survivors
+out of 1,720 mutants under the old counting, and 180 out of 1,651
+after its vectors landed, with 225 crashes under the rule that ended
+a file at its first escape. The 185 crashes are dominated by deleted
+raises and shifted indices that Python detects before any verdict,
+and the corpus takes no kill credit for them. Of the 180 survivors,
+the pytest suite kills 53: 29 of the 61 model preconditions in
+`tx.py`, ten of the fifteen in `secp256k1.py` (the group order moved
+by one, the width guards, the point-at-infinity branch), nine in
 `serialize.py` (length-form table constants, the floor at 2^20
 among them, the `bytes`-only type check, the truncated-atom check),
-the `name` table index and the reserved branch of `condition_cost`
-in `conditions.py`, and one of `substr`'s negative-index checks.
-The other 128 survive both, the five in `machine.py` and all eight
-in `validation.py` among them. All 180 fall into the accepted
-classes below. The five timeouts are mutants that loop until the
-budget rejects them: the `if` operator returning one branch in both
-cases, the scalar multiplication shifting its scalar the wrong way
-or by zero, and the deserializer stepping backward or not at all.
+the `name` table index, the reserved branch of `condition_cost`, and
+the `frozen` flag of the derived-taproot output in `conditions.py`,
+and one of `substr`'s negative-index checks. The other 127 survive
+both, the five in `machine.py` and all seven in `validation.py`
+among them. All 180 fall into the accepted classes below. The five
+timeouts are mutants that loop until the budget rejects them: the
+`if` operator returning one branch in both cases, the scalar
+multiplication shifting its scalar the wrong way or by zero, and the
+deserializer stepping backward or not at all.
 
 ### Gaps found, vectors added
 
@@ -113,7 +117,7 @@ against the vendored Bitcoin Core framework.
 | --- | --- | --- | --- |
 | path cost, leading zero bytes | `break` to `continue` in the leading-zero count: a zero byte after a nonzero byte was counted as leading | `vm/paths.json` `path_trailing_zero_byte`, `path_leading_and_trailing_zero_bytes` | VM.md section 3.1 |
 | one-byte atom in the long form | `<= 0x7F` to `< 0x7F` and `0x7F` to `0x7E`: `0x81 0x7F` accepted as canonical | `vm/serialize.json` `nonminimal_one_byte_atom_7f` | VM.md section 2 (D5) |
-| invalid prefix byte | `>= 0xFC` to `> 0xFC`: a lone `0xFC` fell through every length form | `vm/serialize.json` `lone_prefix_fc` | VM.md section 2 (D5) |
+| invalid prefix byte | `>= 0xFC` to `> 0xFC`: a lone `0xFC` fell through every length form. The vector pins the error code, and the harness reports the mutant crashed rather than killed, since the fall-through indexes an empty list before any verdict | `vm/serialize.json` `lone_prefix_fc` | VM.md section 2 (D5) |
 | three-byte length form floor | floor `0x2000` to `0x1FFF`: a length of 8,191 in the three-byte form accepted as minimal | `vm/serialize.json` `nonminimal_length_e0_at_8191` | VM.md section 2 (D5) |
 | ASSERT_SEQUENCE_HEIGHT domain | low bound `0` to `1` and to `-1`: zero rejected, minus one accepted | `conditions/time-asserts.json` `seqheight_zero`, `seqheight_negative` | CONDITIONS.md time asserts |
 | reserved declared cost | `cost < 0` to `cost < -1`: a declared cost of exactly -1 reported as `reserved_cost_too_low` instead of `bad_condition_arg` | `conditions/encoding.json` `reserved_cost_minus_one` | CONDITIONS.md section 1, VALIDATION.md rule 6 |
