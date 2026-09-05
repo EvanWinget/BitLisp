@@ -392,7 +392,7 @@ class BitLispShell(cmd.Cmd):
                     tree, self.include_paths, self.loaded_includes
                 ):
                     try:
-                        self._add_declaration(declaration)
+                        self.defs.add(declaration, set(self.names))
                     except CompileError as exc:
                         raise CompileError(f'in include "{origin}": {exc}') from None
             except CompileError:
@@ -404,19 +404,7 @@ class BitLispShell(cmd.Cmd):
                 self.loaded_includes = snapshot[3]
                 raise
             return
-        self._add_declaration(tree)
-
-    def _add_declaration(self, tree):
-        taken = set(self.names)
-        keyword = declaration_keyword(tree)
-        if keyword == "defun":
-            self.defs.add_defun(tree, taken)
-        elif keyword == "defun-inline":
-            self.defs.add_defun_inline(tree, taken)
-        elif keyword == "defconstant":
-            self.defs.add_defconstant(tree, taken)
-        else:
-            raise CompileError("expected defun, defun-inline, defconstant, or include")
+        self.defs.add(tree, set(self.names))
 
     @_survives
     def do_def(self, arg):
@@ -438,11 +426,7 @@ class BitLispShell(cmd.Cmd):
         if name in RESERVED_WORDS or name in CONDITION_CONSTANTS:
             print(f"error: {name!r} is reserved by the language")
             return
-        if (
-            name in self.defs.functions
-            or name in self.defs.inlines
-            or name in self.defs.constants
-        ):
+        if name in self.defs:
             print(f"error: {name!r} is already defined")
             return
         nodes = assemble_many(body, self.names)

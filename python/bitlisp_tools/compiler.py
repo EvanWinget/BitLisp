@@ -7,8 +7,8 @@ language occupies only text that previously errored. Atoms quote
 themselves, names resolve to environment paths or inline constant
 values, and the special forms are program, defun, defun-inline,
 defconstant, include, if, let, list, list*, assert, and, and or.
-Everything
-else a source expression can say is an operator application.
+Everything else a source expression can say is an operator
+application.
 
 A compiled program's environment is the pair (function tree . args).
 The function tree holds every reachable function body, balanced in
@@ -336,36 +336,46 @@ class Definitions:
         self.inlines = {}
         self.constants = {}
 
+    def __contains__(self, name):
+        return name in self.functions or name in self.inlines or name in self.constants
+
     def _claim(self, symbol, taken):
         name = _check_name(symbol, "definition")
-        if (
-            name in self.functions
-            or name in self.inlines
-            or name in self.constants
-            or name in taken
-        ):
+        if name in self or name in taken:
             raise CompileError(f"{name!r} is already defined", symbol.offset)
+        return name
+
+    def add(self, form, taken=frozenset()):
+        """Adds one declaration form, dispatched on its keyword. An
+        include form is not a declaration: the caller splices its
+        file's declarations and adds each of those."""
+        keyword = declaration_keyword(form)
+        if keyword == _DEFUN:
+            return self.add_defun(form, taken)
+        if keyword == _DEFUN_INLINE:
+            return self.add_defun_inline(form, taken)
+        if keyword == _DEFCONSTANT:
+            return self.add_defconstant(form, taken)
+        raise CompileError("expected defun, defun-inline, defconstant, or include")
+
+    def _add_function(self, form, keyword, space, taken):
+        items = _form_items(form, keyword, 4)
+        name = self._claim(items[1], taken)
+        arity = _check_params(items[2])
+        space[name] = (items[2], items[3], arity)
         return name
 
     def add_defun(self, form, taken=frozenset()):
         """Adds one (defun name params body) source form. The body
         is stored as written and compiles when a program reaches it,
         so definitions may reference names that arrive later."""
-        items = _form_items(form, _DEFUN, 4)
-        name = self._claim(items[1], taken)
-        arity = _check_params(items[2])
-        self.functions[name] = (items[2], items[3], arity)
-        return name
+        return self._add_function(form, _DEFUN, self.functions, taken)
 
     def add_defun_inline(self, form, taken=frozenset()):
         """Adds one (defun-inline name params body) source form.
         The body is stored as written and splices at each call site
         a program reaches, never entering the function tree."""
-        items = _form_items(form, _DEFUN_INLINE, 4)
-        name = self._claim(items[1], taken)
-        arity = _check_params(items[2])
-        self.inlines[name] = (items[2], items[3], arity)
-        return name
+        return self._add_function(form, _DEFUN_INLINE, self.inlines, taken)
 
     def add_defconstant(self, form, taken=frozenset()):
         """Adds one (defconstant name value) source form. The value
@@ -457,10 +467,7 @@ def _bind_inline_params(params, arguments):
         index += 1
         spine = spine[1]
     if isinstance(spine, Symbol):
-        rest = NIL
-        for argument in reversed(arguments[index:]):
-            rest = _proper_list(_CONS, argument, rest)
-        bindings[spine.name] = rest
+        bindings[spine.name] = _cons_onto(arguments[index:], NIL)
     while stack:
         tree, node = stack.pop()
         if isinstance(tree, Symbol):
@@ -537,10 +544,9 @@ def _proper_items(node, what, offset_hint=None):
     while is_pair(node):
         items.append(node[0])
         node = node[1]
-    if node != NIL and not isinstance(node, Symbol):
-        raise CompileError(f"{what} takes a proper argument list", offset_hint)
-    if isinstance(node, Symbol):
-        raise CompileError(f"{what} takes a proper argument list", node.offset)
+    if node != NIL:
+        offset = node.offset if isinstance(node, Symbol) else offset_hint
+        raise CompileError(f"{what} takes a proper argument list", offset)
     return items
 
 
@@ -857,9 +863,7 @@ class _Compilation:
                 rebound[name] = _proper_list(_APPLY, _quote(bound), environment)
         rebound.update(bound_paths)
         body = self.expression(items[1], rebound)
-        rest = int_to_atom(root)
-        for value in reversed(values):
-            rest = _proper_list(_CONS, value, rest)
+        rest = _cons_onto(values, int_to_atom(root))
         if has_tree:
             rest = _proper_list(_CONS, int_to_atom(_LEFT), rest)
         return _proper_list(_APPLY, _quote(body), rest)
@@ -912,12 +916,8 @@ class _Compilation:
         # The callee sees the caller's layout rebuilt: the function
         # tree it received at path 2, consed onto the evaluated
         # arguments as a proper list.
-        argument_list = NIL
-        for argument in reversed(arguments):
-            argument_list = _proper_list(
-                _CONS, self.expression(argument, bindings), argument_list
-            )
-        environment = _proper_list(_CONS, int_to_atom(_LEFT), argument_list)
+        compiled = [self.expression(argument, bindings) for argument in arguments]
+        environment = _proper_list(_CONS, int_to_atom(_LEFT), _cons_onto(compiled, NIL))
         return _proper_list(_APPLY, int_to_atom(self.fn_paths[name]), environment)
 
     def _operator(self, op, tail, bindings):
@@ -1162,18 +1162,8 @@ def compile_program(source, include_paths=()):
     _check_params(params)
     defs = Definitions()
     for declaration, origin in _spliced(items[1:-1], include_paths):
-        keyword = declaration_keyword(declaration)
         try:
-            if keyword == _DEFUN:
-                defs.add_defun(declaration)
-            elif keyword == _DEFUN_INLINE:
-                defs.add_defun_inline(declaration)
-            elif keyword == _DEFCONSTANT:
-                defs.add_defconstant(declaration)
-            else:
-                raise CompileError(
-                    "expected defun, defun-inline, defconstant, or include"
-                )
+            defs.add(declaration)
         except CompileError as exc:
             # An included declaration's offsets index its own file's
             # text, so the error names the file, as a function body's
