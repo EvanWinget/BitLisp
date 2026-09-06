@@ -82,6 +82,7 @@ from .conditions import (
     Specifier,
 )
 from .errors import BitLispError
+from .spend import check_annex_admission
 
 _SEQUENCE_FINAL = 0xFFFFFFFF
 _SEQUENCE_DISABLE_FLAG = 1 << 31
@@ -253,26 +254,6 @@ def check_self_asserts(tx):
                     )
 
 
-def check_annex_admission(tx_input):
-    """The annex rule: an input whose witness carries an annex is
-    valid only when its condition list holds an ASSERT_MY_ANNEX, so
-    the annex is data the spender committed to and no third party
-    can attach one. The rule reads the input alone, so the spend
-    pipeline runs it right after the input's conditions parse, and
-    validate_transaction runs it again over every assembled input,
-    because a transaction view built without the pipeline must
-    satisfy the same invariant. An input without a condition list
-    is not a BitLisp input and carries no annex the rule reads."""
-    if tx_input.annex_hash is None or tx_input.conditions is None:
-        return
-    if not any(isinstance(cond, AssertMyAnnex) for cond in tx_input.conditions):
-        raise BitLispError(
-            "unasserted_annex",
-            f"the witness carries an annex hashing to {tx_input.annex_hash.hex()} "
-            "and the condition list holds no ASSERT_MY_ANNEX",
-        )
-
-
 def self_specifier(tx_input, commitment):
     """The input's own prevout data and execution identity at a
     commitment value: what an ASSURE or REQUIRE says about its
@@ -363,19 +344,13 @@ def check_announcements(tx):
                 )
 
 
-_SIG_TAG_HASHES = {
-    opcode: hashlib.sha256(tag.encode("ascii")).digest()
-    for opcode, (_, tag, _) in SIG_BINDINGS.items()
-}
-
-
 def _sig_digest(cond, tx_input):
-    """The tagged-hash digest a signature assert verifies against:
-    sha256(sha256(tag) || sha256(tag) || binding fields || message),
-    the fields fixed-length ahead of the variable-length message."""
-    tag_hash = _SIG_TAG_HASHES[cond.opcode]
-    data = bytearray(tag_hash + tag_hash)
-    for kind in SIG_BINDINGS[cond.opcode][2]:
+    """The tagged-hash digest a signature assert verifies against: the
+    binding's tag over the binding fields then the message, the
+    fields fixed-length ahead of the variable-length message."""
+    _, tag, kinds = SIG_BINDINGS[cond.opcode]
+    data = bytearray()
+    for kind in kinds:
         if kind == "txid":
             data += tx_input.txid
         elif kind == "spk_hash":
@@ -387,7 +362,7 @@ def _sig_digest(cond, tx_input):
         else:
             raise AssertionError(f"unknown binding field {kind!r}")
     data += cond.message
-    return hashlib.sha256(data).digest()
+    return secp256k1.tagged_hash(tag, bytes(data))
 
 
 def check_signature_asserts(tx):

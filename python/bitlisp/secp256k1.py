@@ -23,13 +23,18 @@ G = (
     0x483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8,
 )
 
-_CHALLENGE_TAG_HASH = hashlib.sha256(b"BIP0340/challenge").digest()
-_TWEAK_TAG_HASH = hashlib.sha256(b"TapTweak").digest()
+
+def tagged_hash(tag, data):
+    """BIP340's tagged hash: SHA-256 of the tag's digest twice, then
+    the data. tag is the ASCII tag name. Every tagged digest the
+    package computes comes through here, so the tags in use are the
+    strings this function is called with."""
+    tag_hash = hashlib.sha256(tag.encode("ascii")).digest()
+    return hashlib.sha256(tag_hash + tag_hash + data).digest()
 
 
 def _challenge_hash(data):
-    # The BIP 340 tagged hash: the tag's digest twice, then the data.
-    return hashlib.sha256(_CHALLENGE_TAG_HASH + _CHALLENGE_TAG_HASH + data).digest()
+    return tagged_hash("BIP0340/challenge", data)
 
 
 def _tap_tweak_scalar(internal_key, merkle_root):
@@ -39,8 +44,7 @@ def _tap_tweak_scalar(internal_key, merkle_root):
     An empty merkle_root leaves the internal key alone, which is the
     key-only tweak of an output committing to no script tree.
     """
-    data = _TWEAK_TAG_HASH + _TWEAK_TAG_HASH + internal_key + merkle_root
-    return int.from_bytes(hashlib.sha256(data).digest(), "big")
+    return int.from_bytes(tagged_hash("TapTweak", internal_key + merkle_root), "big")
 
 
 def _tweaked_point(point, t):

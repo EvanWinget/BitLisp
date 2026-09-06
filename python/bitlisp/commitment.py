@@ -6,7 +6,8 @@ BitLisp's leaf version. The leaf script is the program's 32-byte tree
 hash, never executed, and the program itself travels in the witness
 to be checked against it. Everything here is hashing: the tree hash
 over a node, BIP341's tagged hashes over the leaf, the branch fold,
-and the annex digest. Point arithmetic stays in secp256k1.
+and the annex digest. Point arithmetic and the tagged hash itself
+stay in secp256k1.
 """
 
 import hashlib
@@ -14,7 +15,8 @@ from dataclasses import dataclass
 
 from . import secp256k1
 from .errors import BaseConsensusError
-from .sexp import is_pair
+from .operators import op_sha256tree
+from .secp256k1 import tagged_hash
 
 # PROVISIONAL: fixed at deployment. Any compliant byte works, the low
 # bit clear, and nothing else in the scheme depends on which one.
@@ -31,35 +33,16 @@ LEAF_VERSION_MASK = 0xFE
 ANNEX_TAG = 0x50
 
 
+def _uncharged(amount):
+    """The charge callback of an operator run outside a budget."""
+
+
 def tree_hash(node):
-    """The tree hash of a node, the value sha256tree computes: an atom
-    hashes as SHA-256 of 0x01 then its bytes, a pair as SHA-256 of
-    0x02 then the first child's hash then the rest child's hash. An
-    explicit stack, so a deep program never meets the recursion
-    limit. Uncharged: the caller prices the bytes that carried the
-    node, not the hashing."""
-    hashes = []
-    stack = [(False, node)]
-    while stack:
-        combine, current = stack.pop()
-        if combine:
-            first = hashes.pop()
-            rest = hashes.pop()
-            hashes.append(hashlib.sha256(b"\x02" + first + rest).digest())
-        elif is_pair(current):
-            stack.append((True, None))
-            stack.append((False, current[0]))
-            stack.append((False, current[1]))
-        else:
-            hashes.append(hashlib.sha256(b"\x01" + current).digest())
-    return hashes[0]
-
-
-def tagged_hash(tag, data):
-    """BIP340's tagged hash: SHA-256 of the tag's digest twice, then
-    the data. tag is the ASCII tag name."""
-    tag_hash = hashlib.sha256(tag.encode("ascii")).digest()
-    return hashlib.sha256(tag_hash + tag_hash + data).digest()
+    """The tree hash of a node, the value the sha256tree operator
+    computes, computed by that operator with its charges discarded:
+    the caller prices the bytes that carried the node, not the
+    hashing."""
+    return op_sha256tree([node], _uncharged)
 
 
 def compact_size(n):
@@ -122,6 +105,27 @@ class ControlBlock:
     parity: int
     internal_key: bytes
     path: bytes
+
+    @classmethod
+    def build(
+        cls, internal_key, leaf_script, path=b"", leaf_version=BITLISP_LEAF_VERSION
+    ):
+        """The control block a spend of leaf_script carries under
+        internal_key with this merkle path: the parity bit is the
+        output key's, derived here. None when the key does not lift
+        or the tweak fails, the same value defects taproot_output_point
+        reports."""
+        tapleaf = tapleaf_hash(leaf_version, leaf_script)
+        output = secp256k1.taproot_output_point(
+            internal_key, merkle_root(tapleaf, path)
+        )
+        if output is None:
+            return None
+        return cls(leaf_version, output[1] & 1, internal_key, path)
+
+    def serialize(self):
+        """The control block's bytes, the inverse of parse."""
+        return bytes([self.leaf_version | self.parity]) + self.internal_key + self.path
 
     @classmethod
     def parse(cls, data):

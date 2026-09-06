@@ -11,21 +11,10 @@ model is a harness bug, never a spend failure.
 import hashlib
 from dataclasses import dataclass
 
+from .commitment import compact_size
 from .conditions import MAX_MONEY
 
 _UINT32_MAX = 0xFFFFFFFF
-
-
-def _compact_size(n):
-    """Bitcoin's variable-length count prefix, the wire encoding of
-    list lengths and byte-string lengths."""
-    if n < 0xFD:
-        return n.to_bytes(1, "little")
-    if n <= 0xFFFF:
-        return b"\xfd" + n.to_bytes(2, "little")
-    if n <= 0xFFFFFFFF:
-        return b"\xfe" + n.to_bytes(4, "little")
-    return b"\xff" + n.to_bytes(8, "little")
 
 
 def _check_amount(amount, what):
@@ -84,22 +73,10 @@ class TxInput:
             raise ValueError("conditions must be a tuple or None")
         if not isinstance(self.script_sig, bytes):
             raise ValueError("scriptSig must be bytes")
-        if self.tapleaf is not None and (
-            not isinstance(self.tapleaf, bytes) or len(self.tapleaf) != 32
-        ):
-            raise ValueError("tapleaf must be 32 bytes")
-        if self.merkle_root is not None and (
-            not isinstance(self.merkle_root, bytes) or len(self.merkle_root) != 32
-        ):
-            raise ValueError("merkle_root must be 32 bytes")
-        if self.internal_key is not None and (
-            not isinstance(self.internal_key, bytes) or len(self.internal_key) != 32
-        ):
-            raise ValueError("internal_key must be 32 bytes")
-        if self.annex_hash is not None and (
-            not isinstance(self.annex_hash, bytes) or len(self.annex_hash) != 32
-        ):
-            raise ValueError("annex_hash must be 32 bytes")
+        for name in ("tapleaf", "merkle_root", "internal_key", "annex_hash"):
+            value = getattr(self, name)
+            if value is not None and (not isinstance(value, bytes) or len(value) != 32):
+                raise ValueError(f"{name} must be 32 bytes")
         if self.conditions is not None and (
             self.tapleaf is None
             or self.merkle_root is None
@@ -136,7 +113,7 @@ class TxOutput:
         amount, then the length-prefixed scriptPubKey."""
         return (
             self.amount.to_bytes(8, "little")
-            + _compact_size(len(self.script_pubkey))
+            + compact_size(len(self.script_pubkey))
             + self.script_pubkey
         )
 
@@ -185,13 +162,13 @@ class Transaction:
         carries changes this value. Distinct from an input's txid,
         which names the past transaction that created its prevout."""
         data = bytearray(self.version.to_bytes(4, "little"))
-        data += _compact_size(len(self.inputs))
+        data += compact_size(len(self.inputs))
         for tx_input in self.inputs:
             data += tx_input.txid
             data += tx_input.index.to_bytes(4, "little")
-            data += _compact_size(len(tx_input.script_sig)) + tx_input.script_sig
+            data += compact_size(len(tx_input.script_sig)) + tx_input.script_sig
             data += tx_input.sequence.to_bytes(4, "little")
-        data += _compact_size(len(self.outputs))
+        data += compact_size(len(self.outputs))
         for output in self.outputs:
             data += output.wire
         data += self.locktime.to_bytes(4, "little")

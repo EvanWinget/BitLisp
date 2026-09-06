@@ -22,11 +22,10 @@ from .commitment import (
     sha_annex,
     tree_hash,
 )
-from .conditions import parse_conditions
+from .conditions import AssertMyAnnex, parse_conditions
 from .errors import BaseConsensusError, BitLispError
 from .machine import run
 from .serialize import deserialize
-from .validation import check_annex_admission
 
 # The solution, the program, the leaf script, and the control block.
 WITNESS_ELEMENT_COUNT = 4
@@ -68,6 +67,26 @@ def read_identity(elements, script_pubkey):
         )
     tapleaf, root = control_block.check(elements[-2], script_pubkey)
     return tapleaf, root, control_block.internal_key
+
+
+def check_annex_admission(tx_input):
+    """The annex rule: an input whose witness carries an annex is
+    valid only when its condition list holds an ASSERT_MY_ANNEX, so
+    the annex is data the spender committed to and no third party
+    can attach one. The rule reads the input alone, so it runs here
+    right after the input's conditions parse, and validate_transaction
+    runs it again over every assembled input, because a transaction
+    view built without evaluate_spend must satisfy the same invariant.
+    An input without a condition list is not a BitLisp input and
+    carries no annex the rule reads."""
+    if tx_input.annex_hash is None or tx_input.conditions is None:
+        return
+    if not any(isinstance(cond, AssertMyAnnex) for cond in tx_input.conditions):
+        raise BitLispError(
+            "unasserted_annex",
+            f"the witness carries an annex hashing to {tx_input.annex_hash.hex()} "
+            "and the condition list holds no ASSERT_MY_ANNEX",
+        )
 
 
 def evaluate_spend(tx_input, witness, max_cost):
@@ -119,10 +138,11 @@ def evaluate_spend(tx_input, witness, max_cost):
 
     # Stage 2: the program decodes and is the one the leaf commits to.
     program = deserialize(program_bytes)
-    if tree_hash(program) != leaf_script:
+    program_hash = tree_hash(program)
+    if program_hash != leaf_script:
         raise BitLispError(
             "leaf_mismatch",
-            f"the program's tree hash {tree_hash(program).hex()} is not the leaf "
+            f"the program's tree hash {program_hash.hex()} is not the leaf "
             f"script {leaf_script.hex()}",
         )
 

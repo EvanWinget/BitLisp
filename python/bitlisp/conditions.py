@@ -19,7 +19,7 @@ work on them.
 
 from dataclasses import dataclass
 
-from . import secp256k1
+from .commitment import taproot_script_pubkey
 from .costs import (
     CONDITION_GENERIC_COST,
     CONDITION_MESSAGE_COST,
@@ -557,12 +557,12 @@ def _derive_taproot_spk(internal_key, merkle_root):
     condition's cost, so a budget too small for the charge never
     reaches this derivation and a derivation defect is reported
     only when the charge is covered."""
-    output_key = secp256k1.taproot_output_key(internal_key, merkle_root)
-    if output_key is None:
+    script_pubkey = taproot_script_pubkey(internal_key, merkle_root)
+    if script_pubkey is None:
         raise BitLispError(
             "bad_condition_arg", "internal key and merkle root derive no output key"
         )
-    return b"\x51\x20" + output_key
+    return script_pubkey
 
 
 def _parse_create_output_taproot(args, meter):
