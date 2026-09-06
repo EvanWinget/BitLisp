@@ -54,7 +54,10 @@ class TxInput:
     block: tapleaf, the executing leaf's leaf hash, merkle_root, the
     spending path's root, and internal_key, the x-only key the
     control block carries. The model takes the triple as
-    authenticated and never re-derives the scriptPubKey from it."""
+    authenticated and never re-derives the scriptPubKey from it.
+    annex_hash is the BIP341 sha_annex digest of the witness's
+    annex when it carries one, None otherwise: a hash and never the
+    bytes, because no rule reads an annex's content."""
 
     txid: bytes
     index: int
@@ -66,6 +69,7 @@ class TxInput:
     tapleaf: bytes | None = None
     merkle_root: bytes | None = None
     internal_key: bytes | None = None
+    annex_hash: bytes | None = None
 
     def __post_init__(self):
         if not isinstance(self.txid, bytes) or len(self.txid) != 32:
@@ -92,6 +96,10 @@ class TxInput:
             not isinstance(self.internal_key, bytes) or len(self.internal_key) != 32
         ):
             raise ValueError("internal_key must be 32 bytes")
+        if self.annex_hash is not None and (
+            not isinstance(self.annex_hash, bytes) or len(self.annex_hash) != 32
+        ):
+            raise ValueError("annex_hash must be 32 bytes")
         if self.conditions is not None and (
             self.tapleaf is None
             or self.merkle_root is None

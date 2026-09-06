@@ -26,6 +26,7 @@ from bitlisp.conditions import (
     AssertLocktimeHeight,
     AssertLocktimeTime,
     AssertMyAmount,
+    AssertMyAnnex,
     AssertMyOutpoint,
     AssertMyScriptPubKey,
     AssertMyTaptree,
@@ -75,12 +76,14 @@ def load_context(obj):
     The shape is the validation corpus's, closed at every level:
     version, locktime, inputs, and outputs exactly, each input with
     txid, index, script_pubkey, and amount plus optional sequence,
-    conditions, script_sig, tapleaf, merkle_root, and internal_key,
-    each output with script_pubkey and amount exactly. Byte fields
-    are plain hex strings. The transaction model requires the
-    execution-identity triple on every condition-carrying input, and
-    the runner's target input needs it too, since conditions are
-    installed there after evaluation.
+    conditions, script_sig, tapleaf, merkle_root, internal_key, and
+    annex_hash, each output with script_pubkey and amount exactly.
+    Byte fields are plain hex strings. The transaction model
+    requires the execution-identity triple on every
+    condition-carrying input, and the runner's target input needs
+    it too, since conditions are installed there after evaluation.
+    annex_hash is the sha_annex digest of an annex the input's
+    witness carries, absent when it carries none.
 
     A carried conditions field is an already-evaluated serialized
     condition list. One that does not deserialize is a shape defect,
@@ -107,6 +110,7 @@ def load_context(obj):
         "tapleaf",
         "merkle_root",
         "internal_key",
+        "annex_hash",
     }
     decoded_inputs = []
     for entry in obj["inputs"]:
@@ -153,6 +157,7 @@ def load_context(obj):
                     tapleaf=_optional_hex(entry, "tapleaf"),
                     merkle_root=_optional_hex(entry, "merkle_root"),
                     internal_key=_optional_hex(entry, "internal_key"),
+                    annex_hash=_optional_hex(entry, "annex_hash"),
                 )
                 for entry, conditions in decoded_inputs
             ),
@@ -221,6 +226,7 @@ _CONDITION_NAMES = {
     AssertMyScriptPubKey: "ASSERT_MY_SCRIPTPUBKEY",
     AssertMyAmount: "ASSERT_MY_AMOUNT",
     AssertMyTaptree: "ASSERT_MY_TAPTREE",
+    AssertMyAnnex: "ASSERT_MY_ANNEX",
     Announce: "ANNOUNCE",
     AssertAnnouncement: "ASSERT_ANNOUNCEMENT",
     Assure: "ASSURE",

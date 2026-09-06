@@ -40,6 +40,7 @@ from bitlisp import (
 )
 from bitlisp.conditions import (
     AssertMyAmount,
+    AssertMyAnnex,
     AssertMyOutpoint,
     AssertMyScriptPubKey,
     AssertMyTaptree,
@@ -64,6 +65,7 @@ IDEMPOTENT = (
     AssertMyScriptPubKey,
     AssertMyAmount,
     AssertMyTaptree,
+    AssertMyAnnex,
     Announce,
     AssertAnnouncement,
     Reserved,
@@ -89,7 +91,9 @@ def _pool(own_txid, own_script, other_txid, other_script):
     input's own values with the other input's, so satisfied and
     failing asserts are both dense, and the taptree asserts pair
     the identity build_tx installs with a wrong root, so a failing
-    assert's idempotence stays exercised."""
+    assert's idempotence stays exercised. The annex assert always
+    fails here, the inputs carrying no annex, the one self assert
+    with no satisfied case in the pool."""
     return (
         CreateOutput(SCRIPT_A, 1),
         CreateOutput(SCRIPT_B, 1),
@@ -103,6 +107,7 @@ def _pool(own_txid, own_script, other_txid, other_script):
         AssertMyAmount(1),
         AssertMyTaptree(FILLER_INTERNAL_KEY, FILLER_MERKLE_ROOT),
         AssertMyTaptree(FILLER_INTERNAL_KEY, FILLER_TAPLEAF),
+        AssertMyAnnex(b"\x0d" * 32),
         AssertLocktimeHeight(600),
         AssertLocktimeHeight(700),
         AssertLocktimeTime(500_000_600),

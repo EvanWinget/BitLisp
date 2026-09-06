@@ -42,8 +42,8 @@ def cond(opcode, *args):
 
 
 # One well-formed condition per cost tier, the generic tier drawn
-# three times (an amount assert, a time assert, and the identity
-# assert), and a reserved declaration off the floor.
+# four times (an amount assert, a time assert, the identity assert,
+# and the annex assert), and a reserved declaration off the floor.
 MENU = (
     cond(0x33, int_to_atom(1000)),
     cond(0x20, int_to_atom(800_000)),
@@ -52,6 +52,7 @@ MENU = (
     cond(0x01, b"\x51", int_to_atom(1000)),
     cond(0x02, GOOD_KEY, b"", int_to_atom(1000)),
     cond(0x38, GOOD_KEY, b"\x11" * 32),
+    cond(0x39, b"\x12" * 32),
     cond(0x80, int_to_atom(600)),
 )
 

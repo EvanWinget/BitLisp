@@ -37,6 +37,8 @@ CODES = frozenset(
         "unsatisfied_scriptpubkey_assert",
         "unsatisfied_amount_assert",
         "unsatisfied_taptree_assert",
+        "unasserted_annex",
+        "unsatisfied_annex_assert",
         "unbalanced_message",
         "unsatisfied_announcement_assert",
         "unsatisfied_sig_assert",

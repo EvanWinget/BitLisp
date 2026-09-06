@@ -27,6 +27,7 @@ from bitlisp.conditions import (  # noqa: E402
     AssertLocktimeHeight,
     AssertLocktimeTime,
     AssertMyAmount,
+    AssertMyAnnex,
     AssertMyOutpoint,
     AssertMyScriptPubKey,
     AssertMyTaptree,
@@ -115,6 +116,7 @@ RENDER_CASES = [
         AssertMyTaptree(b"\x02" * 32, b"\x04" * 32),
         "ASSERT_MY_TAPTREE internal_key=0x" + "02" * 32 + " merkle_root=0x" + "04" * 32,
     ),
+    (AssertMyAnnex(b"\x07" * 32), "ASSERT_MY_ANNEX annex_hash=0x" + "07" * 32),
     (
         AssertSig(ASSERT_SIG_RAW, b"\x05" * 32, b"", b"\x06" * 64),
         "ASSERT_SIG_RAW pubkey=0x" + "05" * 32 + " message=0x signature=0x" + "06" * 64,

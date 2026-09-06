@@ -55,7 +55,8 @@ transaction object:
                  "conditions": "<hex node, optional>",
                  "tapleaf": "<hex, optional>",
                  "merkle_root": "<hex, optional>",
-                 "internal_key": "<hex, optional>"}],
+                 "internal_key": "<hex, optional>",
+                 "annex_hash": "<hex, optional>"}],
      "outputs": [{"script_pubkey": "<hex>", "amount": 600}]}
 
 --input selects which input the program spends, the first by
@@ -64,7 +65,8 @@ runner computes its conditions, and must carry tapleaf,
 merkle_root, and internal_key, the executing input's identity. Any
 other input carrying a conditions field is a BitLisp input whose
 evaluation result is taken as given, and the model requires the
-same identity triple on it.
+same identity triple on it. annex_hash is the sha_annex digest of
+the annex an input's witness carries, omitted when it carries none.
 
 Exit status 0 when the spend is valid, 1 when it is invalid with
 the error line pinning the consensus code, 2 for unusable input: a

@@ -64,6 +64,7 @@ from .conditions import (
     AssertLocktimeHeight,
     AssertLocktimeTime,
     AssertMyAmount,
+    AssertMyAnnex,
     AssertMyOutpoint,
     AssertMyScriptPubKey,
     AssertMyTaptree,
@@ -238,6 +239,38 @@ def check_self_asserts(tx):
                         f"key {tx_input.internal_key.hex()} "
                         f"root {tx_input.merkle_root.hex()}",
                     )
+            elif isinstance(cond, AssertMyAnnex):
+                if cond.annex_hash != tx_input.annex_hash:
+                    raise BitLispError(
+                        "unsatisfied_annex_assert",
+                        f"ASSERT_MY_ANNEX demands {cond.annex_hash.hex()}, the "
+                        "witness carries "
+                        + (
+                            "no annex"
+                            if tx_input.annex_hash is None
+                            else f"annex hash {tx_input.annex_hash.hex()}"
+                        ),
+                    )
+
+
+def check_annex_admission(tx_input):
+    """The annex rule: an input whose witness carries an annex is
+    valid only when its condition list holds an ASSERT_MY_ANNEX, so
+    the annex is data the spender committed to and no third party
+    can attach one. The rule reads the input alone, so the spend
+    pipeline runs it right after the input's conditions parse, and
+    validate_transaction runs it again over every assembled input,
+    because a transaction view built without the pipeline must
+    satisfy the same invariant. An input without a condition list
+    is not a BitLisp input and carries no annex the rule reads."""
+    if tx_input.annex_hash is None or tx_input.conditions is None:
+        return
+    if not any(isinstance(cond, AssertMyAnnex) for cond in tx_input.conditions):
+        raise BitLispError(
+            "unasserted_annex",
+            f"the witness carries an annex hashing to {tx_input.annex_hash.hex()} "
+            "and the condition list holds no ASSERT_MY_ANNEX",
+        )
 
 
 def self_specifier(tx_input, commitment):
@@ -420,7 +453,12 @@ def check_seals(tx):
 
 def validate_transaction(tx):
     """Every validation rule that has landed so far, stage 2 work
-    before stage 4, signature verification last (stage 5)."""
+    before stage 4, signature verification last (stage 5). The
+    annex admission rule is per-input work that precedes them all:
+    a view may have been assembled without the spend pipeline that
+    already ran it."""
+    for tx_input in tx.inputs:
+        check_annex_admission(tx_input)
     check_self_asserts(tx)
     check_output_claims(tx)
     check_time_asserts(tx)
