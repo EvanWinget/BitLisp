@@ -44,7 +44,7 @@ ci/lint/lint.sh
 
 ## Using the tools
 
-The editable install adds seven console scripts:
+The editable install adds eight console scripts:
 
 ```
 .venv/bin/bitlisp [tx.json]                            # REPL with stepping debugger
@@ -54,11 +54,14 @@ The editable install adds seven console scripts:
 .venv/bin/bitlisp-compile [source]                     # v0 language source to bytecode hex
 .venv/bin/bitlisp-curry [hex] --arg <value>            # fix values into a program
 .venv/bin/bitlisp-uncurry [hex]                        # split a curried program back out
+.venv/bin/bitlisp-commit [program] [--sibling <hex>]   # leaf, root, control block, scriptPubKey
 ```
 
 `bitlisp-run` reports the verdict, the emitted conditions, and the
 cost for one spend, exiting 0 on a valid spend, 1 on an invalid
-one, and 2 on input that could not be used. The converters read
+one, and 2 on input that could not be used. `bitlisp-commit` prints
+what an output committing to a program commits to, and the control
+block a spend of it carries. The converters read
 stdin when no argument is given and compose in pipes. The REPL
 loads the same transaction context, keeps a constants scratch
 space, and drives the debugger with `step`, `next`, `cont`, and
