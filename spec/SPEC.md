@@ -152,7 +152,7 @@ each tag digest:
 | `TapLeaf` | `0xae` |
 | `TapBranch` | `0x19` |
 | `TapTweak` | `0xe8` |
-| `BIP340/challenge` | `0x07` |
+| `BIP0340/challenge` | `0x7b` |
 | `BitLisp/sig/my_txid` | `0x54` |
 | `BitLisp/sig/my_scriptpubkey` | `0xe3` |
 | `BitLisp/sig/my_amount` | `0xdf` |
@@ -166,7 +166,7 @@ None is `0x01` or `0x02`, so no tree-hash preimage is a tagged-hash
 preimage and no tagged-hash preimage is a tree-hash preimage. A
 tag added to any companion document adds a row here.
 
-`BIP340/challenge` is the challenge tag of BIP340's Verify, which
+`BIP0340/challenge` is the challenge tag of BIP340's Verify, which
 `secp_verify` and the signature asserts compute. The three other
 digests the companion documents read, the txid and the outputs
 hash of VALIDATION.md's transaction view and the annex hash of
