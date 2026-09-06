@@ -144,9 +144,18 @@ the trigger.
    its wtxid. Rejecting is a pure restriction on a leaf version
    whose execution BIP341 otherwise requires to succeed, and it
    continues C16's decline of the annex as a carrier.
-   Reintroduction trigger, as in C16: a ratified upstream annex
-   format plus relay policy, at which point a committed annex could
-   be admitted. Tapscript also bounds each initial stack element
+   The cost of rejecting, stated so it is priced: a soft fork can
+   only tighten, so a later annex use for BitLisp inputs cannot be
+   enabled under this leaf version and needs a new one, where
+   tapscript's commit-and-reserve idiom (the annex signed by the
+   sighash and meaningless until assigned) keeps the upgrade under
+   the same version. The project's upgrade path already runs on
+   new leaf versions for new coins and reserved conditions for
+   deployed ones, and committing the annex here would mean binding
+   an annex hash into every signature-assert digest while leaving
+   keyless spends malleable anyway. Reintroduction trigger, as in
+   C16: a ratified upstream annex format plus relay policy, at
+   which point a new leaf version could admit a committed annex. Tapscript also bounds each initial stack element
    at 520 bytes and the stack at 1,000 elements. The scheme keeps
    neither: a program element cannot fit in 520 bytes, the element
    count is fixed at four, and the derived budget prices bytes
