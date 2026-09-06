@@ -182,6 +182,61 @@ no signer reaches without about 2^128 work, `r` at or above `P`
 likewise, and a tweak scalar of exactly `N` is a hash preimage. The
 group order itself moved by one changes only those checks.
 
+## Pass of 2026-09-06
+
+Run on the witness-layer branch over the seven modules it touched
+(`commitment` and `spend` new, `conditions`, `validation`, `tx`,
+`errors`, and `secp256k1` changed), the corpus at 1,199 cases before
+this pass's additions, with `--tests`.
+
+| module | mutants | killed | crashed | survived | timeout |
+| --- | --- | --- | --- | --- | --- |
+| commitment | 100 | 48 | 24 | 28 | 0 |
+| conditions | 397 | 315 | 41 | 41 | 0 |
+| errors | 2 | 0 | 1 | 1 | 0 |
+| secp256k1 | 153 | 105 | 26 | 20 | 2 |
+| spend | 45 | 36 | 2 | 7 | 0 |
+| tx | 178 | 100 | 14 | 64 | 0 |
+| validation | 152 | 128 | 17 | 7 | 0 |
+| total | 1,027 | 732 | 125 | 168 | 2 |
+
+Every survivor in the two new modules is killed by the pytest
+suite, 35 of 35. Three things came out of reading them.
+
+One gap, one vector: the compact-size prefix of the annex digest
+turns three bytes wide at 253, and no annex case sat on either side
+of the boundary, so `n < 0xFD` moved by one survived the corpus.
+`spend/programs.json` gains `annex_of_252_bytes` and
+`annex_of_253_bytes` (SPEC.md section 3.4). The wider forms at
+65,536 and 2^32 bytes lie above `MAX_WITNESS_ELEMENT_SIZE` and no
+element reaches them: beyond reach.
+
+One dead function: `_apply_tweak` in `secp256k1.py` survived under
+the corpus because nothing in the consensus path called it once
+`taproot_output_point` landed. Removed, its tests moved onto
+`_tweaked_point`.
+
+One new survivor class, **outside BitLisp by design**: the control
+block length bound, the leaf version check, the key lift, the tweak
+check, and the parity check in `commitment.py` and `spend.py`, and
+the two-element threshold of the annex split. A witness that fails
+them is refused by base consensus or is not a BitLisp spend, SPEC.md
+assigns it no outcome, and the spend suite treats such a case as
+malformed rather than pinning it, so no vector can kill these
+mutants. The pytest suite kills every one (the BIP341 differential
+and the base-consensus tests in `test_spend.py`). In the same file,
+the sibling sort's `<` to `<=` is equivalent: two equal hashes
+concatenate to the same bytes in either order.
+
+The other modules' survivors are the accepted classes above. The
+one new survivor in `conditions.py` is the frozen flag of
+`AssertMyAnnex` (equivalent), the three new in `tx.py` are the
+`annex_hash` width check (model precondition), and the five new in
+`secp256k1.py` are the width guard and value defects of
+`taproot_output_point` (unreachable guard, beyond reach), the same
+sites `taproot_output_key` carried before it. `validation.py` stays
+at seven.
+
 ## Re-running
 
 A pass belongs with any change to `python/bitlisp/` that adds a
