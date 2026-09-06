@@ -68,11 +68,15 @@ is rejected by the sequence assert it feeds, which would brick
 withdrawal alone. With the guards a malformed instance fails on
 its first spend of any kind, before it has a history.
 
-This identity convention is a recorded stand-in: the Phase 4
-commitment scheme decides how programs are really committed under
-the new tapleaf version, and it may replace the bare curried tree
-hash with a tagged leaf construction. The convention is confined
-to the `curry-hash.blib` call sites.
+This identity convention is a recorded stand-in. The commitment
+scheme of `spec/SPEC.md` commits a program in a leaf whose script
+is the curried program's tree hash, so a coin's merkle root is the
+tagged leaf hash over that tree hash, or a tagged branch fold when
+the paths sit in leaves of their own. The sources here still use
+the bare tree hash as the root, confined to the `curry-hash.blib`
+call sites, until the vault is re-pinned under the scheme in its
+own unit, where each path becomes a leaf and only the trigger path
+keeps reconstruction (commitment-record decisions 7 and 8).
 
 ## The two programs
 

@@ -196,7 +196,11 @@ that would decide whether the Chia shape is worth the operator.
 A singleton lineage is the wrapper program curried with two fixed
 values. Its coins' scriptPubKey is the taproot output of the BIP341
 nothing-up-my-sleeve point tweaked with the curried program's tree
-hash as the merkle root, the same identity convention as the vault.
+hash as the merkle root, the same identity convention as the vault
+and the same recorded stand-in: under `spec/SPEC.md` the root is
+the tagged leaf hash over that tree hash, and the sources move to
+it when the singleton is re-pinned, where its reconstruction
+posture is re-decided (commitment-record decision 8).
 The vault curries its internal key. The wrapper fixes it as a
 constant instead, because a singleton's guarantees are relied on by
 third parties, and every one of them rests on a coin at the lineage

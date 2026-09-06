@@ -98,9 +98,10 @@ to the inner program and every fixed value at once, which is what
 makes currying the specialization step: template plus parameters
 becomes one committed identity.
 
-What a scriptPubKey commits to on chain is decided by the
-commitment scheme and measured in Phase 4. The tree hash is the
-program-level identity those commitments build on.
+What a scriptPubKey commits to on chain is the commitment scheme
+of `spec/SPEC.md`: a leaf whose script is the program's tree hash,
+the curried tree hash for a curried program. The tree hash is the
+program-level identity that commitment builds on.
 
 ## The command surfaces
 
