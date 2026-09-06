@@ -23,11 +23,13 @@ import sys
 from bitlisp import BitLispError, deserialize, serialize
 from bitlisp.commitment import (
     BITLISP_LEAF_VERSION,
+    MERKLE_PATH_MAX_DEPTH,
+    ControlBlock,
     merkle_root,
     tapleaf_hash,
+    taproot_script_pubkey,
     tree_hash,
 )
-from bitlisp.secp256k1 import taproot_output_point
 
 from .compiler import CompileError, compile_program, symbols_to_json
 from .curry import curry, uncurry
@@ -224,17 +226,21 @@ the tapleaf hash under BitLisp's leaf version, the merkle root of
 the leaf's position in its tree, the internal key, the control
 block a spend of the leaf carries, and the taproot scriptPubKey of
 the output. The leaf sits alone in its tree unless --sibling names
-the 32-byte hashes beside it, leaf upward, in which case the merkle
-root and the control block carry that path. The internal key is the
-BIP341 nothing-up-my-sleeve point unless --internal-key names one,
-so the default output has no key path.
+the 32-byte hashes beside it, leaf upward, at most 128 of them, in
+which case the merkle root and the control block carry that path.
+The internal key is the BIP341 nothing-up-my-sleeve point unless
+--internal-key names one, so the default output has no key path.
+The control block's first byte is the leaf version with the output
+key's parity in its low bit, so it reads d0 or d1 depending on the
+key and the tree.
 
 The program argument names a file when one exists at that path and
 reads as the literal otherwise, or comes from stdin when omitted.
 
 Exit status 0 on success, 2 when the program does not parse, a hash
-or key is not 32 bytes of hex, the internal key does not lift to a
-curve point, or the file does not open.
+or key is not 32 bytes of hex, there are more than 128 siblings,
+the internal key does not lift to a curve point, or the file does
+not open.
 
 Usage:
     bitlisp-compile vault.bl | bitlisp-commit --hex
@@ -289,12 +295,17 @@ def commit_main(argv=None):
     try:
         program = _node(_input_text(args.program), args.hex)
         internal_key = _hex32(args.internal_key, "internal key")
+        if len(args.sibling) > MERKLE_PATH_MAX_DEPTH:
+            raise ValueError(
+                f"a merkle path holds at most {MERKLE_PATH_MAX_DEPTH} siblings, "
+                f"got {len(args.sibling)}"
+            )
         path = b"".join(_hex32(sibling, "sibling") for sibling in args.sibling)
         leaf_script = tree_hash(program)
         tapleaf = tapleaf_hash(BITLISP_LEAF_VERSION, leaf_script)
         root = merkle_root(tapleaf, path)
-        output = taproot_output_point(internal_key, root)
-        if output is None:
+        control_block = ControlBlock.build(internal_key, leaf_script, path)
+        if control_block is None:
             raise ValueError("the internal key does not lift to a curve point")
     except BitLispError as exc:
         print(f"error: {exc.code}: {exc}", file=sys.stderr)
@@ -302,15 +313,13 @@ def commit_main(argv=None):
     except (ParseError, OSError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
-    x, y = output
-    control_block = bytes([BITLISP_LEAF_VERSION | (y & 1)]) + internal_key + path
     lines = (
         ("leaf script", leaf_script),
         ("tapleaf", tapleaf),
         ("merkle root", root),
         ("internal key", internal_key),
-        ("control block", control_block),
-        ("scriptPubKey", b"\x51\x20" + x.to_bytes(32, "big")),
+        ("control block", control_block.serialize()),
+        ("scriptPubKey", taproot_script_pubkey(internal_key, root)),
     )
     with _pipe_shield():
         for label, value in lines:
