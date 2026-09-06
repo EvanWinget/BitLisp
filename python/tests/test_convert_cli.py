@@ -1,6 +1,6 @@
 """The one-shot command tests: bitlisp-asm, bitlisp-disasm,
-bitlisp-compile, bitlisp-curry, bitlisp-uncurry, the tree-hash
-flag, and the corpus pin."""
+bitlisp-compile, bitlisp-curry, bitlisp-uncurry, bitlisp-commit, the
+tree-hash flag, and the corpus pin."""
 
 import io
 import json
@@ -177,6 +177,76 @@ def test_console_scripts_resolve():
     assert entry.load() is cli.asm_main
     (entry,) = metadata.entry_points(group="console_scripts", name="bitlisp-disasm")
     assert entry.load() is cli.disasm_main
+    (entry,) = metadata.entry_points(group="console_scripts", name="bitlisp-commit")
+    assert entry.load() is cli.commit_main
+
+
+# bitlisp-commit: its output against the spend suite's identity cases,
+# which were cross-checked against the Bitcoin Core tagged hash.
+
+
+def _identity_case(name):
+    path = REPO_ROOT / "vectors" / "spend" / "identity.json"
+    (case,) = [c for c in json.loads(path.read_text())["cases"] if c["name"] == name]
+    return case
+
+
+def _commit_lines(out):
+    return dict(line.split(":", 1) for line in out.rstrip("\n").split("\n"))
+
+
+def test_commit_single_leaf_matches_the_identity_vector(capsys):
+    case = _identity_case("single_leaf")
+    solution, program, leaf, block = case["witness"]
+    assert cli.commit_main([program, "--hex"]) == 0
+    lines = {k: v.strip() for k, v in _commit_lines(capsys.readouterr().out).items()}
+    assert lines == {
+        "leaf script": leaf,
+        "tapleaf": case["expect"]["tapleaf"],
+        "merkle root": case["expect"]["merkle_root"],
+        "internal key": case["expect"]["internal_key"],
+        "control block": block,
+        "scriptPubKey": case["script_pubkey"],
+    }
+
+
+def test_commit_with_path_and_key_matches_the_identity_vector(capsys):
+    case = _identity_case("internal_key_generator_with_path")
+    solution, program, leaf, block = case["witness"]
+    siblings = [block[66 + 64 * i : 66 + 64 * (i + 1)] for i in range(1)]
+    argv = [program, "--hex", "-k", case["expect"]["internal_key"]]
+    for sibling in siblings:
+        argv += ["-s", sibling]
+    assert cli.commit_main(argv) == 0
+    lines = {k: v.strip() for k, v in _commit_lines(capsys.readouterr().out).items()}
+    assert lines["merkle root"] == case["expect"]["merkle_root"]
+    assert lines["control block"] == block
+    assert lines["scriptPubKey"] == case["script_pubkey"]
+
+
+def test_commit_text_program_and_stdin(capsys, monkeypatch):
+    # The atom 1 spelled as text and as hex give one leaf script.
+    assert cli.commit_main(["1"]) == 0
+    from_text = capsys.readouterr().out
+    monkeypatch.setattr(sys, "stdin", io.StringIO("01\n"))
+    assert cli.commit_main(["--hex"]) == 0
+    assert capsys.readouterr().out == from_text
+    assert (
+        _commit_lines(from_text)["leaf script"].strip() == cli.tree_hash(b"\x01").hex()
+    )
+
+
+def test_commit_rejects_bad_inputs(capsys):
+    assert cli.commit_main(["(q . 1"]) == 2
+    assert capsys.readouterr().err.startswith("error: ")
+    assert cli.commit_main(["1", "-k", "ff" * 32]) == 2
+    assert "does not lift" in capsys.readouterr().err
+    assert cli.commit_main(["1", "-k", "ab" * 31]) == 2
+    assert "32 bytes" in capsys.readouterr().err
+    assert cli.commit_main(["1", "-s", "zz"]) == 2
+    assert "not hex" in capsys.readouterr().err
+    assert cli.commit_main(["c00101", "--hex"]) == 2
+    assert capsys.readouterr().err.startswith("error: bad_encoding: ")
 
 
 def test_asm_broken_pipe_keeps_exit_zero(tmp_path):

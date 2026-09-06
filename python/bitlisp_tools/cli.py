@@ -1,5 +1,6 @@
 """The one-shot command surface: bitlisp-run, bitlisp-asm,
-bitlisp-disasm, bitlisp-compile, bitlisp-curry, bitlisp-uncurry.
+bitlisp-disasm, bitlisp-compile, bitlisp-curry, bitlisp-uncurry,
+bitlisp-commit.
 
 Each command is a thin main over the tools library. bitlisp-run runs
 one spend and reports the verdict. bitlisp-asm assembles a text
@@ -8,7 +9,9 @@ serialized hex back as text. bitlisp-compile compiles a source
 program to serialized bytecode hex. bitlisp-curry fixes argument
 values into a program and bitlisp-uncurry splits them back out. The
 converters and bitlisp-curry take -T to print the program's tree
-hash instead of their usual output.
+hash instead of their usual output. bitlisp-commit prints what an
+output committing to a program commits to: the leaf script, the
+leaf hash, the merkle root, the control block, and the scriptPubKey.
 """
 
 import argparse
@@ -18,8 +21,17 @@ import os
 import sys
 
 from bitlisp import BitLispError, deserialize, serialize
+from bitlisp.commitment import (
+    BITLISP_LEAF_VERSION,
+    MERKLE_PATH_MAX_DEPTH,
+    ControlBlock,
+    merkle_root,
+    tapleaf_hash,
+    taproot_script_pubkey,
+    tree_hash,
+)
 
-from .compiler import CompileError, compile_program, symbols_to_json, tree_hash
+from .compiler import CompileError, compile_program, symbols_to_json
 from .curry import curry, uncurry
 from .printer import disassemble
 from .reader import ParseError, assemble
@@ -55,7 +67,8 @@ transaction object:
                  "conditions": "<hex node, optional>",
                  "tapleaf": "<hex, optional>",
                  "merkle_root": "<hex, optional>",
-                 "internal_key": "<hex, optional>"}],
+                 "internal_key": "<hex, optional>",
+                 "annex_hash": "<hex, optional>"}],
      "outputs": [{"script_pubkey": "<hex>", "amount": 600}]}
 
 --input selects which input the program spends, the first by
@@ -64,7 +77,8 @@ runner computes its conditions, and must carry tapleaf,
 merkle_root, and internal_key, the executing input's identity. Any
 other input carrying a conditions field is a BitLisp input whose
 evaluation result is taken as given, and the model requires the
-same identity triple on it.
+same identity triple on it. annex_hash is the sha_annex digest of
+the annex an input's witness carries, omitted when it carries none.
 
 Exit status 0 when the spend is valid, 1 when it is invalid with
 the error line pinning the consensus code, 2 for unusable input: a
@@ -202,6 +216,115 @@ Usage:
     bitlisp-uncurry ff02ffff01ff10ff02ff0580ffff04ffff010aff018080
     bitlisp-compile puzzle.bl | bitlisp-curry -a 600 | bitlisp-uncurry
 """
+
+
+_COMMIT_DOC = """Print what an output committing to a program commits to.
+
+Takes a program as text s-expression syntax, or as serialized hex
+with --hex, and prints the leaf script (the program's tree hash),
+the tapleaf hash under BitLisp's leaf version, the merkle root of
+the leaf's position in its tree, the internal key, the control
+block a spend of the leaf carries, and the taproot scriptPubKey of
+the output. The leaf sits alone in its tree unless --sibling names
+the 32-byte hashes beside it, leaf upward, at most 128 of them, in
+which case the merkle root and the control block carry that path.
+The internal key is the BIP341 nothing-up-my-sleeve point unless
+--internal-key names one, so the default output has no key path.
+The control block's first byte is the leaf version with the output
+key's parity in its low bit, so it reads d0 or d1 depending on the
+key and the tree.
+
+The program argument names a file when one exists at that path and
+reads as the literal otherwise, or comes from stdin when omitted.
+
+Exit status 0 on success, 2 when the program does not parse, a hash
+or key is not 32 bytes of hex, there are more than 128 siblings,
+the internal key does not lift to a curve point, or the file does
+not open.
+
+Usage:
+    bitlisp-compile vault.bl | bitlisp-commit --hex
+    bitlisp-commit "(q (51 0x51 1000))" --sibling <hex> --sibling <hex>
+"""
+
+# The BIP341 nothing-up-my-sleeve point: an output whose internal
+# key is this point has no key path anyone can use.
+_NUMS_POINT = "50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0"
+
+
+def _hex32(text, what):
+    try:
+        value = bytes.fromhex(text)
+    except ValueError:
+        raise ValueError(f"{what} is not hex: {text!r}") from None
+    if len(value) != 32:
+        raise ValueError(f"{what} must be 32 bytes, got {len(value)}")
+    return value
+
+
+def commit_main(argv=None):
+    parser = argparse.ArgumentParser(
+        prog="bitlisp-commit",
+        description=_COMMIT_DOC,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "program",
+        nargs="?",
+        help="file path, or the literal program (default stdin)",
+    )
+    parser.add_argument(
+        "--hex", action="store_true", help="read the program as serialized hex"
+    )
+    parser.add_argument(
+        "-k",
+        "--internal-key",
+        default=_NUMS_POINT,
+        metavar="HEX",
+        help="the 32-byte x-only internal key (default the BIP341 NUMS point)",
+    )
+    parser.add_argument(
+        "-s",
+        "--sibling",
+        action="append",
+        default=[],
+        metavar="HEX",
+        help="a 32-byte merkle path element, repeatable, leaf upward",
+    )
+    args = parser.parse_args(argv)
+    try:
+        program = _node(_input_text(args.program), args.hex)
+        internal_key = _hex32(args.internal_key, "internal key")
+        if len(args.sibling) > MERKLE_PATH_MAX_DEPTH:
+            raise ValueError(
+                f"a merkle path holds at most {MERKLE_PATH_MAX_DEPTH} siblings, "
+                f"got {len(args.sibling)}"
+            )
+        path = b"".join(_hex32(sibling, "sibling") for sibling in args.sibling)
+        leaf_script = tree_hash(program)
+        tapleaf = tapleaf_hash(BITLISP_LEAF_VERSION, leaf_script)
+        root = merkle_root(tapleaf, path)
+        control_block = ControlBlock.build(internal_key, leaf_script, path)
+        if control_block is None:
+            raise ValueError("the internal key does not lift to a curve point")
+    except BitLispError as exc:
+        print(f"error: {exc.code}: {exc}", file=sys.stderr)
+        return 2
+    except (ParseError, OSError, ValueError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    lines = (
+        ("leaf script", leaf_script),
+        ("tapleaf", tapleaf),
+        ("merkle root", root),
+        ("internal key", internal_key),
+        ("control block", control_block.serialize()),
+        ("scriptPubKey", taproot_script_pubkey(internal_key, root)),
+    )
+    with _pipe_shield():
+        for label, value in lines:
+            print(f"{label + ':':<15}{value.hex()}")
+    return 0
 
 
 def _path_or_code(arg):

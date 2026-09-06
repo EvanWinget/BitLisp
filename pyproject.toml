@@ -37,6 +37,7 @@ bitlisp-disasm = "bitlisp_tools.cli:disasm_main"
 bitlisp-compile = "bitlisp_tools.cli:compile_main"
 bitlisp-curry = "bitlisp_tools.cli:curry_main"
 bitlisp-uncurry = "bitlisp_tools.cli:uncurry_main"
+bitlisp-commit = "bitlisp_tools.cli:commit_main"
 
 [tool.setuptools]
 package-dir = {"" = "python"}

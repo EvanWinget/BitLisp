@@ -7,9 +7,10 @@ nothing else in the transaction can change it. The other properties
 pin the txid-outpoint subset relation and the taptree assert's
 indifference to the scriptPubKey plus its agreement, on an honest
 input, with a plain script assert over the scriptPubKey its
-operands derive. Field values
-and operands are drawn from small colliding pools so satisfied and
-unsatisfied asserts are both dense.
+operands derive. The annex assert adds the admission rule: an
+input carrying an annex is valid only under the assert. Field
+values and operands are drawn from small colliding pools so
+satisfied and unsatisfied asserts are both dense.
 """
 
 from bitlisp import (
@@ -21,6 +22,7 @@ from bitlisp import (
 )
 from bitlisp.conditions import (
     AssertMyAmount,
+    AssertMyAnnex,
     AssertMyOutpoint,
     AssertMyScriptPubKey,
     AssertMyTaptree,
@@ -44,6 +46,10 @@ ROOT_B = b"\x78" * 32
 # The execution identity every transaction carries unless a property
 # draws one: the shared corpus filler no assert in the pools names.
 FILLER_IDENTITY = (FILLER_INTERNAL_KEY, FILLER_MERKLE_ROOT)
+# Annex hashes, drawn both as the input's own (or None, no annex) and
+# as annex assert operands.
+ANNEX_A = b"\xa1" * 32
+ANNEX_B = b"\xa2" * 32
 
 # (internal key, merkle root) pairs, drawn both as the input's own
 # identity and as taptree operands, so the two collide often.
@@ -63,6 +69,7 @@ scripts = st.sampled_from(
 )
 amounts = st.sampled_from((0, 1, 50_000, 50_000 + 2**32, 2_100_000_000_000_000))
 identities = st.sampled_from(IDENTITIES)
+annex_hashes = st.sampled_from((None, ANNEX_A, ANNEX_B))
 
 
 def _outpoint(txid, index):
@@ -75,6 +82,7 @@ self_asserts = st.one_of(
     scripts.map(AssertMyScriptPubKey),
     amounts.map(AssertMyAmount),
     identities.map(lambda t: AssertMyTaptree(*t)),
+    st.sampled_from((ANNEX_A, ANNEX_B)).map(AssertMyAnnex),
 )
 cond_lists = st.lists(self_asserts, max_size=4)
 
@@ -86,11 +94,14 @@ environments = st.tuples(
 )
 
 
-def build_tx(txid, index, script, amount, conds, env, identity=FILLER_IDENTITY):
+def build_tx(
+    txid, index, script, amount, conds, env, identity=FILLER_IDENTITY, annex=None
+):
     """One BitLisp input carrying only self asserts, an unclaimed
     zero output, and an environment the family must never read. The
     unrelated input can sit before the carrying input, so an
-    implementation reading a fixed input position dies here."""
+    implementation reading a fixed input position dies here. annex
+    is the input's own annex hash, None for a witness without one."""
     version, locktime, sequence, extra_position = env
     internal_key, merkle_root = identity
     inputs = [
@@ -104,6 +115,7 @@ def build_tx(txid, index, script, amount, conds, env, identity=FILLER_IDENTITY):
             tapleaf=FILLER_TAPLEAF,
             merkle_root=merkle_root,
             internal_key=internal_key,
+            annex_hash=annex,
         )
     ]
     if extra_position != "none":
@@ -131,17 +143,26 @@ def outcome(tx):
 
 
 @given(
-    txids, indexes, scripts, amounts, identities, cond_lists, environments, environments
+    txids,
+    indexes,
+    scripts,
+    amounts,
+    identities,
+    annex_hashes,
+    cond_lists,
+    environments,
+    environments,
 )
 def test_outcome_is_environment_independent(
-    txid, index, script, amount, identity, conds, env_a, env_b
+    txid, index, script, amount, identity, annex, conds, env_a, env_b
 ):
     """The family outcome depends only on the conditions and the
-    input's own prevout data and identity. Version, locktime,
-    sequence, and unrelated inputs never change it, the stage 2
-    property that makes every self assert recombination-invariant."""
-    tx_a = build_tx(txid, index, script, amount, conds, env_a, identity)
-    tx_b = build_tx(txid, index, script, amount, conds, env_b, identity)
+    input's own prevout data, identity, and annex. Version,
+    locktime, sequence, and unrelated inputs never change it, the
+    stage 2 property that makes every self assert
+    recombination-invariant."""
+    tx_a = build_tx(txid, index, script, amount, conds, env_a, identity, annex)
+    tx_b = build_tx(txid, index, script, amount, conds, env_b, identity, annex)
     assert outcome(tx_a) == outcome(tx_b)
 
 
@@ -159,13 +180,26 @@ def test_satisfied_outpoint_assert_implies_txid_assert(
         assert outcome(with_txid) is None
 
 
-@given(txids, indexes, scripts, amounts, identities, self_asserts, environments)
+@given(
+    txids,
+    indexes,
+    scripts,
+    amounts,
+    identities,
+    annex_hashes,
+    self_asserts,
+    environments,
+)
 def test_single_assert_outcome_matches_field_equality(
-    txid, index, script, amount, identity, cond, env
+    txid, index, script, amount, identity, annex, cond, env
 ):
     """A lone self assert is satisfied exactly when each operand
     equals the field it reads, and fails with its field's error
-    otherwise."""
+    otherwise. The input carries an annex only under an annex
+    assert: under any other lone assert an annex fails the admission
+    rule first, the property the admission test pins."""
+    if not isinstance(cond, AssertMyAnnex):
+        annex = None
     if isinstance(cond, AssertMyOutpoint):
         satisfied = cond.outpoint == _outpoint(txid, index)
         error = "unsatisfied_outpoint_assert"
@@ -178,11 +212,32 @@ def test_single_assert_outcome_matches_field_equality(
     elif isinstance(cond, AssertMyTaptree):
         satisfied = (cond.internal_key, cond.merkle_root) == identity
         error = "unsatisfied_taptree_assert"
+    elif isinstance(cond, AssertMyAnnex):
+        satisfied = cond.annex_hash == annex
+        error = "unsatisfied_annex_assert"
     else:
         satisfied = cond.amount == amount
         error = "unsatisfied_amount_assert"
-    got = outcome(build_tx(txid, index, script, amount, [cond], env, identity))
+    got = outcome(build_tx(txid, index, script, amount, [cond], env, identity, annex))
     assert got == (None if satisfied else error)
+
+
+@given(
+    txids, indexes, scripts, amounts, identities, annex_hashes, cond_lists, environments
+)
+def test_annex_admitted_exactly_under_its_assert(
+    txid, index, script, amount, identity, annex, conds, env
+):
+    """An input carrying an annex fails as unasserted_annex exactly
+    when its list holds no ASSERT_MY_ANNEX, before any assert is
+    checked. Without an annex the admission rule never fires, and
+    every annex assert in the list is unsatisfied, so the spend is
+    invalid."""
+    got = outcome(build_tx(txid, index, script, amount, conds, env, identity, annex))
+    asserted = any(isinstance(cond, AssertMyAnnex) for cond in conds)
+    assert (got == "unasserted_annex") == (annex is not None and not asserted)
+    if annex is None and asserted:
+        assert got is not None
 
 
 @given(txids, indexes, scripts, scripts, amounts, identities, identities, environments)

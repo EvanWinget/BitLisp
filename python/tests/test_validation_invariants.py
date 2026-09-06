@@ -370,6 +370,8 @@ def test_model_requires_identity_with_conditions():
         TxInput(b"\x01" * 32, 0, b"\x51", 1, 0, merkle_root=b"\x0b" * 33)
     with pytest.raises(ValueError, match="internal_key must be 32 bytes"):
         TxInput(b"\x01" * 32, 0, b"\x51", 1, 0, internal_key=b"\x0c" * 31)
+    with pytest.raises(ValueError, match="annex_hash must be 32 bytes"):
+        TxInput(b"\x01" * 32, 0, b"\x51", 1, 0, annex_hash=b"\x0d" * 33)
 
 
 def test_model_rejects_out_of_range_amounts():

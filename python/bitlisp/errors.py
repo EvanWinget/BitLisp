@@ -8,7 +8,9 @@ and validation codes, which have no oracle.
 
 CODES = frozenset(
     {
+        "bad_witness",
         "bad_encoding",
+        "leaf_mismatch",
         "path_into_atom",
         "operator_not_atom",
         "reserved_operator",
@@ -37,6 +39,8 @@ CODES = frozenset(
         "unsatisfied_scriptpubkey_assert",
         "unsatisfied_amount_assert",
         "unsatisfied_taptree_assert",
+        "unasserted_annex",
+        "unsatisfied_annex_assert",
         "unbalanced_message",
         "unsatisfied_announcement_assert",
         "unsatisfied_sig_assert",
@@ -44,6 +48,20 @@ CODES = frozenset(
         "insufficient_fee",
     }
 )
+
+
+class BaseConsensusError(Exception):
+    """A spend that never reaches BitLisp's rules.
+
+    Base consensus checks a script-path spend's control block before
+    any rule of this layer runs: its length, that the internal key
+    lifts to a curve point, and that the key tweaked by the revealed
+    leaf's merkle root gives the spent scriptPubKey. A witness that
+    fails those, or whose leaf version is not BitLisp's, is either
+    rejected by base consensus or is not a BitLisp spend at all, and
+    no error code of CODES describes it. Distinct from BitLispError
+    so a vector can never pin one as the other.
+    """
 
 
 class BitLispError(Exception):

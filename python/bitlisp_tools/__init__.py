@@ -6,6 +6,8 @@ debug machine, and the REPL. Nothing in this package is consensus
 code, and nothing in the consensus package depends on it.
 """
 
+from bitlisp.commitment import tree_hash
+
 from .compiler import (
     CONDITION_CONSTANTS,
     RESERVED_WORDS,
@@ -17,7 +19,6 @@ from .compiler import (
     parse_source,
     parse_source_many,
     symbols_to_json,
-    tree_hash,
 )
 from .curry import curry, uncurry
 from .keywords import ATOM_TO_NAME, NAME_TO_ATOM

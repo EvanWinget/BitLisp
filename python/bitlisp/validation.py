@@ -64,6 +64,7 @@ from .conditions import (
     AssertLocktimeHeight,
     AssertLocktimeTime,
     AssertMyAmount,
+    AssertMyAnnex,
     AssertMyOutpoint,
     AssertMyScriptPubKey,
     AssertMyTaptree,
@@ -81,6 +82,7 @@ from .conditions import (
     Specifier,
 )
 from .errors import BitLispError
+from .spend import check_annex_admission
 
 _SEQUENCE_FINAL = 0xFFFFFFFF
 _SEQUENCE_DISABLE_FLAG = 1 << 31
@@ -238,6 +240,18 @@ def check_self_asserts(tx):
                         f"key {tx_input.internal_key.hex()} "
                         f"root {tx_input.merkle_root.hex()}",
                     )
+            elif isinstance(cond, AssertMyAnnex):
+                if cond.annex_hash != tx_input.annex_hash:
+                    raise BitLispError(
+                        "unsatisfied_annex_assert",
+                        f"ASSERT_MY_ANNEX demands {cond.annex_hash.hex()}, the "
+                        "witness carries "
+                        + (
+                            "no annex"
+                            if tx_input.annex_hash is None
+                            else f"annex hash {tx_input.annex_hash.hex()}"
+                        ),
+                    )
 
 
 def self_specifier(tx_input, commitment):
@@ -330,19 +344,13 @@ def check_announcements(tx):
                 )
 
 
-_SIG_TAG_HASHES = {
-    opcode: hashlib.sha256(tag.encode("ascii")).digest()
-    for opcode, (_, tag, _) in SIG_BINDINGS.items()
-}
-
-
 def _sig_digest(cond, tx_input):
-    """The tagged-hash digest a signature assert verifies against:
-    sha256(sha256(tag) || sha256(tag) || binding fields || message),
-    the fields fixed-length ahead of the variable-length message."""
-    tag_hash = _SIG_TAG_HASHES[cond.opcode]
-    data = bytearray(tag_hash + tag_hash)
-    for kind in SIG_BINDINGS[cond.opcode][2]:
+    """The tagged-hash digest a signature assert verifies against: the
+    binding's tag over the binding fields then the message, the
+    fields fixed-length ahead of the variable-length message."""
+    _, tag, kinds = SIG_BINDINGS[cond.opcode]
+    data = bytearray()
+    for kind in kinds:
         if kind == "txid":
             data += tx_input.txid
         elif kind == "spk_hash":
@@ -354,7 +362,7 @@ def _sig_digest(cond, tx_input):
         else:
             raise AssertionError(f"unknown binding field {kind!r}")
     data += cond.message
-    return hashlib.sha256(data).digest()
+    return secp256k1.tagged_hash(tag, bytes(data))
 
 
 def check_signature_asserts(tx):
@@ -420,7 +428,12 @@ def check_seals(tx):
 
 def validate_transaction(tx):
     """Every validation rule that has landed so far, stage 2 work
-    before stage 4, signature verification last (stage 5)."""
+    before stage 4, signature verification last (stage 5). The
+    annex admission rule is per-input work that precedes them all:
+    a view may have been assembled without the spend pipeline that
+    already ran it."""
+    for tx_input in tx.inputs:
+        check_annex_admission(tx_input)
     check_self_asserts(tx)
     check_output_claims(tx)
     check_time_asserts(tx)

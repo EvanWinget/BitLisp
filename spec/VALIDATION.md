@@ -62,7 +62,8 @@ A transaction is:
   reads `internalKey` or `annexHash`. Only conditions reach these fields: an input
   without a condition list, whether a non-BitLisp input or a
   BitLisp spend whose evaluation has not yet produced one, may
-  carry the triple or not, and no rule reads it from either.
+  carry the triple and `annexHash` or not, and no rule reads them
+  from either.
 - `outputs`, an ordered list of slots. Each slot's content is the
   pair (`scriptPubKey`, `amount`). Slots are addressed by index.
 

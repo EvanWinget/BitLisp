@@ -26,8 +26,8 @@ sys.path.insert(0, str(REPO_ROOT / "tools" / "oracle" / "bitcoincore"))
 from bitlisp.secp256k1 import (  # noqa: E402
     G,
     N,
-    _apply_tweak,
     _tap_tweak_scalar,
+    _tweaked_point,
     lift_x,
     point_mul,
     taproot_output_key,
@@ -77,19 +77,19 @@ def test_official_script_pubkey(key, root, tweak, outkey, spk):
 
 
 def test_tweak_scalar_at_group_order_rejected():
-    assert _apply_tweak(G, N) is None
+    assert _tweaked_point(G, N) is None
 
 
 def test_tweak_scalar_below_group_order_accepted():
     # 2G + (N - 1)G = (N + 1)G = G, so the boundary scalar just below
     # the order passes and lands back on the generator.
-    assert _apply_tweak(point_mul(2, G), N - 1) == G[0].to_bytes(32, "big")
+    assert _tweaked_point(point_mul(2, G), N - 1) == G
 
 
 def test_tweaked_point_at_infinity_rejected():
     # kG + (N - k)G = NG, the point at infinity.
     k = 5
-    assert _apply_tweak(point_mul(k, G), N - k) is None
+    assert _tweaked_point(point_mul(k, G), N - k) is None
 
 
 # --- value defects and width contracts of the public derivation ------------

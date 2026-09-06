@@ -458,12 +458,13 @@ charged after every argument check.
 **Validation rule.** The assert clause of VALIDATION.md
 (claims and asserts, rule 2). Stage 4.
 
-### Self asserts (`0x30` to `0x33`, `0x38`)
+### Self asserts (`0x30` to `0x33`, `0x38`, `0x39`)
 
-The five conditions of this family assert facts of the spending
-input's own prevout data and execution identity: the outpoint it
-consumes, the creating txid, the spent scriptPubKey, the amount,
-and the internal key and merkle root its control block carries.
+The six conditions of this family assert facts of the spending
+input's own prevout data, execution identity, and witness: the
+outpoint it consumes, the creating txid, the spent scriptPubKey,
+the amount, the internal key and merkle root its control block
+carries, and the hash of the annex its witness carries.
 Every assert is an equality against that input's own data in the
 transaction view. Nothing in this family reads another input, an
 output slot, or a transaction-level field.

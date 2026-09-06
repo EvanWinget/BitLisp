@@ -6,6 +6,7 @@ differential testing against the consensus oracle where one exists,
 and by property-based invariants where none does.
 """
 
+from .commitment import BITLISP_LEAF_VERSION, tree_hash
 from .conditions import (
     MAX_MONEY,
     Announce,
@@ -23,10 +24,11 @@ from .conditions import (
     condition_cost,
     parse_conditions,
 )
-from .errors import CODES, BitLispError
+from .errors import CODES, BaseConsensusError, BitLispError
 from .machine import run, run_serialized
 from .serialize import deserialize, serialize
 from .sexp import NIL, TRUE, atom_to_int, int_to_atom, is_atom, is_pair
+from .spend import MAX_WITNESS_ELEMENT_SIZE, evaluate_spend
 from .tx import Transaction, TxInput, TxOutput
 from .validation import validate_transaction
 
@@ -39,12 +41,15 @@ __all__ = [
     "AssertLocktimeTime",
     "AssertSequenceHeight",
     "AssertSequenceTime",
+    "BITLISP_LEAF_VERSION",
+    "BaseConsensusError",
     "BitLispError",
     "CODES",
     "CreateOutput",
     "CreateOutputTaproot",
     "Specifier",
     "MAX_MONEY",
+    "MAX_WITNESS_ELEMENT_SIZE",
     "NIL",
     "Require",
     "Reserved",
@@ -56,6 +61,7 @@ __all__ = [
     "atom_to_int",
     "condition_cost",
     "deserialize",
+    "evaluate_spend",
     "int_to_atom",
     "is_atom",
     "is_pair",
@@ -63,5 +69,6 @@ __all__ = [
     "run",
     "run_serialized",
     "serialize",
+    "tree_hash",
     "validate_transaction",
 ]

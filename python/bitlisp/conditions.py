@@ -19,7 +19,7 @@ work on them.
 
 from dataclasses import dataclass
 
-from . import secp256k1
+from .commitment import taproot_script_pubkey
 from .costs import (
     CONDITION_GENERIC_COST,
     CONDITION_MESSAGE_COST,
@@ -53,6 +53,7 @@ ASSERT_MY_TXID = 0x31
 ASSERT_MY_SCRIPTPUBKEY = 0x32
 ASSERT_MY_AMOUNT = 0x33
 ASSERT_MY_TAPTREE = 0x38
+ASSERT_MY_ANNEX = 0x39
 ANNOUNCE = 0x40
 ASSERT_ANNOUNCEMENT = 0x41
 ASSURE = 0x42
@@ -182,6 +183,7 @@ CONDITION_COSTS = {
     ASSERT_MY_SCRIPTPUBKEY: CONDITION_GENERIC_COST,
     ASSERT_MY_AMOUNT: CONDITION_GENERIC_COST,
     ASSERT_MY_TAPTREE: CONDITION_GENERIC_COST,
+    ASSERT_MY_ANNEX: CONDITION_GENERIC_COST,
     ANNOUNCE: CONDITION_MESSAGE_COST,
     ASSERT_ANNOUNCEMENT: CONDITION_MESSAGE_COST,
     ASSURE: CONDITION_MESSAGE_COST,
@@ -315,6 +317,22 @@ class AssertMyTaptree:
     merkle_root: bytes
 
     opcode = ASSERT_MY_TAPTREE
+
+
+@dataclass(frozen=True)
+class AssertMyAnnex:
+    """Asserts the input's annex by its hash: sha256 over the
+    compact-size length prefix and the annex element's bytes, the
+    leading 0x50 included, compared byte-exact against the annex
+    hash the input's witness carries. An input without an annex
+    carries no hash, so the assert fails there. The rule that
+    admits an annex only under this assert runs in validation, not
+    here: parsing knows one condition at a time.
+    """
+
+    annex_hash: bytes
+
+    opcode = ASSERT_MY_ANNEX
 
 
 @dataclass(frozen=True)
@@ -539,12 +557,12 @@ def _derive_taproot_spk(internal_key, merkle_root):
     condition's cost, so a budget too small for the charge never
     reaches this derivation and a derivation defect is reported
     only when the charge is covered."""
-    output_key = secp256k1.taproot_output_key(internal_key, merkle_root)
-    if output_key is None:
+    script_pubkey = taproot_script_pubkey(internal_key, merkle_root)
+    if script_pubkey is None:
         raise BitLispError(
             "bad_condition_arg", "internal key and merkle root derive no output key"
         )
-    return b"\x51\x20" + output_key
+    return script_pubkey
 
 
 def _parse_create_output_taproot(args, meter):
@@ -843,6 +861,8 @@ def _parse_assigned(opcode, args):
         return _parse_assert_my_amount(args)
     if opcode == ASSERT_MY_TAPTREE:
         return _parse_assert_my_taptree(args)
+    if opcode == ASSERT_MY_ANNEX:
+        return _parse_fixed_bytes(args, "ASSERT_MY_ANNEX", AssertMyAnnex, 32)
     if opcode == ANNOUNCE:
         return _parse_announce(args)
     if opcode == ASSERT_ANNOUNCEMENT:

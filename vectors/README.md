@@ -11,6 +11,7 @@ why the vector was wrong (CLAUDE.md).
 | --- | --- | --- |
 | `vm/` | `vm` | (program, witness arguments) to (result, cost) or error |
 | `conditions/` | `conditions` | condition-list parsing and validation |
+| `spend/` | `spend` | one input's witness through the per-input stages: shape, decoding, the leaf check, evaluation, the condition list, the annex rule |
 | `validation/` | `validation` | tx-context validation, including the adversarial regression corpus |
 | `upstream/` | `tools/run_upstream.py` (clvm), unit suite (bip340, bip341) | Upstream vectors vendored as data, original format, provenance headers required |
 
@@ -72,7 +73,8 @@ condition (`{"opcode", "script_pubkey", "amount"}` for CREATE_OUTPUT,
 `{"opcode", "internal_key", "merkle_root", "amount", "script_pubkey"}`
 for CREATE_OUTPUT_TAPROOT with `script_pubkey` the derived taproot
 script, `{"opcode", "internal_key", "merkle_root"}` for
-ASSERT_MY_TAPTREE, `{"opcode"}` plus the operand under its entry's argument name
+ASSERT_MY_TAPTREE, `{"opcode", "annex_hash"}` for ASSERT_MY_ANNEX,
+`{"opcode"}` plus the operand under its entry's argument name
 (`"height"`, `"time"`, `"blocks"`, `"units"`) for the time asserts,
 `{"opcode", "cost", "args": ["<hex node>"]}` for reserved
 conditions) or `{"error": "<code>"}`. The message family pins
@@ -83,6 +85,38 @@ order, amounts as integers, all other fields hex: ANNOUNCE is
 "requirer", "message"}`, REQUIRE mirrors it with
 `"assurer"` and `"requirer_commitment"`. Every rejection rule in
 CONDITIONS.md section 1 and VALIDATION.md rule 6 has at least one case.
+
+## spend case shape
+
+```json
+{
+    "name": "unique within the file",
+    "script_pubkey": "<hex, the spent taproot scriptPubKey>",
+    "witness": ["<hex solution>", "<hex program>", "<hex leaf script>", "<hex control block>"],
+    "max_cost": 10000000,
+    "expect": {
+        "conditions": [],
+        "tapleaf": "<hex, 32 bytes>",
+        "merkle_root": "<hex, 32 bytes>",
+        "internal_key": "<hex, 32 bytes>",
+        "cost": 244
+    }
+}
+```
+
+`witness` is the input's elements as the transaction serializes
+them, the control block last and an annex after it when the case
+carries one. `max_cost` is required: the budget function of
+COSTS.md section 9 is not fixed, so every case states the budget it
+runs under. `expect` is the success shape above, with `annex_hash`
+added when the witness carries an annex, or `{"error": "<code>"}`.
+`conditions` uses the conditions suite's JSON forms, and the three
+identity fields are what the control block and leaf script read to.
+Every case is a spend base consensus accepts: the runner rejects as
+malformed a witness base consensus would refuse or one under another
+leaf version, because SPEC.md assigns those no outcome. Every case
+in `spend/identity.json` was cross-checked against the vendored
+Bitcoin Core tagged hash when written.
 
 ## validation case shape
 
@@ -103,7 +137,8 @@ CONDITIONS.md section 1 and VALIDATION.md rule 6 has at least one case.
                 "conditions": "<hex node>",
                 "tapleaf": "<hex, 32 bytes>",
                 "merkle_root": "<hex, 32 bytes>",
-                "internal_key": "<hex, 32 bytes>"
+                "internal_key": "<hex, 32 bytes>",
+                "annex_hash": "<hex, 32 bytes, optional>"
             }
         ],
         "outputs": [{"script_pubkey": "<hex>", "amount": 50000}]
@@ -123,7 +158,10 @@ each exactly 32 bytes: the triple base consensus authenticates from
 the control block. Rule 3's composed specifiers read the first two,
 ASSERT_MY_TAPTREE reads the last two. The model rejects a
 condition-carrying input without all three, and derives nothing
-from them, so a family-suite input may carry filler. `expect`
+from them, so a family-suite input may carry filler. `annex_hash`
+is the BIP341 `sha_annex` digest of the annex the input's witness
+carries, present exactly when it carries one: ASSERT_MY_ANNEX reads
+it, and an input carrying one without the assert is invalid. `expect`
 is `{"valid": true}` or `{"error": "<code>"}`. The transaction must
 satisfy the model's base rules (value conservation, ranges, distinct
 outpoints): a case violating them is a malformed vector, not an

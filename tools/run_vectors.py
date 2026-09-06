@@ -9,7 +9,7 @@ Envelope format (v0), one JSON object per file:
 
     {
         "schema": "bitlisp-vector-v0",
-        "suite": "vm" | "conditions" | "validation",
+        "suite": "vm" | "conditions" | "spend" | "validation",
         "spec": "<citation of the spec section the cases pin>",
         "cases": [ ... ]
     }
@@ -33,7 +33,7 @@ VECTOR_ROOT = REPO_ROOT / "vectors"
 sys.path.insert(0, str(REPO_ROOT / "python"))
 
 SCHEMA = "bitlisp-vector-v0"
-SUITES = ("vm", "conditions", "validation")
+SUITES = ("vm", "conditions", "spend", "validation")
 
 
 class VectorError(Exception):
@@ -203,7 +203,7 @@ def run_conditions_case(case):
     entry's name ("outpoint", "txid", "script_pubkey", "amount"),
     amounts as integers, bytes as hex. ASSERT_MY_TAPTREE pins
     {"opcode", "internal_key", "merkle_root"}, its two operands and
-    nothing derived.
+    nothing derived. ASSERT_MY_ANNEX pins {"opcode", "annex_hash"}.
 
     The message family pins specifiers as {"commitment", "fields"}
     with fields in operand order, amounts as integers, all other
@@ -256,6 +256,90 @@ def run_conditions_case(case):
         raise VectorError(f"expected {expect}, got {outcome}")
 
 
+def run_spend_case(case):
+    """One spend case: one input's witness through the per-input
+    stages, from witness shape to the parsed condition list.
+
+    Case shape, closed like the envelope:
+        {
+            "name": "<unique within the file>",
+            "script_pubkey": "<hex, the spent taproot scriptPubKey>",
+            "witness": ["<hex>", ...],
+            "max_cost": <int>,
+            "expect": {"conditions": [<condition JSON>],
+                       "tapleaf": "<32-byte hex>",
+                       "merkle_root": "<32-byte hex>",
+                       "internal_key": "<32-byte hex>",
+                       "annex_hash": "<32-byte hex, only with an annex>",
+                       "cost": <int>}
+                      or {"error": "<bitlisp error code>"}
+        }
+
+    witness is the input's elements as the transaction serializes
+    them, the control block last, an annex after it when present.
+    max_cost is required: the budget function is not fixed yet, so
+    every case states the budget it runs under. The condition JSON
+    is the conditions suite's. tapleaf, merkle_root, and
+    internal_key are the execution identity read from the control
+    block, annex_hash the sha_annex digest of the annex.
+
+    Every case is a spend base consensus accepts: a witness base
+    consensus would reject, or one that is not a BitLisp spend, has
+    no outcome under this layer and is a malformed vector.
+    """
+    from bitlisp import BaseConsensusError, BitLispError, TxInput, evaluate_spend
+    from bitlisp.errors import CODES
+
+    required = {"name", "script_pubkey", "witness", "max_cost", "expect"}
+    keys = set(case)
+    if missing := required - keys:
+        raise VectorError(f"missing keys {sorted(missing)}")
+    if extra := keys - required:
+        raise VectorError(f"unknown keys {sorted(extra)}")
+    expect = case["expect"]
+    success_keys = {"conditions", "tapleaf", "merkle_root", "internal_key", "cost"}
+    if not isinstance(expect, dict) or set(expect) not in (
+        success_keys,
+        success_keys | {"annex_hash"},
+        {"error"},
+    ):
+        raise VectorError(
+            "expect must be exactly {conditions, tapleaf, merkle_root, "
+            "internal_key, cost}, those plus annex_hash, or {error}"
+        )
+    if "error" in expect and expect["error"] not in CODES:
+        raise VectorError(f"unknown expected error code {expect['error']!r}")
+    if not isinstance(case["witness"], list):
+        raise VectorError("witness must be a list of hex elements")
+    # The outpoint, amount, and sequence are filler: nothing before
+    # the transaction stage reads them.
+    tx_input = TxInput(
+        txid=b"\x00" * 32,
+        index=0,
+        script_pubkey=bytes.fromhex(case["script_pubkey"]),
+        amount=1,
+        sequence=0xFFFFFFFF,
+    )
+    witness = [bytes.fromhex(element) for element in case["witness"]]
+    try:
+        cost, spent = evaluate_spend(tx_input, witness, case["max_cost"])
+        outcome = {
+            "conditions": [_condition_json(c) for c in spent.conditions],
+            "tapleaf": spent.tapleaf.hex(),
+            "merkle_root": spent.merkle_root.hex(),
+            "internal_key": spent.internal_key.hex(),
+            "cost": cost,
+        }
+        if spent.annex_hash is not None:
+            outcome["annex_hash"] = spent.annex_hash.hex()
+    except BaseConsensusError as exc:
+        raise VectorError(f"outside BitLisp, base consensus decides: {exc}") from None
+    except BitLispError as exc:
+        outcome = {"error": exc.code}
+    if outcome != expect:
+        raise VectorError(f"expected {expect}, got {outcome}")
+
+
 def run_validation_case(case):
     """One validation case: validate a transaction's condition lists.
 
@@ -271,7 +355,8 @@ def run_validation_case(case):
                             "conditions": "<hex node, optional>",
                             "tapleaf": "<32-byte hex, required with conditions>",
                             "merkle_root": "<32-byte hex, required with conditions>",
-                            "internal_key": "<32-byte hex, required with conditions>"}],
+                            "internal_key": "<32-byte hex, required with conditions>",
+                            "annex_hash": "<32-byte hex, optional>"}],
                 "outputs": [{"script_pubkey": "<hex>", "amount": <int>}]
             },
             "expect": {"valid": true} or {"error": "<bitlisp error code>"}
@@ -279,7 +364,8 @@ def run_validation_case(case):
 
     An input without a conditions key is a non-BitLisp input. An
     input with one is a BitLisp input whose program evaluation
-    produced that condition list.
+    produced that condition list. annex_hash is the sha_annex digest
+    of the annex the input's witness carries, absent without one.
     """
     from bitlisp import BitLispError, validate_transaction
     from bitlisp.errors import CODES
@@ -344,6 +430,7 @@ def _make_suite_runner(case_runner):
 RUNNERS = {
     "vm": _make_suite_runner(run_vm_case),
     "conditions": _make_suite_runner(run_conditions_case),
+    "spend": _make_suite_runner(run_spend_case),
     "validation": _make_suite_runner(run_validation_case),
 }
 
