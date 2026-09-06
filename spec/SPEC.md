@@ -16,7 +16,8 @@ the output's script tree, under the leaf version section 2 assigns.
 The leaf commits to the program by its tree hash. A spend of that
 leaf is a BIP341 script-path spend whose witness carries four
 elements: the solution, the serialized program, the leaf script,
-and the control block. Base consensus authenticates the leaf
+and the control block, with an annex after them only when the
+program commits to one. Base consensus authenticates the leaf
 against the spent output exactly as it does for every script-path
 spend, and the rules of this document then run: the program must
 match the leaf, the program evaluates over the solution under a
@@ -166,20 +167,22 @@ preimage and no tagged-hash preimage is a tree-hash preimage. A
 tag added to any companion document adds a row here.
 
 `BIP340/challenge` is the challenge tag of BIP340's Verify, which
-`secp_verify` and the signature asserts compute. The two other
+`secp_verify` and the signature asserts compute. The three other
 digests the companion documents read, the txid and the outputs
-hash of VALIDATION.md's transaction view, are Bitcoin's own
-untagged constructions. Neither enters a script tree, no rule
-compares either against a digest of the two kinds above, and each
-reaches a rule only as a value compared against a condition
-operand or bound as data into a tagged signature digest.
+hash of VALIDATION.md's transaction view and the annex hash of
+section 3.4, are Bitcoin's own untagged constructions. None
+enters a script tree, no rule compares any of them against a
+digest of the two kinds above, and each reaches a rule only as a
+value compared against a condition operand or bound as data into
+a tagged signature digest.
 
 ## 3. Witness structure
 
 ### 3.1 Elements
 
 The witness of a BitLisp spend is exactly four elements, in BIP341's
-stack order with the control block last:
+stack order with the control block last, followed by an annex only
+when section 3.4 admits one:
 
 | position | element | content |
 | --- | --- | --- |
@@ -196,17 +199,21 @@ runs: its length, the lift of the internal key, and the tweak
 check of section 2.3. This document adds no rule over its bytes.
 The rules over the witness, in order:
 
-1. **No annex.** The witness as the transaction serializes it,
-   before base consensus removes an annex: if it has at least two
-   elements and the last begins with the byte `0x50`, the spend is
-   invalid, `bad_witness`.
-2. **Exactly four elements**, else `bad_witness`.
+1. **The annex.** In the witness as the transaction serializes
+   it, if there are at least two elements and the last begins with
+   the byte `0x50`, that element is the annex, as BIP341 defines
+   it. It is set aside before the rules below count elements, and
+   section 3.4 governs it.
+2. **Exactly four elements** remain, else `bad_witness`.
 3. **The leaf script** is exactly 32 bytes, else `bad_witness`.
-4. **The program element** deserializes under VM.md section 2 to
+4. **Element sizes.** The solution, the program, and the annex
+   when present are each at most `MAX_WITNESS_ELEMENT_SIZE =
+   10,000` bytes, else `bad_witness`.
+5. **The program element** deserializes under VM.md section 2 to
    a node, else `bad_encoding`, and that node's tree hash equals
    the leaf script, else `leaf_mismatch`. The node is the program:
    an atom or a pair, with no further constraint on its shape.
-5. **The solution element** deserializes under VM.md section 2 to
+6. **The solution element** deserializes under VM.md section 2 to
    a node, else `bad_encoding`. That node is the environment the
    program evaluates over. Its content is otherwise unconstrained:
    the program reads what it reads, and solution data the program
@@ -215,10 +222,11 @@ The rules over the witness, in order:
 An empty element is not the serialization of any node. Nil is the
 one-byte element `0x80`.
 
-No element has a size bound beyond the ones base consensus places
-on the transaction. Every witness byte is priced by the weight
-mapping of COSTS.md section 9, and the budget of section 3.2 is
-the only bound evaluation places on a spend.
+The leaf script's width and the element bound of rule 4 are the
+only sizes this document fixes, and the control block's length is
+base consensus's. Every witness byte is priced by the weight
+mapping of COSTS.md section 9, and within the bound the budget of
+section 3.2 is the only limit evaluation places on a spend.
 
 ### 3.2 Budget
 
@@ -251,6 +259,29 @@ the empty list, which CONDITIONS.md rejects as
 `bad_condition_list`, so a leaf committing to nil has no valid
 script-path spend.
 
+### 3.4 The annex
+
+An annex is admitted on a BitLisp spend exactly when the input's
+condition list carries `ASSERT_MY_ANNEX` over its hash. The annex
+hash is
+
+`annexHash = sha256(compact_size(len(annex)) || annex)`
+
+over the annex element's bytes including its leading `0x50`, the
+`sha_annex` value of BIP341. The transaction view's BitLisp input
+carries `annexHash` when the witness carries an annex and nothing
+otherwise. No rule reads the annex's content.
+
+- An input whose witness carries an annex and whose condition list
+  holds no `ASSERT_MY_ANNEX` is invalid, `unasserted_annex`.
+- An `ASSERT_MY_ANNEX` on an input without an annex, or whose
+  annex hashes to a different value, is unsatisfied,
+  `unsatisfied_annex_assert`, the CONDITIONS.md entry.
+
+Together the two rules make an input's annex committed data the
+spender chose: no third party can attach, remove, or alter one
+without invalidating the spend.
+
 ## 4. Validation pipeline
 
 A BitLisp spend passes through six stages. The first five are
@@ -263,11 +294,11 @@ failure modes so each has its own vector.
 
 | stage | work | failure modes |
 | --- | --- | --- |
-| 1 | witness shape: no annex, four elements, a 32-byte leaf script | `bad_witness` |
+| 1 | witness shape: the annex set aside, four elements, a 32-byte leaf script, element sizes | `bad_witness` |
 | 2 | program decode and the leaf check | `bad_encoding`, `leaf_mismatch` |
 | 3 | solution decode | `bad_encoding` |
 | 4 | evaluation under the budget | the VM.md section 5 taxonomy, `cost_exceeded` among them |
-| 5 | condition-list parsing and costing | the CONDITIONS.md parse errors, `cost_exceeded` |
+| 5 | condition-list parsing and costing, then the annex rule of section 3.4 | the CONDITIONS.md parse errors, `cost_exceeded`, `unasserted_annex` |
 | 6 | transaction validation | the VALIDATION.md rule errors |
 
 Stages 1 to 3 precede VALIDATION.md's stage 1, stages 4 and 5 are
