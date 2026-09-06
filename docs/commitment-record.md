@@ -131,35 +131,32 @@ the trigger.
    its first byte is `0xf4` regardless. The vector pinning the
    table lands with the reference witness layer.
 
-4. **The witness is exactly four elements and no annex.** RATIFIED
-   (decision by Evan, 2026-09-06, via the approved unit plan).
-   Solution, program, leaf script, control block, in BIP341's order.
-   A fifth element or a missing one is `bad_witness`. The annex is
-   rejected rather than ignored, and the reason is an asymmetry
-   with the solution: a program can read any solution byte and so
-   commit to it, by checking its shape or folding it into a signed
-   message, while no operator reads the annex, so nothing in the
-   system can ever commit to one, and an ignored annex would be
-   bytes any relay peer could attach to a signed input to change
-   its wtxid. Rejecting is a pure restriction on a leaf version
-   whose execution BIP341 otherwise requires to succeed, and it
-   continues C16's decline of the annex as a carrier.
-   The cost of rejecting, stated so it is priced: a soft fork can
-   only tighten, so a later annex use for BitLisp inputs cannot be
-   enabled under this leaf version and needs a new one, where
-   tapscript's commit-and-reserve idiom (the annex signed by the
-   sighash and meaningless until assigned) keeps the upgrade under
-   the same version. The project's upgrade path already runs on
-   new leaf versions for new coins and reserved conditions for
-   deployed ones, and committing the annex here would mean binding
-   an annex hash into every signature-assert digest while leaving
-   keyless spends malleable anyway. Reintroduction trigger, as in
-   C16: a ratified upstream annex format plus relay policy, at
-   which point a new leaf version could admit a committed annex. Tapscript also bounds each initial stack element
-   at 520 bytes and the stack at 1,000 elements. The scheme keeps
-   neither: a program element cannot fit in 520 bytes, the element
-   count is fixed at four, and the derived budget prices bytes
-   instead.
+4. **The witness is four elements, and an annex only under a self
+   assert.** RATIFIED (decision by Evan, 2026-09-06, revising the
+   approved unit plan at the PR's review). Solution, program, leaf
+   script, control block, in BIP341's order. A fifth element or a
+   missing one is `bad_witness`. The unit plan rejected the annex
+   outright, on an asymmetry with the solution: a program can read
+   any solution byte and so commit to it, while no operator reads
+   the annex, so nothing could commit to one and an ignored annex
+   would be bytes any relay peer could attach to a signed input to
+   change its wtxid. Review priced what rejection costs: a soft
+   fork only tightens, so a later annex use for BitLisp inputs
+   would need a new leaf version, where tapscript's
+   commit-and-reserve idiom keeps it under one. Binding an annex
+   hash into the signature digests, tapscript's shape, was weighed
+   and declined because it protects signed spends only, and this
+   vocabulary is built for keyless paths. The annex is instead
+   admitted exactly when the condition list carries
+   `ASSERT_MY_ANNEX` over its BIP341 `sha_annex` digest, the
+   condition-record's decision 30 and divergence C25: keyless
+   paths are protected by default, a program that wants an annex
+   commits to it, and the door stays open under this leaf version.
+   Tapscript also bounds each initial stack element at 520 bytes
+   and the stack at 1,000 elements. The scheme keeps neither as
+   such: a program element cannot fit in 520 bytes, the element
+   count is fixed at four, and decision 12 sets the bound the
+   scheme does keep.
 
 5. **Surplus solution data is tolerated, at the element boundary
    it is not.** RATIFIED (decision by Evan, 2026-09-06, via the
@@ -180,6 +177,14 @@ the trigger.
    unless a program opts in with a shape check. The standard-layer
    obligation is that opt-in: templates check the shape of the
    solution they consume, and the vault does at its re-pin.
+   Addendum (decision by Evan, 2026-09-06, at the PR's review):
+   the compiler emits that shape check by default for every
+   `program` form's parameter list, so strictness becomes the
+   default for every compiled program at a few bytes each with no
+   new consensus surface. A compiler behavior change, not a
+   language surface, landing with unit 9. A seal does not close
+   this: seals commit to the transaction's outputs, non-witness
+   data, and read no witness byte.
 
 6. **The budget derives from witness weight.** RATIFIED (decision
    by Evan, 2026-09-06, via the approved unit plan). Objection O21
@@ -275,6 +280,26 @@ the trigger.
     `leaf_mismatch`, and a stub status line in a normative document
     is the placeholder the quality mandate forbids.
 
+12. **Every spender-chosen element is bounded at 10,000 bytes.**
+    RATIFIED (decision by Evan, 2026-09-06, at the PR's review,
+    revising the approved unit plan). The solution, the program,
+    and the annex are each at most `MAX_WITNESS_ELEMENT_SIZE =
+    10,000` bytes. The plan set no bound, on the argument that the
+    derived budget and the block weight limit price every byte
+    and deserialization is linear. Review asked for a limit as
+    the deserialization-side counterpart of tapscript's 520-byte
+    element bound, a constant a reviewer can check rather than an
+    argument. The number is Bitcoin's own legacy script cap,
+    already reused by the condition layer as the scriptPubKey
+    operand bound, so the scheme adds no new magnitude. It binds
+    the singleton: its solution carries two full transaction
+    serializations, so a lineage whose parent or grandparent
+    transaction is large cannot be proven, a limit the owner
+    controls and the singleton doc records. Both node elements
+    and the annex share the bound so the rule is one sentence. The
+    leaf script's width and the control block's length were
+    already fixed.
+
 ## 4. Carried to Phase 4
 
 - The weight mapping (COSTS.md section 9): the budget function and
@@ -291,5 +316,7 @@ the trigger.
   merkle root, and a scriptPubKey from program sources, lands with
   the reference witness layer now that the scheme fixes its output.
 - Vectors owed to the reference witness layer: every stage 1 and 2
-  failure mode, the digest-domain table, and the two programs spec
-  section 3.3 names, the atom `1` and nil.
+  failure mode including the element bound at and above 10,000
+  bytes, the digest-domain table, the two programs spec section
+  3.3 names, the atom `1` and nil, and the annex rule in both
+  directions with the ASSERT_MY_ANNEX cases.

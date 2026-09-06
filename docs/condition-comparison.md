@@ -102,6 +102,7 @@ delegate to.
 | own amount | `ASSERT_MY_AMOUNT` 73 | `ASSERT_MY_AMOUNT` `0x33`, normative |
 | own taproot components | absent | removed (decision 29): `ASSERT_MY_TAPTREE` `0x38` subsumes the derivation assert, `0x37` now a visible gap |
 | own taptree | absent | `ASSERT_MY_TAPTREE` `0x38`, normative, reads the control block's internal key and merkle root at the generic cost (decision 28) |
+| own annex | absent | `ASSERT_MY_ANNEX` `0x39`, normative, reads the annex's BIP341 sha_annex digest at the generic cost, the annex admitted only under it (decision 30) |
 | own birth time or height | `ASSERT_MY_BIRTH_SECONDS` 74, `ASSERT_MY_BIRTH_HEIGHT` 75 | declined, a chain read outside the transaction view (C13) |
 | ephemerality | `ASSERT_EPHEMERAL` 76, the coin was created in the same block it is spent | declined, structurally inexpressible within one transaction (C14) |
 

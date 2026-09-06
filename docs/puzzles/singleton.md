@@ -291,6 +291,13 @@ reliance on CREATE_COIN creating exactly the coin it names, which
 validation rule 1's index-free claims and rule 2's free outputs do
 not provide.
 
+The commitment scheme bounds the solution element at 10,000 bytes,
+so both serializations and the rest of the solution must fit in it
+together. A lineage whose parent or grandparent transaction is
+large enough to break the bound cannot be proven, a limit the
+owner controls by keeping the lineage's own spends small and
+choosing a small launch transaction.
+
 ## The state output
 
 The creating transaction commits the child's state through one
