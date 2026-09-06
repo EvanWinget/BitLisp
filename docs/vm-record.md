@@ -424,8 +424,9 @@ marked open name the phase that owes the answer.
    separation. The owed statement is that context argument, written
    down and pinned. Written down 2026-09-06: `spec/SPEC.md`
    section 2.4 states the disjointness as a first-byte fact over
-   every tag in use (commitment-record decision 3), and the vector
-   lands with the reference witness layer.
+   every tag in use (commitment-record decision 3), pinned
+   2026-09-06 by the test that recomputes the table from the tags
+   the implementation hashes under.
 8. **Peak memory and evaluation order.** OPEN, owed with the Phase 4
    budget mapping (recorded 2026-08-16 from the public record in
    §8.5 of the evaluation doc). CLVM costing charges total

@@ -3,11 +3,12 @@
 The interactive front end over the reference VM, the spend runner,
 the compiler, and the debug machine, all in `python/bitlisp_tools/`.
 This is tooling, not consensus. The REPL is the `bitlisp` command,
-and five one-shot commands ship beside it: `bitlisp-asm` assembles
+and six one-shot commands ship beside it: `bitlisp-asm` assembles
 text to serialized bytecode hex, `bitlisp-disasm` renders hex back
 as text, `bitlisp-compile` compiles a source program to serialized
-bytecode hex, and `bitlisp-curry` and `bitlisp-uncurry` fix values
-into a program and split them back out. The text syntax is defined
+bytecode hex, `bitlisp-curry` and `bitlisp-uncurry` fix values
+into a program and split them back out, and `bitlisp-commit` prints
+what an output committing to a program commits to. The text syntax is defined
 in `syntax.md`, the authoring language in `language.md`, and the
 currying and tree-hash surfaces in `curry.md`.
 
@@ -198,9 +199,11 @@ bitlisp-compile [--symbols <path>] [-I <path>]... [-T] [<file-or-literal>]
 bitlisp-curry [-a <sexpr>]... [-T] [<file-or-literal>]
                                           fix values into a program
 bitlisp-uncurry [<file-or-literal>]       split a curried program back
+bitlisp-commit [--hex] [-k <hex>] [-s <hex>]... [<file-or-literal>]
+                                          leaf, root, control block, scriptPubKey
 ```
 
-All five take one argument, a file when one exists at that path
+All six take one argument, a file when one exists at that path
 and the literal otherwise, the `bitlisp-run` convention, or read
 stdin when the argument is omitted, so they compose in pipelines:
 
@@ -222,6 +225,28 @@ search path is the same, the REPL's `-I` included.
 into a hex program, and `bitlisp-uncurry` prints the inner
 program's hex and then one fixed value per line as text. The
 curried shape and its contract are defined in `curry.md`.
+
+`bitlisp-commit` takes a program as text, or as serialized hex
+under `--hex`, and prints six lines: the leaf script (the program's
+tree hash), the tapleaf hash under BitLisp's leaf version, the
+merkle root, the internal key, the control block a spend of the
+leaf carries, and the taproot scriptPubKey of the output. The leaf
+sits alone in its tree unless `-s` names the 32-byte hashes beside
+it, leaf upward, and the internal key is the BIP341
+nothing-up-my-sleeve point unless `-k` names one, so the default
+output has no key path. It exits 2 when the program does not parse,
+a hash or key is not 32 bytes of hex, or the key does not lift to a
+curve point.
+
+```
+$ bitlisp-compile vault.bl | bitlisp-commit --hex
+leaf script:   ...
+tapleaf:       ...
+merkle root:   ...
+internal key:  50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0
+control block: d050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0
+scriptPubKey:  5120...
+```
 
 `bitlisp-asm`, `bitlisp-disasm`, `bitlisp-compile`, and
 `bitlisp-curry` take `-T`, printing the program's tree hash

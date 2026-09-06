@@ -128,8 +128,14 @@ the trigger.
    table is exhaustive over those tags and gains a row with any new
    one, the check that keeps the argument true. TapSighash is base
    consensus's key-path digest, computed by no BitLisp rule, and
-   its first byte is `0xf4` regardless. The vector pinning the
-   table lands with the reference witness layer.
+   its first byte is `0xf4` regardless. The table is pinned by a
+   test that recomputes every row from the tag strings the
+   implementation hashes under and checks the set of rows is exactly
+   the set of tags in use (landed 2026-09-06 with the reference
+   witness layer). Writing that test found the challenge row wrong:
+   the table had named the tag `BIP340/challenge` with first byte
+   `0x07`, and BIP340 spells it `BIP0340/challenge`, first byte
+   `0x7b`. Corrected the same day, the argument unchanged.
 
 4. **The witness is four elements, and an annex only under a self
    assert.** RATIFIED (decision by Evan, 2026-09-06, revising the
@@ -312,11 +318,33 @@ the trigger.
   asset token study.
 - Relay policy for the leaf version: today's policy discourages
   unknown leaf versions, a deployment question for Phase 6.
-- The commitment-hash utility: a command printing a leaf hash, a
-  merkle root, and a scriptPubKey from program sources, lands with
-  the reference witness layer now that the scheme fixes its output.
-- Vectors owed to the reference witness layer: every stage 1 and 2
-  failure mode including the element bound at and above 10,000
-  bytes, the digest-domain table, the two programs spec section
-  3.3 names, the atom `1` and nil, and the annex rule in both
-  directions with the ASSERT_MY_ANNEX cases.
+
+## 5. The reference witness layer
+
+Landed 2026-09-06, the PR after the scheme. `python/bitlisp/`
+gained `commitment.py` (the tree hash, the tagged hashes, the
+control block) and `spend.py` (the stages of spec section 4 for one
+input), the vector corpus a `spend` suite, and the front end
+`bitlisp-commit`, the commitment-hash utility queued 2026-08-14.
+Three choices made there, none a change to the scheme:
+
+- Base consensus's control block checks are run by the reference
+  as a precondition and reported outside the error taxonomy
+  (`BaseConsensusError`), never as a code a vector could pin: the
+  spec says a spend failing them never reaches it, and a reference
+  that read the triple unchecked would call spends valid that base
+  consensus rejects. A vector whose witness fails them is
+  malformed.
+- The annex admission rule is one function run twice on the
+  reference path, at stage 5 by the spend entry and first in
+  transaction validation, because the validation vectors and the
+  runner assemble transaction views without the spend entry and
+  the view's invariant must hold for them too.
+- The witness form of `bitlisp-run` and the REPL is deferred to
+  unit 9's first PR, where the vault is the first consumer.
+
+Writing the vectors found spec section 3.3 wrong about the nil
+program (its empty condition list is valid under CONDITIONS.md and
+the corpus, so the nil leaf is spendable by anyone) and the digest
+table wrong about the challenge tag (decision 3). Both corrected
+in their own spec commits.
