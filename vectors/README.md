@@ -11,6 +11,7 @@ why the vector was wrong (CLAUDE.md).
 | --- | --- | --- |
 | `vm/` | `vm` | (program, witness arguments) to (result, cost) or error |
 | `conditions/` | `conditions` | condition-list parsing and validation |
+| `spend/` | `spend` | one input's witness through the per-input stages: shape, decoding, the leaf check, evaluation, the condition list, the annex rule |
 | `validation/` | `validation` | tx-context validation, including the adversarial regression corpus |
 | `upstream/` | `tools/run_upstream.py` (clvm), unit suite (bip340, bip341) | Upstream vectors vendored as data, original format, provenance headers required |
 
@@ -84,6 +85,38 @@ order, amounts as integers, all other fields hex: ANNOUNCE is
 "requirer", "message"}`, REQUIRE mirrors it with
 `"assurer"` and `"requirer_commitment"`. Every rejection rule in
 CONDITIONS.md section 1 and VALIDATION.md rule 6 has at least one case.
+
+## spend case shape
+
+```json
+{
+    "name": "unique within the file",
+    "script_pubkey": "<hex, the spent taproot scriptPubKey>",
+    "witness": ["<hex solution>", "<hex program>", "<hex leaf script>", "<hex control block>"],
+    "max_cost": 10000000,
+    "expect": {
+        "conditions": [],
+        "tapleaf": "<hex, 32 bytes>",
+        "merkle_root": "<hex, 32 bytes>",
+        "internal_key": "<hex, 32 bytes>",
+        "cost": 244
+    }
+}
+```
+
+`witness` is the input's elements as the transaction serializes
+them, the control block last and an annex after it when the case
+carries one. `max_cost` is required: the budget function of
+COSTS.md section 9 is not fixed, so every case states the budget it
+runs under. `expect` is the success shape above, with `annex_hash`
+added when the witness carries an annex, or `{"error": "<code>"}`.
+`conditions` uses the conditions suite's JSON forms, and the three
+identity fields are what the control block and leaf script read to.
+Every case is a spend base consensus accepts: the runner rejects as
+malformed a witness base consensus would refuse or one under another
+leaf version, because SPEC.md assigns those no outcome. Every case
+in `spend/identity.json` was cross-checked against the vendored
+Bitcoin Core tagged hash when written.
 
 ## validation case shape
 
