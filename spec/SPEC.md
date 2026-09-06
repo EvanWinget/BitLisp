@@ -114,6 +114,11 @@ reads it:
   `tagged_hash("TapBranch", e_j || k_j)` otherwise. `merkleRoot` is
   `k_m`.
 
+When `m` is 0 the merkle root is the tapleaf hash itself, so a
+BitLisp spend's `merkleRoot` is never empty: the empty root the
+CREATE_OUTPUT_TAPROOT entry admits names an output with no script
+tree, which has no leaf to execute.
+
 Base consensus accepts the spend only when the spent scriptPubKey
 is `0x51 0x20` followed by the x coordinate of `P + t*G`, where `P`
 is the point with x coordinate `internalKey` and even y, `t` is
@@ -124,8 +129,13 @@ derives nothing further from it.
 
 ### 2.4 Digest domains
 
-Two kinds of digest meet in a BitLisp coin's script tree and its
-tweak, and no preimage is valid under both:
+A tree hash never enters a script tree as a node. The leaf script
+is the tree hash as data, and the tree's nodes are BIP341's tagged
+hashes over it: the tapleaf hash wraps the leaf script under
+`BITLISP_LEAF_VERSION`, and every branch and the tweak wrap tagged
+hashes again. The two kinds of digest a BitLisp validator computes
+are further disjoint by preimage, and no preimage is valid under
+both:
 
 - A tree hash. Its preimage begins with the byte `0x01` (an atom)
   or `0x02` (a pair).
@@ -133,13 +143,15 @@ tweak, and no preimage is valid under both:
   `sha256(tag) || sha256(tag)`, whose first byte is the first byte
   of `sha256(tag)`.
 
-The tags in use and the first byte of each tag digest:
+Every tag a BitLisp validator hashes under, and the first byte of
+each tag digest:
 
 | tag | first byte |
 | --- | --- |
 | `TapLeaf` | `0xae` |
 | `TapBranch` | `0x19` |
 | `TapTweak` | `0xe8` |
+| `BIP340/challenge` | `0x07` |
 | `BitLisp/sig/my_txid` | `0x54` |
 | `BitLisp/sig/my_scriptpubkey` | `0xe3` |
 | `BitLisp/sig/my_amount` | `0xdf` |
@@ -153,11 +165,14 @@ None is `0x01` or `0x02`, so no tree-hash preimage is a tagged-hash
 preimage and no tagged-hash preimage is a tree-hash preimage. A
 tag added to any companion document adds a row here.
 
-The two other digests the companion documents read, the txid and
-the outputs hash of VALIDATION.md's transaction view, are Bitcoin's
-own untagged constructions. Neither enters a script tree, and no
-rule compares either against a digest of the two kinds above: each
-is compared only against a condition operand.
+`BIP340/challenge` is the challenge tag of BIP340's Verify, which
+`secp_verify` and the signature asserts compute. The two other
+digests the companion documents read, the txid and the outputs
+hash of VALIDATION.md's transaction view, are Bitcoin's own
+untagged constructions. Neither enters a script tree, no rule
+compares either against a digest of the two kinds above, and each
+reaches a rule only as a value compared against a condition
+operand or bound as data into a tagged signature digest.
 
 ## 3. Witness structure
 
@@ -173,21 +188,25 @@ stack order with the control block last:
 | 3 | leaf script | the 32-byte tree hash of section 2.2 |
 | 4 | control block | `33 + 32m` bytes, as base consensus defines it |
 
-The rules over them, in order:
+Position 1 is the first element of the input's witness as the
+transaction serializes it, and the control block is the last.
 
-1. **No annex.** A witness whose last element begins with the
-   byte `0x50`, the element BIP341 would remove as the annex, makes
-   the spend invalid, `bad_witness`.
+Base consensus checks the control block before any rule below
+runs: its length, the lift of the internal key, and the tweak
+check of section 2.3. This document adds no rule over its bytes.
+The rules over the witness, in order:
+
+1. **No annex.** The witness as the transaction serializes it,
+   before base consensus removes an annex: if it has at least two
+   elements and the last begins with the byte `0x50`, the spend is
+   invalid, `bad_witness`.
 2. **Exactly four elements**, else `bad_witness`.
-3. **The control block** is checked by base consensus: its length,
-   the lift of the internal key, and the tweak check of section
-   2.3. This document adds no rule over its bytes.
-4. **The leaf script** is exactly 32 bytes, else `bad_witness`.
-5. **The program element** deserializes under VM.md section 2 to
+3. **The leaf script** is exactly 32 bytes, else `bad_witness`.
+4. **The program element** deserializes under VM.md section 2 to
    a node, else `bad_encoding`, and that node's tree hash equals
    the leaf script, else `leaf_mismatch`. The node is the program:
    an atom or a pair, with no further constraint on its shape.
-6. **The solution element** deserializes under VM.md section 2 to
+5. **The solution element** deserializes under VM.md section 2 to
    a node, else `bad_encoding`. That node is the environment the
    program evaluates over. Its content is otherwise unconstrained:
    the program reads what it reads, and solution data the program
@@ -210,6 +229,10 @@ input's witness changes the budget. Deserializing the two node
 elements and hashing the program tree are not charged against the
 budget: the weight mapping prices those bytes.
 
+PROVISIONAL until COSTS.md section 9 fixes the function. Until it
+does, a vector under this document states the budget it runs
+under explicitly.
+
 ### 3.3 Evaluation and the condition list
 
 The spend evaluates `run(program, solution, budget)` under VM.md
@@ -219,6 +242,14 @@ and the conditions are costed against the remaining budget under
 VALIDATION.md rule 5. The input then enters the transaction view
 carrying its condition list and its execution identity, and
 VALIDATION.md's rules run over the assembled transaction.
+
+Two programs follow from these rules and are named so they are
+pinned. The program that is the atom `1` returns its solution, so
+a leaf committing to it accepts any condition list the spender
+supplies: the anyone-can-spend leaf. The program nil returns nil,
+the empty list, which CONDITIONS.md rejects as
+`bad_condition_list`, so a leaf committing to nil has no valid
+script-path spend.
 
 ## 4. Validation pipeline
 
@@ -239,7 +270,8 @@ failure modes so each has its own vector.
 | 5 | condition-list parsing and costing | the CONDITIONS.md parse errors, `cost_exceeded` |
 | 6 | transaction validation | the VALIDATION.md rule errors |
 
-Stages 1 to 5 are VALIDATION.md's stage 1, the stateless per-spend
-work, and stage 6 is its stages 2 to 5. The control block's own
+Stages 1 to 3 precede VALIDATION.md's stage 1, stages 4 and 5 are
+that stage, the stateless per-spend work, and stage 6 is its
+stages 2 to 5. The control block's own
 checks, base consensus's, precede stage 1: a spend that fails them
 never reaches this document.
