@@ -15,6 +15,7 @@ pure function of the control block and leaf.
 
 import hashlib
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -45,7 +46,6 @@ from bitlisp.commitment import (  # noqa: E402
     tree_hash,
 )
 from bitlisp.operators import op_sha256tree  # noqa: E402
-from bitlisp.secp256k1 import taproot_output_point  # noqa: E402
 from bitlisp.spend import MAX_WITNESS_ELEMENT_SIZE, split_annex  # noqa: E402
 from support import NUMS  # noqa: E402
 from test_framework.key import TaggedHash  # noqa: E402
@@ -237,17 +237,24 @@ def test_digest_domain_table_first_bytes():
 
 
 def test_digest_domain_table_is_every_tag_the_package_hashes_under():
+    """Every tagged digest goes through secp256k1.tagged_hash, so the
+    tags in use are its literal arguments plus the signature bindings'
+    tags, and the table must be exactly that set."""
     from bitlisp.conditions import SIG_BINDINGS
 
     package = REPO_ROOT / "python" / "bitlisp"
-    sig_tags = {binding[1] for binding in SIG_BINDINGS.values()}
-    literal_tags = set()
+    literal = re.compile(r'tagged_hash\(\s*"([^"]+)"')
+    tags = {binding[1] for binding in SIG_BINDINGS.values()}
     for path in package.glob("*.py"):
-        text = path.read_text()
-        for tag in ("TapLeaf", "TapBranch", "TapTweak", "BIP0340/challenge"):
-            if f'"{tag}"' in text or f'b"{tag}"' in text:
-                literal_tags.add(tag)
-    assert sig_tags | literal_tags == set(DIGEST_DOMAIN_TABLE)
+        tags.update(literal.findall(path.read_text()))
+    assert tags == set(DIGEST_DOMAIN_TABLE)
+    # One tagged hash, in one place, so the scan above sees every tag.
+    definitions = [
+        path.name
+        for path in package.glob("*.py")
+        if "def tagged_hash(" in path.read_text()
+    ]
+    assert definitions == ["secp256k1.py"]
 
 
 # --- the spend entry's invariants ------------------------------------------
@@ -261,15 +268,15 @@ def _clist(*items):
 
 
 def _spend(program, solution, annex=None, path=b"", max_cost=10_000_000):
-    """Evaluates a program over a solution as a single-leaf spend under
-    NUMS, returning (cost, input) or the error code."""
+    """Evaluates a program over a solution as a spend of a leaf under
+    NUMS with the given path, returning (cost, input) or the error
+    code."""
     leaf = tree_hash(program)
-    root = merkle_root(tapleaf_hash(BITLISP_LEAF_VERSION, leaf), path)
-    x, y = taproot_output_point(NUMS, root)
-    block = bytes([BITLISP_LEAF_VERSION | (y & 1)]) + NUMS + path
-    witness = [serialize(solution), serialize(program), leaf, block]
+    block = ControlBlock.build(NUMS, leaf, path)
+    witness = [serialize(solution), serialize(program), leaf, block.serialize()]
     if annex is not None:
         witness.append(annex)
+    root = merkle_root(tapleaf_hash(BITLISP_LEAF_VERSION, leaf), path)
     tx_input = TxInput(b"\x00" * 32, 0, taproot_script_pubkey(NUMS, root), 1, 0)
     try:
         return evaluate_spend(tx_input, witness, max_cost)
@@ -349,27 +356,42 @@ def test_split_annex_follows_bip341():
 
 def test_key_path_and_foreign_leaf_versions_are_outside_bitlisp():
     leaf = tree_hash(b"\x01")
+    block = ControlBlock.build(NUMS, leaf, leaf_version=0xC0).serialize()
     root = merkle_root(tapleaf_hash(0xC0, leaf), b"")
-    x, y = taproot_output_point(NUMS, root)
-    block = bytes([0xC0 | (y & 1)]) + NUMS
     tx_input = TxInput(b"\x00" * 32, 0, taproot_script_pubkey(NUMS, root), 1, 0)
     with pytest.raises(BaseConsensusError, match="leaf version"):
         evaluate_spend(tx_input, [b"\x80", b"\x01", leaf, block], 1000)
     with pytest.raises(BaseConsensusError, match="not a script-path spend"):
         evaluate_spend(tx_input, [b"\x00" * 64], 1000)
+    carrying = TxInput(
+        b"\x00" * 32,
+        0,
+        b"\x51",
+        1,
+        0,
+        conditions=(),
+        tapleaf=leaf,
+        merkle_root=leaf,
+        internal_key=NUMS,
+    )
     with pytest.raises(ValueError, match="already carries"):
-        evaluate_spend(
-            TxInput(
-                b"\x00" * 32,
-                0,
-                b"\x51",
-                1,
-                0,
-                conditions=(),
-                tapleaf=leaf,
-                merkle_root=leaf,
-                internal_key=NUMS,
-            ),
-            [b"\x80", b"\x01", leaf, block],
-            1000,
-        )
+        evaluate_spend(carrying, [b"\x80", b"\x01", leaf, block], 1000)
+
+
+@EXAMPLES
+@given(
+    st.integers(0, 127).map(lambda v: v * 2),
+    st.lists(st.binary(min_size=32, max_size=32), max_size=5),
+    st.binary(max_size=40),
+)
+def test_control_block_round_trips(leaf_version, siblings, leaf_script):
+    """build then serialize then parse gives the block back, its
+    parity the output key's, and build reports None exactly when the
+    key does not lift."""
+    path = b"".join(siblings)
+    block = ControlBlock.build(NUMS, leaf_script, path, leaf_version)
+    assert ControlBlock.parse(block.serialize()) == block
+    assert block.check(
+        leaf_script, taproot_script_pubkey(NUMS, block.identity(leaf_script)[1])
+    )
+    assert ControlBlock.build(b"\xff" * 32, leaf_script, path, leaf_version) is None

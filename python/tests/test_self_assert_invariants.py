@@ -195,9 +195,11 @@ def test_single_assert_outcome_matches_field_equality(
 ):
     """A lone self assert is satisfied exactly when each operand
     equals the field it reads, and fails with its field's error
-    otherwise. An input carrying an annex under any other lone
-    assert fails the admission rule instead, whatever that assert
-    would have said."""
+    otherwise. The input carries an annex only under an annex
+    assert: under any other lone assert an annex fails the admission
+    rule first, the property the admission test pins."""
+    if not isinstance(cond, AssertMyAnnex):
+        annex = None
     if isinstance(cond, AssertMyOutpoint):
         satisfied = cond.outpoint == _outpoint(txid, index)
         error = "unsatisfied_outpoint_assert"
@@ -217,10 +219,7 @@ def test_single_assert_outcome_matches_field_equality(
         satisfied = cond.amount == amount
         error = "unsatisfied_amount_assert"
     got = outcome(build_tx(txid, index, script, amount, [cond], env, identity, annex))
-    if annex is not None and not isinstance(cond, AssertMyAnnex):
-        assert got == "unasserted_annex"
-    else:
-        assert got == (None if satisfied else error)
+    assert got == (None if satisfied else error)
 
 
 @given(
