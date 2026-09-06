@@ -234,18 +234,21 @@ leaf carries, and the taproot scriptPubKey of the output. The leaf
 sits alone in its tree unless `-s` names the 32-byte hashes beside
 it, leaf upward, and the internal key is the BIP341
 nothing-up-my-sleeve point unless `-k` names one, so the default
-output has no key path. It exits 2 when the program does not parse,
-a hash or key is not 32 bytes of hex, or the key does not lift to a
-curve point.
+output has no key path. The control block's first byte is the leaf
+version `0xd0` with the output key's parity in its low bit, so it
+reads `d0` or `d1` depending on the key and the tree. It exits 2
+when the program does not parse, a hash or key is not 32 bytes of
+hex, there are more than 128 siblings, or the key does not lift to
+a curve point.
 
 ```
-$ bitlisp-compile vault.bl | bitlisp-commit --hex
-leaf script:   ...
-tapleaf:       ...
-merkle root:   ...
+$ bitlisp-commit "1"
+leaf script:   9dcf97a184f32623d11a73124ceb99a5709b083721e878a16d78f596718ba7b2
+tapleaf:       dde54461ef9453a9d235b60142c77f6680d0243ec4a02d206750059e8ea08b95
+merkle root:   dde54461ef9453a9d235b60142c77f6680d0243ec4a02d206750059e8ea08b95
 internal key:  50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0
 control block: d050929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0
-scriptPubKey:  5120...
+scriptPubKey:  5120864ac98761331f672c01124a5a08e77402420ff7e471bd38cf5ce354a104a194
 ```
 
 `bitlisp-asm`, `bitlisp-disasm`, `bitlisp-compile`, and

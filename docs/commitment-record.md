@@ -129,10 +129,13 @@ the trigger.
    one, the check that keeps the argument true. TapSighash is base
    consensus's key-path digest, computed by no BitLisp rule, and
    its first byte is `0xf4` regardless. The table is pinned by a
-   test that recomputes every row from the tag strings the
-   implementation hashes under and checks the set of rows is exactly
-   the set of tags in use (landed 2026-09-06 with the reference
-   witness layer). Writing that test found the challenge row wrong:
+   test rather than the vector this entry first promised (decision
+   by Evan, 2026-09-06, steelmanned both ways): the table fits no
+   suite's case shape, and a test can state the argument as well as
+   the values, recomputing every row from the tag strings and
+   checking that the rows are exactly the tags in use, every tagged
+   digest passing through one function. Writing that test found the
+   challenge row wrong:
    the table had named the tag `BIP340/challenge` with first byte
    `0x07`, and BIP340 spells it `BIP0340/challenge`, first byte
    `0x7b`. Corrected the same day, the argument unchanged.
@@ -339,7 +342,9 @@ Three choices made there, none a change to the scheme:
   reference path, at stage 5 by the spend entry and first in
   transaction validation, because the validation vectors and the
   runner assemble transaction views without the spend entry and
-  the view's invariant must hold for them too.
+  the view's invariant must hold for them too. It lives with the
+  per-input stages, and transaction validation imports it, so the
+  dependency runs from the later stage to the earlier one.
 - The witness form of `bitlisp-run` and the REPL is deferred to
   unit 9's first PR, where the vault is the first consumer.
 
