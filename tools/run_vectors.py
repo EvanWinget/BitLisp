@@ -203,7 +203,7 @@ def run_conditions_case(case):
     entry's name ("outpoint", "txid", "script_pubkey", "amount"),
     amounts as integers, bytes as hex. ASSERT_MY_TAPTREE pins
     {"opcode", "internal_key", "merkle_root"}, its two operands and
-    nothing derived.
+    nothing derived. ASSERT_MY_ANNEX pins {"opcode", "annex_hash"}.
 
     The message family pins specifiers as {"commitment", "fields"}
     with fields in operand order, amounts as integers, all other
@@ -271,7 +271,8 @@ def run_validation_case(case):
                             "conditions": "<hex node, optional>",
                             "tapleaf": "<32-byte hex, required with conditions>",
                             "merkle_root": "<32-byte hex, required with conditions>",
-                            "internal_key": "<32-byte hex, required with conditions>"}],
+                            "internal_key": "<32-byte hex, required with conditions>",
+                            "annex_hash": "<32-byte hex, optional>"}],
                 "outputs": [{"script_pubkey": "<hex>", "amount": <int>}]
             },
             "expect": {"valid": true} or {"error": "<bitlisp error code>"}
@@ -279,7 +280,8 @@ def run_validation_case(case):
 
     An input without a conditions key is a non-BitLisp input. An
     input with one is a BitLisp input whose program evaluation
-    produced that condition list.
+    produced that condition list. annex_hash is the sha_annex digest
+    of the annex the input's witness carries, absent without one.
     """
     from bitlisp import BitLispError, validate_transaction
     from bitlisp.errors import CODES

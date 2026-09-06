@@ -72,7 +72,8 @@ condition (`{"opcode", "script_pubkey", "amount"}` for CREATE_OUTPUT,
 `{"opcode", "internal_key", "merkle_root", "amount", "script_pubkey"}`
 for CREATE_OUTPUT_TAPROOT with `script_pubkey` the derived taproot
 script, `{"opcode", "internal_key", "merkle_root"}` for
-ASSERT_MY_TAPTREE, `{"opcode"}` plus the operand under its entry's argument name
+ASSERT_MY_TAPTREE, `{"opcode", "annex_hash"}` for ASSERT_MY_ANNEX,
+`{"opcode"}` plus the operand under its entry's argument name
 (`"height"`, `"time"`, `"blocks"`, `"units"`) for the time asserts,
 `{"opcode", "cost", "args": ["<hex node>"]}` for reserved
 conditions) or `{"error": "<code>"}`. The message family pins
@@ -103,7 +104,8 @@ CONDITIONS.md section 1 and VALIDATION.md rule 6 has at least one case.
                 "conditions": "<hex node>",
                 "tapleaf": "<hex, 32 bytes>",
                 "merkle_root": "<hex, 32 bytes>",
-                "internal_key": "<hex, 32 bytes>"
+                "internal_key": "<hex, 32 bytes>",
+                "annex_hash": "<hex, 32 bytes, optional>"
             }
         ],
         "outputs": [{"script_pubkey": "<hex>", "amount": 50000}]
@@ -123,7 +125,10 @@ each exactly 32 bytes: the triple base consensus authenticates from
 the control block. Rule 3's composed specifiers read the first two,
 ASSERT_MY_TAPTREE reads the last two. The model rejects a
 condition-carrying input without all three, and derives nothing
-from them, so a family-suite input may carry filler. `expect`
+from them, so a family-suite input may carry filler. `annex_hash`
+is the BIP341 `sha_annex` digest of the annex the input's witness
+carries, present exactly when it carries one: ASSERT_MY_ANNEX reads
+it, and an input carrying one without the assert is invalid. `expect`
 is `{"valid": true}` or `{"error": "<code>"}`. The transaction must
 satisfy the model's base rules (value conservation, ranges, distinct
 outpoints): a case violating them is a malformed vector, not an

@@ -266,6 +266,60 @@
    }
   },
   {
+   "name": "annex_parses",
+   "conditions": "ffff39ffa09ead2a42d43638f5cd0d2f61f94c8786211ea1d678445db915507c61bbcbf07c8080",
+   "expect": {
+    "parsed": [
+     {
+      "opcode": 57,
+      "annex_hash": "9ead2a42d43638f5cd0d2f61f94c8786211ea1d678445db915507c61bbcbf07c"
+     }
+    ]
+   }
+  },
+  {
+   "name": "annex_31_bytes",
+   "conditions": "ffff39ff9f9ead2a42d43638f5cd0d2f61f94c8786211ea1d678445db915507c61bbcbf08080",
+   "expect": {
+    "error": "bad_condition_arg"
+   }
+  },
+  {
+   "name": "annex_33_bytes",
+   "conditions": "ffff39ffa19ead2a42d43638f5cd0d2f61f94c8786211ea1d678445db915507c61bbcbf07c008080",
+   "expect": {
+    "error": "bad_condition_arg"
+   }
+  },
+  {
+   "name": "annex_empty",
+   "conditions": "ffff39ff808080",
+   "expect": {
+    "error": "bad_condition_arg"
+   }
+  },
+  {
+   "name": "annex_arity_zero",
+   "conditions": "ffff398080",
+   "expect": {
+    "error": "bad_condition_arity"
+   }
+  },
+  {
+   "name": "annex_arity_two",
+   "conditions": "ffff39ffa09ead2a42d43638f5cd0d2f61f94c8786211ea1d678445db915507c61bbcbf07cffa09ead2a42d43638f5cd0d2f61f94c8786211ea1d678445db915507c61bbcbf07c8080",
+   "expect": {
+    "error": "bad_condition_arity"
+   }
+  },
+  {
+   "name": "annex_operand_is_pair",
+   "conditions": "ffff39ffffa09ead2a42d43638f5cd0d2f61f94c8786211ea1d678445db915507c61bbcbf07c808080",
+   "expect": {
+    "error": "bad_condition_arg"
+   }
+  },
+  {
    "name": "txid_operand_not_atom",
    "conditions": "ffff31ffffa01111111111111111111111111111111111111111111111111111111111111111808080",
    "expect": {
@@ -310,13 +364,6 @@
   {
    "name": "gap_0x37_invalid",
    "conditions": "ffff37ffa011111111111111111111111111111111111111111111111111111111111111118080",
-   "expect": {
-    "error": "bad_condition_opcode"
-   }
-  },
-  {
-   "name": "gap_0x39_invalid",
-   "conditions": "ffff39ffa011111111111111111111111111111111111111111111111111111111111111118080",
    "expect": {
     "error": "bad_condition_opcode"
    }
