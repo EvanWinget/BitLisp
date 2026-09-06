@@ -254,10 +254,11 @@ VALIDATION.md's rules run over the assembled transaction.
 Two programs follow from these rules and are named so they are
 pinned. The program that is the atom `1` returns its solution, so
 a leaf committing to it accepts any condition list the spender
-supplies: the anyone-can-spend leaf. The program nil returns nil,
-the empty list, which CONDITIONS.md rejects as
-`bad_condition_list`, so a leaf committing to nil has no valid
-script-path spend.
+supplies: the anyone-can-spend leaf. The program nil returns nil
+whatever the solution, the empty condition list, which
+CONDITIONS.md accepts and which constrains nothing, so a leaf
+committing to nil is spendable by anyone too, its spend
+contributing no condition to the transaction.
 
 ### 3.4 The annex
 
