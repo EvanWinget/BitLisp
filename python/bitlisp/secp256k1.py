@@ -55,14 +55,6 @@ def _tweaked_point(point, t):
     return point_add(point, point_mul(t, G))
 
 
-def _apply_tweak(point, t):
-    """The x-only bytes of point + t*G, or None as _tweaked_point."""
-    tweaked = _tweaked_point(point, t)
-    if tweaked is None:
-        return None
-    return tweaked[0].to_bytes(32, "big")
-
-
 def taproot_output_point(internal_key, merkle_root):
     """The taproot output point (x, y), or None.
 
