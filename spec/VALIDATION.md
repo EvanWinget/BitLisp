@@ -45,7 +45,9 @@ A transaction is:
   evaluation produced and its execution identity: `tapleaf`, the
   32-byte leaf hash of the executing leaf, `merkleRoot`, the
   32-byte merkle root of the spending path, and `internalKey`, the
-  32-byte x-only internal key the control block carries. Base
+  32-byte x-only internal key the control block carries, and, when
+  its witness carries an annex, `annexHash`, the 32-byte
+  `sha_annex` digest of BIP341 over it, absent otherwise. Base
   consensus authenticates all three during every script-path
   spend, hashing the revealed leaf into `tapleaf`, combining it
   with the control block's path into `merkleRoot`, lifting
@@ -56,8 +58,8 @@ A transaction is:
   from it: no rule recomputes the scriptPubKey from the key and
   the root. Rule 3's specifiers read `tapleaf` and `merkleRoot`,
   the self assert family of `spec/CONDITIONS.md` reads
-  `internalKey` and `merkleRoot`, and no specifier reads
-  `internalKey`. Only conditions reach these fields: an input
+  `internalKey`, `merkleRoot`, and `annexHash`, and no specifier
+  reads `internalKey` or `annexHash`. Only conditions reach these fields: an input
   without a condition list, whether a non-BitLisp input or a
   BitLisp spend whose evaluation has not yet produced one, may
   carry the triple or not, and no rule reads it from either.
@@ -707,6 +709,10 @@ it enforceable, and lands with that rule:
 - An ASSERT_MY_TAPTREE's outcome is unchanged by the spent
   scriptPubKey: it reads the execution identity and nothing else
   (self asserts).
+- An ASSERT_MY_ANNEX is satisfied exactly when its input carries
+  an annex of its operand's hash, and an input carrying an annex
+  is valid only when its list carries an ASSERT_MY_ANNEX (self
+  asserts, SPEC.md section 3.4).
 - On an input whose spent scriptPubKey is the taproot output of
   its `internalKey` tweaked with its `merkleRoot`, the shape of
   every input base consensus admits, ASSERT_MY_TAPTREE over an

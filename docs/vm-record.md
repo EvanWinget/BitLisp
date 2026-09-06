@@ -422,7 +422,10 @@ marked open name the phase that owes the answer.
    which traded protocol-level domain separation for the released
    oracle on the grounds that the commitment context provides the
    separation. The owed statement is that context argument, written
-   down and pinned.
+   down and pinned. Written down 2026-09-06: `spec/SPEC.md`
+   section 2.4 states the disjointness as a first-byte fact over
+   every tag in use (commitment-record decision 3), and the vector
+   lands with the reference witness layer.
 8. **Peak memory and evaluation order.** OPEN, owed with the Phase 4
    budget mapping (recorded 2026-08-16 from the public record in
    §8.5 of the evaluation doc). CLVM costing charges total
@@ -479,3 +482,10 @@ marked open name the phase that owes the answer.
    Both sides are steelmanned at decision time and the call is
    Evan's. Until decided, no standard-layer template may depend on
    surplus tolerance.
+
+   CLOSED (decision by Evan, 2026-09-06, commitment-record decision
+   5): the default side, on tapscript's own precedent. The witness
+   is strict at the element boundary and the solution element's
+   content is the program's to check, stated in `spec/SPEC.md`
+   section 3.1. Standard-layer templates check the shape of the
+   solution they consume.

@@ -83,6 +83,7 @@ block without a vocabulary entry are invalid, not reserved:
 | `0x32` | `ASSERT_MY_SCRIPTPUBKEY` |
 | `0x33` | `ASSERT_MY_AMOUNT` |
 | `0x38` | `ASSERT_MY_TAPTREE` |
+| `0x39` | `ASSERT_MY_ANNEX` |
 | `0x40` | `ANNOUNCE` |
 | `0x41` | `ASSERT_ANNOUNCEMENT` |
 | `0x42` | `ASSURE` |
@@ -596,6 +597,35 @@ unsatisfied. `merkle_root` is an atom of exactly 32 bytes
 executes a leaf of some tree, so there is no no-tree case to
 encode, unlike CREATE_OUTPUT_TAPROOT's `merkle_root` operand.
 Exactly two arguments, both atoms.
+
+**Cost.** `CONDITION_GENERIC_COST` = 200 (COSTS.md section 10),
+charged after every argument check.
+
+**Validation rule.** The assert clause of VALIDATION.md
+(claims and asserts, rule 2). Stage 2.
+
+### ASSERT_MY_ANNEX (`0x39`)
+
+`(0x39 annex_hash)`
+
+**Semantics.** Claims nothing. Asserts that the spending input's
+witness carries an annex whose hash equals `annex_hash`
+byte-exact, read from the transaction view's `annexHash` field
+(`unsatisfied_annex_assert`). The hash is
+`sha256(compact_size(len(annex)) || annex)` over the annex
+element's bytes including its leading `0x50` byte, the `sha_annex`
+value of BIP341. An input without an annex carries no `annexHash`
+and fails the assert.
+
+The annex is admitted only under this assert: an input whose
+witness carries an annex and whose condition list holds no
+ASSERT_MY_ANNEX is invalid (`unasserted_annex`, SPEC.md section
+3.4). No rule reads the annex's content. The assert commits the
+spending input to the annex bytes it chose, so no third party can
+attach, remove, or alter an annex without invalidating the spend.
+
+**Arguments.** `annex_hash` is an atom of exactly 32 bytes
+(`bad_condition_arg`). Exactly one argument.
 
 **Cost.** `CONDITION_GENERIC_COST` = 200 (COSTS.md section 10),
 charged after every argument check.

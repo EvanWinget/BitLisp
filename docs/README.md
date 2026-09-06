@@ -14,6 +14,10 @@
   behind spec/CONDITIONS.md and spec/VALIDATION.md, the
   divergence-from-Chia table, reference provenance, decision record,
   and the novel-layer register. Cited by CLAUDE.md ground rule 3.
+- [commitment-record.md](commitment-record.md): the record behind
+  spec/SPEC.md, the leaf version and commitment scheme, its
+  reference provenance, the measurements it rests on, and the
+  decision record.
 - [opcode-comparison.md](opcode-comparison.md): informative side-by-side
   of the CLVM, bllsh, and BitLisp operator sets.
 - [objection-register.md](objection-register.md): every objection on

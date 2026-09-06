@@ -196,7 +196,11 @@ that would decide whether the Chia shape is worth the operator.
 A singleton lineage is the wrapper program curried with two fixed
 values. Its coins' scriptPubKey is the taproot output of the BIP341
 nothing-up-my-sleeve point tweaked with the curried program's tree
-hash as the merkle root, the same identity convention as the vault.
+hash as the merkle root, the same identity convention as the vault
+and the same recorded stand-in: under `spec/SPEC.md` the root is
+the tagged leaf hash over that tree hash, and the sources move to
+it when the singleton is re-pinned, where its reconstruction
+posture is re-decided (commitment-record decision 8).
 The vault curries its internal key. The wrapper fixes it as a
 constant instead, because a singleton's guarantees are relied on by
 third parties, and every one of them rests on a coin at the lineage
@@ -286,6 +290,13 @@ output does not name, and is dust. This replaces the Chia wrapper's
 reliance on CREATE_COIN creating exactly the coin it names, which
 validation rule 1's index-free claims and rule 2's free outputs do
 not provide.
+
+The commitment scheme bounds the solution element at 10,000 bytes,
+so both serializations and the rest of the solution must fit in it
+together. A lineage whose parent or grandparent transaction is
+large enough to break the bound cannot be proven, a limit the
+owner controls by keeping the lineage's own spends small and
+choosing a small launch transaction.
 
 ## The state output
 

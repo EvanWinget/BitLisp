@@ -62,7 +62,8 @@ In practice this means:
    touching semantics references its spec section. The spec states
    behavior only, and stays complete enough on its own to predict
    every vector's outcome. Rationale, oracle provenance, and decision
-   records live in `docs/` (for the VM, `docs/vm-record.md`), with
+   records live in `docs/` (for the VM, `docs/vm-record.md`, for the
+   commitment scheme, `docs/commitment-record.md`), with
    no exception: a curation-note carve-out was ratified 2026-07-29
    and reversed 2026-08-08 (decisions 5 and 17 in
    `docs/condition-record.md`).

@@ -39,6 +39,7 @@ Section 4 registers the rules that have no external reference at all.
 | C22 | signature-condition cost | 1,200,000 (AGG_SIG_COST) per occurrence in every regime, pricing one BLS pairing toward the bundle aggregate | 1,300,000 (CONDITION_SIG_ASSERT_COST), equal to the VM's SECP_VERIFY_COST, PROVISIONAL | Both layers of BitLisp price the same BIP340 verification, so the condition constant ties to the operator constant rather than to Chia's BLS figure: one Phase 4 measurement settles both, and a program can never buy the same verification cheaper in one layer than the other. Chia's magnitude corroborates the range, their pairing being work of the same order. Ratified 2026-08-09, decision 25. | `conditions/costs.json` signature cases |
 | C23 | execution-identity addressing | none: puzzle hash is both the coin's script commitment and the executing program, one field carries both meanings | the specifier table composes the executing leaf's tapleaf hash (bit 3) and the spending path's merkle root (bit 4) onto the prevout rows, commitment values 0 to 31, the mode packed as assurer times 32 plus requirer, both fields validator-filled from the control block. The pair itself is renamed ASSURE and REQUIRE (decision 27) | Taproot splits Chia's one identity into two, and the C9 mapping carried only the script commitment, so program-to-program trust had no faithful addressing field. Internal-key addressing declined as attacker-satisfiable (no possession proof in BIP341). Grafted-leaf and moved-root caveats recorded in decision 26 and in rule 3's author guidance. Ratified 2026-08-18, decision 26, landed 2026-08-20. | `validation/messages.json` identity cases, `conditions/messages.json` composed-mode cases |
 | C24 | the cheap identity assert | none: ASSERT_MY_PUZZLEHASH reads the one identity field, and no derive-versus-read split exists because a puzzle hash is a plain tree hash | ASSERT_MY_TAPTREE, a self assert over the control block's internal key and merkle root at the generic cost, the transaction view's identity widened to a triple. ASSERT_MY_TAPROOT, the derivation assert it subsumes, removed once the puzzle rework landed (decision 29) | Taproot's identity is a tweak preimage the control block reveals and base consensus authenticates, so the assert reads it at 200 where the derivation assert re-derives it at a point multiplication, the largest single cost in both landed puzzles. Internal key read by self asserts only: decision 26's attacker-satisfiable objection concerns a counterpart's key, not the spending input's own. Ratified 2026-08-22, decision 28. | `validation/self-asserts.json` taptree cases, `conditions/self-asserts.json` and `conditions/costs.json` taptree cases |
+| C25 | the annex assert | none: Chia has no annex | ASSERT_MY_ANNEX, a self assert over the BIP341 `sha_annex` digest of the spending input's annex at the generic cost, the annex admitted on a BitLisp spend only under it | Bitcoin's annex is a witness element no operator reads and no BitLisp signature digest commits to, so an ignored annex is third-party malleability on every spend, and a rejected one closes the upgrade path under this leaf version, since a soft fork cannot loosen. Admitting it only under a self assert commits the spender to it, keeps keyless paths safe by default, and leaves the door open. Ratified 2026-09-06, decision 30. | owed to the reference witness layer: `validation/self-asserts.json` and `conditions/self-asserts.json` annex cases |
 
 ## 2. Reference provenance
 
@@ -1608,6 +1609,41 @@ Section 4 registers the rules that have no external reference at all.
     derived-scriptPubKey agreement invariant over honest inputs,
     with no intermediate assert. CREATE_OUTPUT_TAPROOT and the
     derivation machinery are untouched.
+
+30. **ASSERT_MY_ANNEX, the annex under a self assert.** RATIFIED
+    (decision by Evan, 2026-09-06, at the review of the
+    commitment-scheme PR, revising the approved unit plan). A
+    seventh self assert at 0x39, `(0x39 annex_hash)`, over the
+    BIP341 `sha_annex` digest of the spending input's annex, the
+    transaction view's BitLisp input gaining an optional
+    `annexHash`. An annex is admitted exactly when the list
+    carries the assert (`unasserted_annex` otherwise), and the
+    assert is unsatisfied without an annex or with another's hash.
+    Three shapes were weighed:
+    - Reject every annex, the unit plan's choice. Closes
+      malleability on every spend including keyless ones, but a
+      soft fork can only tighten, so any later annex use for
+      BitLisp inputs would need a new leaf version.
+    - Bind an annex hash into every signature-assert digest,
+      tapscript's own commit-and-reserve idiom. Keeps the door
+      open but protects signed spends only: a stranger can still
+      attach an annex to a keyless recovery, a consolidation, or
+      a singleton spend sealed through its inner program, and it
+      re-pins every signature vector.
+    - Admit the annex only under a self assert. Keyless paths are
+      protected by default because they carry no assert, a
+      program that wants an annex commits to it in one condition,
+      and a future soft fork can give annex contents meaning to
+      programs that opt in, under this leaf version.
+    The third was taken. Cost: one vocabulary entry for a feature
+    no puzzle uses yet, accepted because the alternative is a
+    leaf version. The hash mirrors BIP341's `sha_annex`, length
+    prefix and `0x50` included, so any taproot tooling computes
+    the same value. 0x39 follows the taptree assert, 0x34 to 0x37
+    staying the visible gap. Error `unsatisfied_annex_assert` for
+    the condition and `unasserted_annex` for the witness rule,
+    each its own vector, both owed to the reference witness layer
+    with the implementation.
 
 ## 4. Novel-layer register
 
