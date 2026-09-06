@@ -39,10 +39,10 @@ parameter names. Atom bodies stay out of the table, because an atom
 is not distinguishable from ordinary data by its hash.
 """
 
-import hashlib
 import os
 
 from bitlisp import conditions
+from bitlisp.commitment import tree_hash
 from bitlisp.errors import BitLispError
 from bitlisp.machine import run
 from bitlisp.operators import OPERATORS
@@ -938,27 +938,6 @@ class _Compilation:
         arguments = _proper_items(tail, name)
         compiled = [self.expression(argument, bindings) for argument in arguments]
         return (op, _proper_list(*compiled))
-
-
-def tree_hash(node):
-    """The sha256 tree hash of a node, exactly as the sha256tree
-    operator computes it: leaves hash 0x01 plus the atom, pairs hash
-    0x02 plus both child hashes."""
-    hashes = []
-    stack = [(False, node)]
-    while stack:
-        combine, current = stack.pop()
-        if combine:
-            first = hashes.pop()
-            rest = hashes.pop()
-            hashes.append(hashlib.sha256(b"\x02" + first + rest).digest())
-        elif is_pair(current):
-            stack.append((True, None))
-            stack.append((False, current[0]))
-            stack.append((False, current[1]))
-        else:
-            hashes.append(hashlib.sha256(b"\x01" + current).digest())
-    return hashes[0]
 
 
 def _compile(defs, params, body):

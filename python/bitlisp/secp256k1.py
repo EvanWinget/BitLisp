@@ -43,8 +43,8 @@ def _tap_tweak_scalar(internal_key, merkle_root):
     return int.from_bytes(hashlib.sha256(data).digest(), "big")
 
 
-def _apply_tweak(point, t):
-    """The x-only bytes of point + t*G, or None.
+def _tweaked_point(point, t):
+    """The point point + t*G, or None.
 
     None when t is not below the group order or the sum is the point
     at infinity. Both are rejected rather than reduced or folded, so
@@ -52,28 +52,44 @@ def _apply_tweak(point, t):
     """
     if t >= N:
         return None
-    tweaked = point_add(point, point_mul(t, G))
+    return point_add(point, point_mul(t, G))
+
+
+def _apply_tweak(point, t):
+    """The x-only bytes of point + t*G, or None as _tweaked_point."""
+    tweaked = _tweaked_point(point, t)
     if tweaked is None:
         return None
     return tweaked[0].to_bytes(32, "big")
 
 
-def taproot_output_key(internal_key, merkle_root):
-    """The 32-byte x-only taproot output key, or None.
+def taproot_output_point(internal_key, merkle_root):
+    """The taproot output point (x, y), or None.
 
     internal_key is 32 bytes and merkle_root 0 or 32 bytes, widths
     the caller guarantees. Every value defect (an internal key that
     lifts to no curve point, a tweak scalar at or above the group
     order, a tweaked point at infinity) returns None, never raises.
+    The full point, so a caller checking a control block can read
+    the parity of y.
     """
     if len(internal_key) != 32 or len(merkle_root) not in (0, 32):
         raise ValueError(
-            "taproot_output_key requires a 32-byte key and a 0- or 32-byte root"
+            "taproot_output_point requires a 32-byte key and a 0- or 32-byte root"
         )
     point = lift_x(int.from_bytes(internal_key, "big"))
     if point is None:
         return None
-    return _apply_tweak(point, _tap_tweak_scalar(internal_key, merkle_root))
+    return _tweaked_point(point, _tap_tweak_scalar(internal_key, merkle_root))
+
+
+def taproot_output_key(internal_key, merkle_root):
+    """The 32-byte x-only taproot output key, or None as
+    taproot_output_point."""
+    tweaked = taproot_output_point(internal_key, merkle_root)
+    if tweaked is None:
+        return None
+    return tweaked[0].to_bytes(32, "big")
 
 
 def lift_x(x):
